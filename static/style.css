@@ -1,0 +1,289 @@
+/* === Общий стиль === */
+body, html {
+  font-family: 'Segoe UI', Roboto, sans-serif;
+  background: #0f111a;
+  color: #e8e8e8;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  overflow: auto !important; /* скролл только у окна */
+  zoom: 1.5; /* увеличиваем интерфейс на 150% */
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* === Контейнер === */
+.container {
+  width: 90%;
+  max-width: 1400px;
+  margin: 30px auto;
+  background: #1b1e2b;
+  padding: 35px 40px;
+  border-radius: 16px;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+  overflow: visible !important;
+  height: auto !important;
+}
+
+/* === Заголовок === */
+h1 {
+  text-align: center;
+  margin-bottom: 30px;
+  color: #3fa9f5;
+  font-size: 34px;
+  letter-spacing: 0.5px;
+}
+
+/* === Сетка формы === */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 22px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  font-weight: 500;
+  font-size: 18px;
+  position: relative;
+}
+
+/* === Подсказки ℹ️ === */
+.info {
+  margin-left: 6px;
+  cursor: pointer;
+  color: #3fa9f5;
+  font-weight: 700;       /* жирный */
+  font-size: 20px;        /* увеличен размер */
+  position: relative;
+  display: inline-block;
+  line-height: 1;
+  vertical-align: middle;
+  text-shadow: 0 0 2px rgba(0,0,0,0.5); /* выделение */
+}
+
+.info::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2c3350;      /* изменили цвет фона */
+  color: #e6e6e6;
+  padding: 10px 12px;
+  border-radius: 8px;
+  white-space: pre-line;
+  opacity: 0;
+  visibility: hidden;
+  font-size: 15px;
+  width: 320px;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.6); /* усилена тень */
+  transition: opacity 0.3s ease;
+  z-index: 10;
+}
+
+
+.info:hover::after {
+  opacity: 1;
+  visibility: visible;
+}
+
+.info-text {
+  grid-column: 1 / -1;
+  text-align: right;
+  color: #8ea0bf;
+  font-size: 16px;
+}
+
+/* === Поля формы === */
+input, select {
+  margin-top: 8px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #2c3245;
+  background: #23283b;
+  color: #fff;
+  transition: border-color 0.2s, background 0.2s;
+  font-size: 16px;
+}
+
+input:focus, select:focus {
+  border-color: #3fa9f5;
+  background: #2a3147;
+  outline: none;
+}
+
+/* === Кнопка запуска === */
+button {
+  grid-column: 1 / -1;
+  background: linear-gradient(90deg, #3fa9f5, #2d84d3);
+  border: none;
+  color: white;
+  padding: 16px 0;
+  border-radius: 10px;
+  font-size: 18px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.25s;
+  box-shadow: 0 4px 15px rgba(63, 169, 245, 0.3);
+}
+
+button:hover {
+  background: linear-gradient(90deg, #4db5ff, #3298e3);
+  transform: translateY(-1px);
+}
+
+/* === Индикатор выполнения === */
+#progressBar {
+  grid-column: 1 / -1;
+  text-align: center;
+  margin-top: 10px;
+  padding: 10px 0;
+  color: #8ea0bf;
+  font-size: 16px;
+  animation: fadeIn 0.4s ease-in;
+}
+
+#progressBar .bar {
+  width: 0%;
+  height: 8px;
+  background: linear-gradient(90deg, #3fa9f5, #2d84d3);
+  border-radius: 6px;
+  margin: 0 auto 8px auto;
+  transition: width 0.4s ease;
+  box-shadow: 0 0 10px rgba(63, 169, 245, 0.5);
+}
+
+#progressBar.active .bar {
+  width: 80%;
+  animation: progressAnim 2s ease-in-out infinite alternate;
+}
+
+/* === Блок результата === */
+#result {
+  margin-top: 40px;
+  animation: fadeIn 0.5s ease-in;
+  overflow: visible !important;  /* убираем внутренний скролл */
+  max-height: none;
+}
+
+/* === Отчёт === */
+pre {
+  background: #121522;
+  padding: 20px !important;
+  border-radius: 12px;
+  font-size: 16px;
+  line-height: 1.6;
+  border: 1px solid #2a3147;
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  overflow: visible !important; /* убираем прокрутку */
+  max-height: none;
+}
+
+/* === График === */
+img {
+  display: block;
+  max-width: 100%;
+  margin-top: 20px;
+  border-radius: 10px;
+  border: 1px solid #2a3147;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.4);
+}
+
+/* === Кнопка ZIP === */
+#downloadZip {
+  display: inline-block;
+  text-align: center;
+  margin-top: 15px;
+  padding: 14px 26px;
+  background: linear-gradient(90deg, #3fa9f5, #2d84d3);
+  color: #fff;
+  font-weight: 600;
+  border-radius: 10px;
+  text-decoration: none;
+  font-size: 16px;
+  box-shadow: 0 4px 15px rgba(63, 169, 245, 0.3);
+  transition: 0.25s;
+}
+
+#downloadZip.disabled {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+#downloadZip:hover:not(.disabled) {
+  background: linear-gradient(90deg, #4db5ff, #3298e3);
+  transform: translateY(-1px);
+}
+
+/* === Toast уведомления === */
+#toastContainer {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 9999;
+}
+
+.toast {
+  background: #23283b;
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 8px;
+  min-width: 240px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.3s ease;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toast.success { border-left: 4px solid #3fa9f5; }
+.toast.error { border-left: 4px solid #e74c3c; }
+.toast.info { border-left: 4px solid #f1c40f; }
+
+/* === Анимации === */
+@keyframes progressAnim {
+  0% { width: 20%; opacity: 0.7; }
+  100% { width: 90%; opacity: 1; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+#chartContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* центрируем горизонтально */
+    margin-top: 20px;
+}
+
+/* --- блюр для демо-отчёта --- */
+#result.demo #reportText {
+    filter: blur(1px);
+    opacity: 0.9;
+    pointer-events: none;
+    user-select: none;
+    transition: filter 0.3s ease, opacity 0.3s ease;
+}
+
+#result:not(.demo) #reportText {
+    filter: none;
+    opacity: 1;
+    pointer-events: auto;
+}

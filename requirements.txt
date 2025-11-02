@@ -1,0 +1,13 @@
+flask>=2.0
+gunicorn
+mysql-connector-python
+pandas
+numpy
+matplotlib
+openpyxl
+ccxt
+PyQt5==5.15.9
+PyQtWebEngine==5.15.9
+Flask==2.3.3
+requests==2.31.0
+
