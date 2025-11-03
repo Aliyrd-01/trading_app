@@ -3,6 +3,7 @@
 import io
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+import traceback
 import ccxt
 import pandas as pd
 import numpy as np
@@ -10,10 +11,10 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-# --- Конфигурация ---
 LOCAL_TZ = ZoneInfo("Europe/Kyiv")
 exchange = ccxt.binance({"enableRateLimit": True, "timeout": 20000})
 
+# --- Конфигурация (твои словари) ---
 STRATEGIES = {
     "Консервативная": {"entry_type": "ema50", "atr_sl": 1.5, "atr_tp": 1.8, "ema_buffer": 0.001, "rsi_filter": 55},
     "Сбалансированная": {"entry_type": "ema20", "atr_sl": 1.2, "atr_tp": 1.8, "ema_buffer": 0.0007, "rsi_filter": 50},
@@ -44,7 +45,7 @@ TRADING_HISTORY_DAYS = {
     "Долгосрочная": 180,
 }
 
-# --- Вспомогательные функции ---
+# === вспомогательные (как в твоём оригинале) ===
 def safe_fmt(x):
     try:
         return f"{float(x):,.2f}"
@@ -58,13 +59,20 @@ def fetch_ohlcv(symbol, timeframe, history_days=30):
     now_ms = int(datetime.utcnow().timestamp() * 1000)
 
     while True:
-        chunk = exchange.fetch_ohlcv(symbol, timeframe=timeframe, since=since_ms, limit=1000)
+        try:
+            chunk = exchange.fetch_ohlcv(symbol, timeframe=timeframe, since=since_ms, limit=1000)
+        except Exception as e:
+            print("⚠️ Ошибка fetch_ohlcv:", e)
+            raise
         if not chunk:
             break
         all_bars.extend(chunk)
         since_ms = chunk[-1][0] + 1
         if len(chunk) < 1000 or since_ms >= now_ms:
             break
+
+    if not all_bars:
+        return pd.DataFrame()  # пустой DF — обработаем выше
 
     df = pd.DataFrame(all_bars, columns=["ts", "Open", "High", "Low", "Close", "Volume"])
     df["Datetime_UTC"] = pd.to_datetime(df["ts"], unit="ms", utc=True)
@@ -101,25 +109,31 @@ def add_indicators(df):
     return df
 
 def compute_adx(df, period=14):
-    df = df.copy()
-    up_move = df['High'].diff()
-    down_move = df['Low'].diff().abs()
+    try:
+        df2 = df.copy()
+        up_move = df2['High'].diff()
+        down_move = -df2['Low'].diff()
+        plus_dm = pd.Series(np.where((up_move > down_move) & (up_move > 0), up_move, 0), index=df2.index)
+        minus_dm = pd.Series(np.where((down_move > up_move) & (down_move > 0), down_move, 0), index=df2.index)
 
-    plus_dm = pd.Series(np.where((up_move > down_move) & (up_move > 0), up_move, 0), index=df.index)
-    minus_dm = pd.Series(np.where((down_move > up_move) & (down_move > 0), down_move, 0), index=df.index)
+        tr = pd.concat([df2['High'] - df2['Low'],
+                        (df2['High'] - df2['Close'].shift()).abs(),
+                        (df2['Low'] - df2['Close'].shift()).abs()], axis=1).max(axis=1)
 
-    tr = pd.concat([df['High'] - df['Low'],
-                    (df['High'] - df['Close'].shift()).abs(),
-                    (df['Low'] - df['Close'].shift()).abs()], axis=1).max(axis=1)
-
-    atr = tr.rolling(period).mean()
-    plus_di = 100 * (plus_dm.rolling(period).sum() / atr)
-    minus_di = 100 * (minus_dm.rolling(period).sum() / atr)
-    dx = 100 * (abs(plus_di - minus_di) / (plus_di + minus_di))
-    adx = dx.rolling(period).mean()
-    return adx
+        atr = tr.rolling(period).mean()
+        # защитимся от деления на ноль
+        plus_di = 100 * (plus_dm.rolling(period).sum() / (atr.replace(0, np.nan)))
+        minus_di = 100 * (minus_dm.rolling(period).sum() / (atr.replace(0, np.nan)))
+        dx = 100 * (abs(plus_di - minus_di) / (plus_di + minus_di).replace(0, np.nan))
+        adx = dx.rolling(period).mean()
+        return adx.fillna(0)
+    except Exception:
+        print("⚠️ compute_adx failed:", traceback.format_exc())
+        return pd.Series(0, index=df.index)
 
 def dynamic_risk(risk_pct, rsi, trend):
+    if pd.isna(rsi):
+        return risk_pct
     if rsi < 45 or trend == "Downtrend":
         return risk_pct * 0.7
     elif rsi > 60 and trend == "Uptrend":
@@ -128,15 +142,19 @@ def dynamic_risk(risk_pct, rsi, trend):
         return risk_pct
 
 def position_size(capital, risk_pct, entry, stop):
-    risk_usd = capital * risk_pct
-    dist = abs(entry - stop)
-    if dist <= 1e-9:
+    try:
+        risk_usd = capital * risk_pct
+        dist = abs(entry - stop)
+        if dist <= 1e-9:
+            return 0, 0
+        units = risk_usd / dist
+        dollars = units * entry
+        return units, dollars
+    except Exception:
         return 0, 0
-    units = risk_usd / dist
-    dollars = units * entry
-    return units, dollars
 
 def interpret_indicator(name, value, df_row):
+    # same as original; keep it
     if name == "RSI_14":
         if value > 70:
             return "Перекупленность — возможна коррекция"
@@ -149,88 +167,188 @@ def interpret_indicator(name, value, df_row):
     elif name == "Trend":
         return "Бычий рынок" if df_row["Trend"] == "Uptrend" else "Медвежий рынок"
     elif name == "BB":
-        if df_row["Close"] >= df_row["BB_upper"]:
+        if "BB_upper" in df_row and df_row["Close"] >= df_row["BB_upper"]:
             return "Цена у верхней границы — риск коррекции"
-        elif df_row["Close"] <= df_row["BB_lower"]:
+        elif "BB_lower" in df_row and df_row["Close"] <= df_row["BB_lower"]:
             return "Цена у нижней границы — возможен отскок"
         else:
             return "В пределах диапазона"
     elif name == "VWMA":
-        return "Цена выше VWMA — восходящий импульс" if df_row["Close"] > df_row["VWMA_20"] else "Цена ниже VWMA — давление продавцов"
+        if "VWMA_20" in df_row and not pd.isna(df_row["VWMA_20"]):
+            return "Цена выше VWMA — восходящий импульс" if df_row["Close"] > df_row["VWMA_20"] else "Цена ниже VWMA — давление продавцов"
+        return "-"
     return "-"
 
 def calc_confirmation_type(row):
-    adx = row["ADX"]
-    rsi = row["RSI_14"]
-    macd = row["MACD"]
-    signal = row["Signal_Line"]
-    close = row["Close"]
-    vwma = row["VWMA_20"]
+    adx = row.get("ADX", 0)
+    rsi = row.get("RSI_14", 50)
+    macd = row.get("MACD", 0)
+    signal = row.get("Signal_Line", 0)
+    close = row.get("Close", 0)
+    vwma = row.get("VWMA_20", 0)
 
-    if adx > 25 and close > vwma and rsi > 50 and macd > signal:
-        return "Все фильтры подтверждены"
-    elif adx > 25 and close > vwma:
-        return "EMA + ADX + VWMA"
-    elif rsi > 50 and macd > signal:
-        return "RSI + MACD"
-    elif close > vwma:
-        return "EMA + VWMA"
+    try:
+        if adx > 25 and close > vwma and rsi > 50 and macd > signal:
+            return "Все фильтры подтверждены"
+        elif adx > 25 and close > vwma:
+            return "EMA + ADX + VWMA"
+        elif rsi > 50 and macd > signal:
+            return "RSI + MACD"
+        elif close > vwma:
+            return "EMA + VWMA"
+        else:
+            return "Нет подтверждения"
+    except Exception:
+        return "Ошибка в подтверждении"
+
+def check_confirmations(row, selected):
+    # robust version (same logic as final you approved)
+    if not selected:
+        return "Нет выбранных подтверждений", 0, 0
+
+    if isinstance(selected, str):
+        if selected.upper() in ("NONE", ""):
+            return "Без фильтров", 0, 0
+        selected_list = [s.strip() for s in selected.split("+") if s.strip()]
+    elif isinstance(selected, (list, tuple)):
+        selected_list = [str(s).strip() for s in selected if str(s).strip()]
     else:
-        return "Нет подтверждения"
+        selected_list = [str(selected)]
 
-# --- Основная функция анализа ---
+    total = len(selected_list)
+    score = 0
+    for s in selected_list:
+        s_up = s.upper()
+        if s_up == "RSI":
+            if row["RSI_14"] > 50:
+                score += 1
+        elif s_up == "MACD":
+            if row["MACD"] > row["Signal_Line"]:
+                score += 1
+        elif s_up == "ADX":
+            if row["ADX"] > 25:
+                score += 1
+        elif s_up == "VWMA":
+            if row["Close"] > row.get("VWMA_20", 0):
+                score += 1
+        elif s_up == "EMA":
+            if row["EMA_50"] > row["EMA_200"]:
+                score += 1
+        elif s_up == "ALL":
+            tmp = 0
+            tmp += 1 if row["ADX"] > 25 else 0
+            tmp += 1 if row["Close"] > row.get("VWMA_20", 0) else 0
+            tmp += 1 if row["RSI_14"] > 50 else 0
+            tmp += 1 if row["MACD"] > row["Signal_Line"] else 0
+            tmp += 1 if row["EMA_50"] > row["EMA_200"] else 0
+            score += tmp
+            total = 5
+        else:
+            pass
+
+    if total == 0:
+        res = "Нет выбранных подтверждений"
+    elif score >= total:
+        res = "Все выбранные фильтры подтверждены"
+    elif score >= max(1, int(total * 0.6)):
+        res = f"Частично подтверждено ({score}/{total})"
+    else:
+        res = f"Нет подтверждения ({score}/{total})"
+    return res, score, total
+
+# ===== основной run_analysis с защитой =====
 def run_analysis(symbol, timeframe=None, strategy="Сбалансированная", trading_type="Дейтрейдинг",
-                 capital=10000, risk=0.01, range_days=None, confirmation="EMA"):
+                 capital=10000, risk=0.01, range_days=None, confirmation=None):
+    try:
+        if timeframe is None:
+            timeframe = DEFAULT_TIMEFRAMES.get(trading_type, "1d")
+        if range_days is None:
+            range_days = TRADING_HISTORY_DAYS.get(trading_type, 30)
 
-    if timeframe is None:
-        timeframe = DEFAULT_TIMEFRAMES.get(trading_type, "1d")
+        df = fetch_ohlcv(symbol, timeframe, history_days=range_days)
+        if df.empty:
+            raise ValueError("Пустой DataFrame: нет исторических данных (fetch_ohlcv вернул 0 баров)")
 
-    if range_days is None:
-        range_days = TRADING_HISTORY_DAYS.get(trading_type, 30)
+        df = add_indicators(df)
 
-    df = fetch_ohlcv(symbol, timeframe, history_days=range_days)
-    df = add_indicators(df)
+        # дополнительные индикаторы
+        df["VWMA_20"] = (df["Close"] * df["Volume"]).rolling(20).sum() / df["Volume"].rolling(20).sum()
+        df["BB_middle"] = df["Close"].rolling(20).mean()
+        df["BB_std"] = df["Close"].rolling(20).std()
+        df["BB_upper"] = df["BB_middle"] + 2 * df["BB_std"]
+        df["BB_lower"] = df["BB_middle"] - 2 * df["BB_std"]
+        df["ADX"] = compute_adx(df).fillna(0)
 
-    df["VWMA_20"] = (df["Close"] * df["Volume"]).rolling(20).sum() / df["Volume"].rolling(20).sum()
-    df["BB_middle"] = df["Close"].rolling(20).mean()
-    df["BB_std"] = df["Close"].rolling(20).std()
-    df["BB_upper"] = df["BB_middle"] + 2 * df["BB_std"]
-    df["BB_lower"] = df["BB_middle"] - 2 * df["BB_std"]
-    df["ADX"] = compute_adx(df)
+        df["Auto_Confirmation"] = df.apply(calc_confirmation_type, axis=1)
 
-    df["Auto_Confirmation"] = df.apply(calc_confirmation_type, axis=1)
+        latest = df.dropna(subset=["Close"]).iloc[-1]
+        strat = STRATEGIES.get(strategy, STRATEGIES["Сбалансированная"])
+        atr = latest.get("ATR_14", np.nan)
 
-    latest = df.dropna(subset=["Close"]).iloc[-1]
-    strat = STRATEGIES[strategy]
-    atr = latest["ATR_14"]
+        ema20, ema50, ema200 = latest["EMA_20"], latest["EMA_50"], latest["EMA_200"]
+        risk_adj = dynamic_risk(risk, latest["RSI_14"], latest["Trend"])
 
-    ema20, ema50, ema200 = latest["EMA_20"], latest["EMA_50"], latest["EMA_200"]
-    risk_adj = dynamic_risk(risk, latest["RSI_14"], latest["Trend"])
+        long_entry = ema50 * (1 + strat["ema_buffer"])
+        long_sl = long_entry - strat["atr_sl"] * atr
+        long_tp = long_entry + strat["atr_tp"] * atr
+        short_entry = ema20 * (1 - strat["ema_buffer"])
+        short_sl = short_entry + strat["atr_sl"] * atr
+        short_tp = short_entry - strat["atr_tp"] * atr
 
-    long_entry = ema50 * (1 + strat["ema_buffer"])
-    long_sl = long_entry - strat["atr_sl"] * atr
-    long_tp = long_entry + strat["atr_tp"] * atr
-    short_entry = ema20 * (1 - strat["ema_buffer"])
-    short_sl = short_entry + strat["atr_sl"] * atr
-    short_tp = short_entry - strat["atr_tp"] * atr
+        long_units, long_dollars = position_size(capital, risk_adj, long_entry, long_sl)
+        short_units, short_dollars = position_size(capital, risk_adj, short_entry, short_sl)
 
-    long_units, long_dollars = position_size(capital, risk_adj, long_entry, long_sl)
-    short_units, short_dollars = position_size(capital, risk_adj, short_entry, short_sl)
+        rr_long = round((long_tp - long_entry) / (long_entry - long_sl), 2) if (long_entry - long_sl) else 0
+        rr_short = round((short_entry - short_tp) / (short_sl - short_entry), 2) if (short_sl - short_entry) else 0
 
-    rr_long = round((long_tp - long_entry) / (long_entry - long_sl), 2) if (long_entry - long_sl) else 0
-    rr_short = round((short_entry - short_tp) / (short_sl - short_entry), 2) if (short_sl - short_entry) else 0
+                # ---------- ИЗМЕНЁННЫЙ БЛОК: подтверждения, перспектива, рекомендации ----------
+        # Пользовательские подтверждения
+        if confirmation and isinstance(confirmation, (list, tuple)) and len(confirmation) > 0:
+            user_confirmation_str = ", ".join(map(str, confirmation))
+            user_confirmation_result, score, total = check_confirmations(latest, confirmation)
+        else:
+            user_confirmation_str = "Не выбраны (использовано автоопределение)"
+            user_confirmation_result = f"{latest.get('Auto_Confirmation', 'Авто-анализ')}"
 
-    if latest['Trend'] == 'Uptrend' and latest['RSI_14'] > strat['rsi_filter']:
-        perspective_bias = "Более перспективно: Лонг 🚀"
-    elif latest['Trend'] == 'Downtrend' and latest['RSI_14'] < strat['rsi_filter']:
-        perspective_bias = "Более перспективно: Шорт 📉"
-    else:
-        perspective_bias = "Рынок неопределён ⚖️"
+        # Перспектива рынка
+        adx = latest.get("ADX", 0)
+        trend = latest.get("Trend", "N/A")
+        rsi = latest.get("RSI_14", np.nan)
 
-    now = datetime.now(LOCAL_TZ)
+        if adx < 20:
+            perspective_bias = "Рынок во флете ⚖️"
+        elif 20 <= adx < 25:
+            perspective_bias = "Тренд неопределён — формируется движение ⚖️"
+        else:
+            if trend == "Uptrend" and (not pd.isna(rsi)) and rsi > strat.get("rsi_filter", 50):
+                perspective_bias = "Явный бычий тренд 🚀"
+            elif trend == "Downtrend" and (not pd.isna(rsi)) and rsi < strat.get("rsi_filter", 50):
+                perspective_bias = "Явный медвежий тренд 📉"
+            else:
+                perspective_bias = "Тренд выражен, но подтверждения неоднозначны 🔄"
 
-    # --- Полный отчет ---
-    report_md = f"""=== Аналитический отчёт по {symbol.split('/')[0]} ===  
+        # --- Динамические рекомендации ---
+        rec_list = []
+        if adx < 20:
+            rec_list.append("Рынок во флете — лучше воздержаться от входов.")
+        if rsi < 30:
+            rec_list.append("RSI < 30 — перепроданность, возможен отскок вверх.")
+        elif rsi > 70:
+            rec_list.append("RSI > 70 — перекупленность, возможна коррекция.")
+        if trend == "Uptrend":
+            rec_list.append("EMA50 выше EMA200 — общий фон бычий, лонги предпочтительнее.")
+        else:
+            rec_list.append("EMA50 ниже EMA200 — общий фон медвежий, рассматривать шорты осторожно.")
+        if latest["Close"] < latest.get("VWMA_20", 0):
+            rec_list.append("Цена ниже VWMA — давление продавцов усиливается.")
+        else:
+            rec_list.append("Цена выше VWMA — восходящий импульс сохраняется.")
+        recommendations_md = "\n".join([f"- {r}" for r in rec_list])
+        # -------------------------------------------------------------------------
+
+        now = datetime.now(LOCAL_TZ)
+
+        report_md = f"""=== Аналитический отчёт по {symbol} ===  
 Сгенерировано: {now.strftime('%Y-%m-%d %H:%M:%S (%Z)')}  
 Текущий рынок (bias): {"Бычий" if ema50 > ema200 else "Медвежий"}
 
@@ -242,17 +360,18 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
 | **RSI(14)** | {safe_fmt(latest['RSI_14'])} | {interpret_indicator("RSI_14", latest['RSI_14'], latest)} |
 | **ATR(14)** | {safe_fmt(atr)} | Средняя волатильность рынка |
 | **Trend** | {latest['Trend']} | {interpret_indicator("Trend", latest['Trend'], latest)} |
-| **VWMA(20)** | {safe_fmt(latest['VWMA_20'])} | {interpret_indicator("VWMA", latest['VWMA_20'], latest)} |
-| **BB Upper/Lower** | {safe_fmt(latest['BB_upper'])} / {safe_fmt(latest['BB_lower'])} | {interpret_indicator("BB", None, latest)} |
-| **ADX** | {safe_fmt(latest['ADX'])} | {interpret_indicator("ADX", latest['ADX'], latest)} |
+| **VWMA(20)** | {safe_fmt(latest.get('VWMA_20', np.nan))} | {interpret_indicator("VWMA", latest.get('VWMA_20', np.nan), latest)} |
+| **BB Upper/Lower** | {safe_fmt(latest.get('BB_upper', np.nan))} / {safe_fmt(latest.get('BB_lower', np.nan))} | {interpret_indicator("BB", None, latest)} |
+| **ADX** | {safe_fmt(latest.get('ADX', np.nan))} | {interpret_indicator("ADX", latest.get('ADX', np.nan), latest)} |
 | **Подтверждение входа (авто)** | {latest['Auto_Confirmation']} | Автоматический анализ индикаторов |
+| **Выбранные подтверждения (пользователь)** | {user_confirmation_str} | Результат: {user_confirmation_result} |
 
 ### ⚙️ Стратегия
 - Тип торговли: {trading_type}
 - Стратегия: {strategy}
 - Капитал: ${capital:,.2f}
 - **Динамический риск:** {risk_adj*100:.2f}% (базовый {risk*100:.2f}%)
-- Тип подтверждения: {confirmation} / авто: {latest['Auto_Confirmation']}
+- Тип подтверждения: {user_confirmation_str}
 
 ### 🎯 Уровни
 **Лонг**
@@ -271,45 +390,56 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
 | Take-profit | {safe_fmt(short_tp)} | вход − {strat["atr_tp"]} × ATR |
 | Размер позиции | {short_units:.6f} units ≈ ${short_dollars:,.2f} | Риск: {risk_adj*100:.2f}% |
 
+### 📊 Соотношение риск/прибыль
+| Направление | R:R |
+|--------------|------|
+| Лонг | {rr_long} |
+| Шорт | {rr_short} |
+
 ### 💰 Перспектива
 - {perspective_bias}
-- Тренд: {latest['Trend']}
+- Тренд: {trend}
 - {interpret_indicator("RSI_14", latest['RSI_14'], latest)}
 - {interpret_indicator("BB", None, latest)}
-- {interpret_indicator("VWMA", latest['VWMA_20'], latest)}
-- {interpret_indicator("ADX", latest['ADX'], latest)}
+- {interpret_indicator("VWMA", latest.get('VWMA_20', np.nan), latest)}
+- {interpret_indicator("ADX", latest.get('ADX', np.nan), latest)}
 
 ### 💡 Дополнительные рекомендации
-- Тренд устойчивый — допускаются сделки по направлению движения.
-- RSI < 30 — перепроданность, возможен отскок вверх.
-- Цена ниже VWMA — давление продавцов усиливается.
-- EMA50 выше EMA200 — общий фон бычий, лонги предпочтительнее.
+{recommendations_md}
 
 === Конец отчёта ===
 """
 
-    # --- График ---
-    df_plot = df.tail(120)
-    fig, ax = plt.subplots(figsize=(10, 5))
-    ax.plot(df_plot.index, df_plot["Close"], label="Close", lw=1.5)
-    ax.plot(df_plot.index, df_plot["EMA_20"], label="EMA20")
-    ax.plot(df_plot.index, df_plot["EMA_50"], label="EMA50")
-    ax.plot(df_plot.index, df_plot["EMA_200"], label="EMA200")
-    ax.legend()
-    ax.grid(True)
-    ax.set_title(f"{symbol} — {strategy} ({trading_type})")
 
-    buf_chart = io.BytesIO()
-    plt.tight_layout()
-    plt.savefig(buf_chart, format="png")
-    buf_chart.seek(0)
-    plt.close(fig)
+        # --- График ---
+        df_plot = df.tail(120)
+        fig, ax = plt.subplots(figsize=(10, 5))
+        ax.plot(df_plot.index, df_plot["Close"], label="Close", lw=1.5)
+        ax.plot(df_plot.index, df_plot["EMA_20"], label="EMA20")
+        ax.plot(df_plot.index, df_plot["EMA_50"], label="EMA50")
+        ax.plot(df_plot.index, df_plot["EMA_200"], label="EMA200")
+        ax.legend()
+        ax.grid(True)
+        ax.set_title(f"{symbol} — {strategy} ({trading_type})")
 
-    # --- Excel ---
-    df_excel = df.copy()
-    df_excel.index = df_excel.index.tz_localize(None)
-    buf_excel = io.BytesIO()
-    df_excel.to_excel(buf_excel)
-    buf_excel.seek(0)
+        buf_chart = io.BytesIO()
+        plt.tight_layout()
+        plt.savefig(buf_chart, format="png")
+        buf_chart.seek(0)
+        plt.close(fig)
 
-    return report_md, buf_chart, buf_excel
+        # --- Excel ---
+        df_excel = df.copy()
+        df_excel.index = df_excel.index.tz_localize(None)
+        buf_excel = io.BytesIO()
+        df_excel.to_excel(buf_excel)
+        buf_excel.seek(0)
+
+        return report_md, buf_chart, buf_excel
+
+    except Exception as e:
+        tb = traceback.format_exc()
+        print("❌ Ошибка в run_analysis:", e)
+        print(tb)
+        # Пробрасываем исключение дальше — app.py поймает и вернёт в ответе
+        raise

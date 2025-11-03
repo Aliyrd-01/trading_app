@@ -2,9 +2,12 @@ from flask import Flask, render_template, request, jsonify
 import base64
 import io
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from trading_app import run_analysis
+import traceback
 
 app = Flask(__name__)
+executor = ThreadPoolExecutor(max_workers=2)
 
 @app.route("/")
 def index():
@@ -12,21 +15,30 @@ def index():
 
 @app.route("/run_analysis", methods=["POST"])
 def analyze():
-    data = request.json
-
-    # Получаем результаты анализа
-    report_text, chart_bytes, excel_bytes = run_analysis(
-        symbol=data.get("symbol"),
-        strategy=data.get("strategy"),
-        trading_type=data.get("trading_type"),
-        capital=float(data.get("capital", 10000)),
-        risk=float(data.get("risk", 1)) / 100
+    data = request.json or {}
+    print("🔔 /run_analysis called with:", data)
+    # normalization: confirmation может быть строкой, списком, None
+    confirmation = data.get("confirmation")
+    # Запускаем анализ в пуле
+    future = executor.submit(
+        run_analysis,
+        data.get("symbol"),
+        None,
+        data.get("strategy"),
+        data.get("trading_type"),
+        float(data.get("capital", 10000)),
+        float(data.get("risk", 1)) / 100,
+        None,
+        confirmation
     )
+    try:
+        report_text, chart_bytes, excel_bytes = future.result()
+    except Exception as e:
+        tb = traceback.format_exc()
+        print("❌ Ошибка анализа:", tb)
+        return jsonify({"error": f"Ошибка анализа: {str(e)}", "trace": tb}), 500
 
-    # Кодируем график в base64
     chart_base64 = base64.b64encode(chart_bytes.getvalue()).decode()
-
-    # Создаем ZIP с отчётом, графиком и Excel
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w") as zf:
         zf.writestr("report.txt", report_text)
@@ -34,7 +46,6 @@ def analyze():
         zf.writestr("data.xlsx", excel_bytes.getvalue())
     zip_base64 = base64.b64encode(zip_buffer.getvalue()).decode()
 
-    # Отправляем JSON с результатами
     return jsonify({
         "report_text": report_text,
         "chart_base64": chart_base64,
@@ -42,5 +53,4 @@ def analyze():
     })
 
 if __name__ == "__main__":
-    # Для десктоп-приложения debug=False, use_reloader=False
-    app.run(debug=False, port=5000, use_reloader=False)
+    app.run(debug=False, port=5000, use_reloader=False, threaded=True)

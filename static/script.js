@@ -17,7 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- подключение к PyQt Bridge ---
   if (typeof QWebChannel !== "undefined") {
-    new QWebChannel(qt.webChannelTransport, function(channel) {
+    new QWebChannel(qt.webChannelTransport, function (channel) {
       window.pyjs = channel.objects.pyjs;
       console.log("✅ WebChannel подключен");
     });
@@ -38,7 +38,10 @@ document.addEventListener("DOMContentLoaded", () => {
     t.textContent = text;
     container.appendChild(t);
     setTimeout(() => t.classList.add("show"), 100);
-    setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 300); }, 3500);
+    setTimeout(() => {
+      t.classList.remove("show");
+      setTimeout(() => t.remove(), 300);
+    }, 3500);
   }
 
   // --- запуск анализа ---
@@ -48,7 +51,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const trading_type = tradingType.value;
     const capital = document.getElementById("capital").value;
     const risk = document.getElementById("risk").value;
-    const confirmation = document.getElementById("confirmation").value;
+    const confirmationSelect = document.getElementById("confirmation");
+
+    // Собираем все выбранные значения
+    const confirmation = Array.from(confirmationSelect.selectedOptions).map(o => o.value);
+    console.log("Выбрано подтверждений:", confirmation);
+
+    if (confirmation.length === 0) {
+      showToast("⚠️ Выберите хотя бы одно подтверждение входа", "error");
+      return;
+    }
 
     progress.classList.remove("hidden");
     progress.classList.add("active");
@@ -57,6 +69,8 @@ document.addEventListener("DOMContentLoaded", () => {
     downloadBtn.classList.add("disabled");
 
     try {
+      await new Promise(r => setTimeout(r, 50));
+
       const res = await fetch("/run_analysis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -68,56 +82,19 @@ document.addEventListener("DOMContentLoaded", () => {
       progress.classList.add("hidden");
       progress.classList.remove("active");
 
+      if (data.error) {
+        showToast("❌ " + data.error, "error");
+        return;
+      }
+
       if (data.report_text) {
-        reportText.textContent = data.report_text;
+        reportText.innerHTML = "";
+        const pre = document.createElement("pre");
+        pre.textContent = data.report_text;
+        pre.style.whiteSpace = "pre-wrap";
+        reportText.appendChild(pre);
+
         result.classList.remove("demo");
-        reportText.style.maxHeight = "none";
-        reportText.style.overflow = "visible";
-        reportText.style.height = "auto";
-
-        // --- контейнер графика и кнопки ---
-        let chartContainer = document.getElementById("chartContainer");
-        if (!chartContainer) {
-          chartContainer = document.createElement("div");
-          chartContainer.id = "chartContainer";
-          chartContainer.style.display = "flex";
-          chartContainer.style.flexDirection = "column";
-          chartContainer.style.alignItems = "center";
-          chartContainer.style.marginTop = "20px";
-          reportText.insertAdjacentElement("afterend", chartContainer);
-        }
-
-        // --- график ---
-        let chartImg = document.getElementById("chartImg");
-        if (!chartImg) {
-          chartImg = document.createElement("img");
-          chartImg.id = "chartImg";
-          chartImg.alt = "График";
-          chartContainer.appendChild(chartImg);
-        }
-        chartImg.src = "data:image/png;base64," + data.chart_base64;
-        chartImg.style.maxWidth = "100%";
-
-        // --- кнопка скачивания ---
-        chartContainer.appendChild(downloadBtn);
-        downloadBtn.classList.add("disabled");
-        downloadBtn.style.pointerEvents = "none";
-
-        // --- активируем кнопку, если есть ZIP ---
-        if (data.zip_base64) {
-          if (window.pyjs) {
-            window.pyjs.setZipBase64(data.zip_base64, symbol);
-            downloadBtn.classList.remove("disabled");
-            downloadBtn.style.pointerEvents = "auto";
-          } else {
-            // если не в десктопе — даём прямую ссылку
-            downloadBtn.href = "data:application/zip;base64," + data.zip_base64;
-            downloadBtn.download = symbol.replace("/", "_") + "_report.zip";
-            downloadBtn.classList.remove("disabled");
-            downloadBtn.style.pointerEvents = "auto";
-          }
-        }
-
         showToast("✅ Анализ завершён", "success");
       } else {
         showToast("⚠️ Не удалось получить отчёт", "error");
@@ -126,20 +103,6 @@ document.addEventListener("DOMContentLoaded", () => {
       progress.classList.add("hidden");
       progress.classList.remove("active");
       showToast("❌ Ошибка анализа: " + err.message, "error");
-    }
-  });
-
-  // --- клик по кнопке скачивания ---
-  downloadBtn.addEventListener("click", (e) => {
-    if (downloadBtn.classList.contains("disabled")) {
-      e.preventDefault();
-      return;
-    }
-
-    if (window.pyjs) {
-      window.pyjs.downloadReport();
-    } else {
-      showToast("⚠️ Скачать отчёт можно только в десктопном приложении", "error");
     }
   });
 });

@@ -48,6 +48,7 @@ def wait_for_server(url="http://127.0.0.1:5000", timeout=10):
         time.sleep(0.1)
     return False
 
+# --- 🟢 Главный запуск приложения ---
 if __name__ == "__main__":
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
@@ -63,7 +64,10 @@ if __name__ == "__main__":
     window.setMinimumSize(1200, 800)
 
     web = QWebEngineView()
-    web.setUrl(QUrl("http://127.0.0.1:5000"))
+
+    # 🟢 Добавляем уникальный параметр, чтобы сбросить кеш
+    cache_buster = int(time.time())
+    web.setUrl(QUrl(f"http://127.0.0.1:5000?nocache={cache_buster}"))
 
     channel = QWebChannel()
     bridge = Bridge()
