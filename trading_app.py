@@ -360,22 +360,38 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
 === Конец отчёта ===
 """
 
-        # --- График ---
+                # --- График с уровнями входа/выхода ---
         df_plot = df.tail(120)
         fig, ax = plt.subplots(figsize=(10, 5))
         ax.plot(df_plot.index, df_plot["Close"], label="Close", lw=1.5)
-        ax.plot(df_plot.index, df_plot["EMA_20"], label="EMA20")
-        ax.plot(df_plot.index, df_plot["EMA_50"], label="EMA50")
-        ax.plot(df_plot.index, df_plot["EMA_200"], label="EMA200")
-        ax.legend()
-        ax.grid(True)
-        ax.set_title(f"{symbol} — {strategy} ({trading_type})")
+        ax.plot(df_plot.index, df_plot["EMA_20"], label="EMA20", alpha=0.7)
+        ax.plot(df_plot.index, df_plot["EMA_50"], label="EMA50", alpha=0.7)
+        ax.plot(df_plot.index, df_plot["EMA_200"], label="EMA200", alpha=0.7)
+
+        ax.axhline(latest["Close"], color="cyan", lw=1, linestyle="--", label="Текущая цена")
+
+        preferred_side = "LONG" if trend == "Uptrend" else "SHORT"
+
+        if preferred_side == "LONG":
+            ax.axhline(long_entry, color="lime", lw=1.5, linestyle="--", label="Long Entry")
+            ax.axhline(long_tp, color="gold", lw=1.5, linestyle="--", label="Take Profit")
+            ax.axhline(long_sl, color="red", lw=1.5, linestyle="--", label="Stop Loss")
+        else:
+            ax.axhline(short_entry, color="orange", lw=1.5, linestyle="--", label="Short Entry")
+            ax.axhline(short_tp, color="gold", lw=1.5, linestyle="--", label="Take Profit")
+            ax.axhline(short_sl, color="red", lw=1.5, linestyle="--", label="Stop Loss")
+
+        ax.legend(loc="upper left", fontsize=8)
+        ax.grid(True, alpha=0.3)
+        ax.set_title(f"{symbol} — {strategy} ({trading_type}) [{preferred_side}]")
 
         buf_chart = io.BytesIO()
         plt.tight_layout()
-        plt.savefig(buf_chart, format="png")
+        plt.savefig(buf_chart, format="png", bbox_inches="tight", dpi=90)
         buf_chart.seek(0)
         plt.close(fig)
+
+
 
         # --- Excel ---
         df_excel = df.copy()
@@ -384,10 +400,12 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
         df_excel.to_excel(buf_excel)
         buf_excel.seek(0)
 
-        return report_md, buf_chart, buf_excel
+        # ✅ Возвращаем результаты анализа
+        return report_md, buf_chart, buf_excel, symbol
 
     except Exception as e:
         tb = traceback.format_exc()
         print("❌ Ошибка в run_analysis:", e)
         print(tb)
         raise
+

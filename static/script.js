@@ -104,6 +104,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
         result.classList.remove("demo");
         showToast("✅ Анализ завершён", "success");
+		  // --- отображаем график, если сервер его прислал ---
+	  const chartContainer = document.getElementById("chartContainer");
+	  const chartImage = document.getElementById("chartImage");
+
+	  if (data.chart_base64) {
+		chartContainer.classList.remove("hidden");
+		chartImage.src = "data:image/png;base64," + data.chart_base64;
+	  } else {
+		chartContainer.classList.add("hidden");
+	  }
+
 
         if (data.zip_base64) {
           downloadBtn.classList.remove("disabled");
@@ -112,8 +123,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (window.pyjs && typeof window.pyjs.saveZipFile === "function") {
               try {
-                await window.pyjs.saveZipFile(data.zip_base64, "analysis_report.zip");
-                showToast("💾 Файл успешно сохранён", "success");
+                const cleanSymbol = symbol.replace("/", "_");
+				const result = await window.pyjs.saveZipFile(data.zip_base64, `${cleanSymbol}_report.zip`);
+				if (result === true || result === "ok") {
+				  showToast("💾 Файл успешно сохранён", "success");
+				} else {
+				  showToast("⚠️ Сохранение отменено", "info");
+				}
+				return;
+
                 return;
               } catch (err) {
                 console.warn("Ошибка передачи файла в PyQt:", err);

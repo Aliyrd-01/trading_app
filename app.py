@@ -32,7 +32,7 @@ def analyze():
         confirmation
     )
     try:
-        report_text, chart_bytes, excel_bytes = future.result()
+        report_text, chart_bytes, excel_bytes, symbol = future.result()
     except Exception as e:
         tb = traceback.format_exc()
         print("❌ Ошибка анализа:", tb)
@@ -44,13 +44,20 @@ def analyze():
         zf.writestr("report.txt", report_text)
         zf.writestr("chart.png", chart_bytes.getvalue())
         zf.writestr("data.xlsx", excel_bytes.getvalue())
+
+    # 🟢 добавляем имя архива по названию валютной пары
+    zip_filename = f"{symbol}_report.zip"
+
     zip_base64 = base64.b64encode(zip_buffer.getvalue()).decode()
 
+    # 🟢 добавляем zip_filename в JSON-ответ
     return jsonify({
         "report_text": report_text,
         "chart_base64": chart_base64,
-        "zip_base64": zip_base64
+        "zip_base64": zip_base64,
+        "zip_filename": zip_filename
     })
+
 
 if __name__ == "__main__":
     app.run(debug=False, port=5000, use_reloader=False, threaded=True)

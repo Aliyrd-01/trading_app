@@ -12,9 +12,11 @@ html, body {
   background: #0f111a;
   color: #e8e8e8;
   font-family: 'Segoe UI', Roboto, sans-serif;
-  overflow: auto;
   zoom: 1.35; /* ✅ стабильный масштаб, равен старому виду */
+  overflow-x: hidden;   /* ✅ убирает горизонтальный скролл */
+  overflow-y: auto;     /* оставляем вертикальный */
 }
+
 
 /* === Контейнер интерфейса === */
 .container {
