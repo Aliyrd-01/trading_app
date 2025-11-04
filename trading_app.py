@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 LOCAL_TZ = ZoneInfo("Europe/Kyiv")
 exchange = ccxt.binance({"enableRateLimit": True, "timeout": 20000})
 
-# --- Конфигурация (твои словари) ---
+# --- Конфигурация ---
 STRATEGIES = {
     "Консервативная": {"entry_type": "ema50", "atr_sl": 1.5, "atr_tp": 1.8, "ema_buffer": 0.001, "rsi_filter": 55},
     "Сбалансированная": {"entry_type": "ema20", "atr_sl": 1.2, "atr_tp": 1.8, "ema_buffer": 0.0007, "rsi_filter": 50},
@@ -45,7 +45,7 @@ TRADING_HISTORY_DAYS = {
     "Долгосрочная": 180,
 }
 
-# === вспомогательные (как в твоём оригинале) ===
+# === вспомогательные функции ===
 def safe_fmt(x):
     try:
         return f"{float(x):,.2f}"
@@ -72,7 +72,7 @@ def fetch_ohlcv(symbol, timeframe, history_days=30):
             break
 
     if not all_bars:
-        return pd.DataFrame()  # пустой DF — обработаем выше
+        return pd.DataFrame()
 
     df = pd.DataFrame(all_bars, columns=["ts", "Open", "High", "Low", "Close", "Volume"])
     df["Datetime_UTC"] = pd.to_datetime(df["ts"], unit="ms", utc=True)
@@ -121,7 +121,6 @@ def compute_adx(df, period=14):
                         (df2['Low'] - df2['Close'].shift()).abs()], axis=1).max(axis=1)
 
         atr = tr.rolling(period).mean()
-        # защитимся от деления на ноль
         plus_di = 100 * (plus_dm.rolling(period).sum() / (atr.replace(0, np.nan)))
         minus_di = 100 * (minus_dm.rolling(period).sum() / (atr.replace(0, np.nan)))
         dx = 100 * (abs(plus_di - minus_di) / (plus_di + minus_di).replace(0, np.nan))
@@ -153,110 +152,46 @@ def position_size(capital, risk_pct, entry, stop):
     except Exception:
         return 0, 0
 
-def interpret_indicator(name, value, df_row):
-    # same as original; keep it
-    if name == "RSI_14":
-        if value > 70:
-            return "Перекупленность — возможна коррекция"
-        elif value < 30:
-            return "Перепроданность — возможен отскок"
-        else:
-            return "Нейтральная зона"
-    elif name == "ADX":
-        return "Сильный тренд" if value > 25 else "Флет или слабый тренд"
-    elif name == "Trend":
-        return "Бычий рынок" if df_row["Trend"] == "Uptrend" else "Медвежий рынок"
-    elif name == "BB":
-        if "BB_upper" in df_row and df_row["Close"] >= df_row["BB_upper"]:
-            return "Цена у верхней границы — риск коррекции"
-        elif "BB_lower" in df_row and df_row["Close"] <= df_row["BB_lower"]:
-            return "Цена у нижней границы — возможен отскок"
-        else:
-            return "В пределах диапазона"
-    elif name == "VWMA":
-        if "VWMA_20" in df_row and not pd.isna(df_row["VWMA_20"]):
-            return "Цена выше VWMA — восходящий импульс" if df_row["Close"] > df_row["VWMA_20"] else "Цена ниже VWMA — давление продавцов"
-        return "-"
-    return "-"
-
-def calc_confirmation_type(row):
-    adx = row.get("ADX", 0)
-    rsi = row.get("RSI_14", 50)
-    macd = row.get("MACD", 0)
-    signal = row.get("Signal_Line", 0)
-    close = row.get("Close", 0)
-    vwma = row.get("VWMA_20", 0)
-
-    try:
-        if adx > 25 and close > vwma and rsi > 50 and macd > signal:
-            return "Все фильтры подтверждены"
-        elif adx > 25 and close > vwma:
-            return "EMA + ADX + VWMA"
-        elif rsi > 50 and macd > signal:
-            return "RSI + MACD"
-        elif close > vwma:
-            return "EMA + VWMA"
-        else:
-            return "Нет подтверждения"
-    except Exception:
-        return "Ошибка в подтверждении"
-
+# --- Переписанный блок проверок подтверждений ---
 def check_confirmations(row, selected):
-    # robust version (same logic as final you approved)
+    indicators_map = {
+        "EMA": row["EMA_50"] > row["EMA_200"],
+        "RSI": row["RSI_14"] > 50,
+        "MACD": row["MACD"] > row["Signal_Line"],
+        "ADX": row["ADX"] > 25,
+        "VWMA": row["Close"] > row.get("VWMA_20", 0),
+    }
     if not selected:
         return "Нет выбранных подтверждений", 0, 0
 
-    if isinstance(selected, str):
-        if selected.upper() in ("NONE", ""):
-            return "Без фильтров", 0, 0
-        selected_list = [s.strip() for s in selected.split("+") if s.strip()]
-    elif isinstance(selected, (list, tuple)):
-        selected_list = [str(s).strip() for s in selected if str(s).strip()]
+    passed = []
+    failed = []
+
+    if "ALL" in selected:
+        for ind, cond in indicators_map.items():
+            if cond:
+                passed.append(ind)
+            else:
+                failed.append(ind)
+        total = len(indicators_map)
     else:
-        selected_list = [str(selected)]
+        for ind in selected:
+            ind_upper = ind.upper()
+            if indicators_map.get(ind_upper, False):
+                passed.append(ind_upper)
+            else:
+                failed.append(ind_upper)
+        total = len(selected)
 
-    total = len(selected_list)
-    score = 0
-    for s in selected_list:
-        s_up = s.upper()
-        if s_up == "RSI":
-            if row["RSI_14"] > 50:
-                score += 1
-        elif s_up == "MACD":
-            if row["MACD"] > row["Signal_Line"]:
-                score += 1
-        elif s_up == "ADX":
-            if row["ADX"] > 25:
-                score += 1
-        elif s_up == "VWMA":
-            if row["Close"] > row.get("VWMA_20", 0):
-                score += 1
-        elif s_up == "EMA":
-            if row["EMA_50"] > row["EMA_200"]:
-                score += 1
-        elif s_up == "ALL":
-            tmp = 0
-            tmp += 1 if row["ADX"] > 25 else 0
-            tmp += 1 if row["Close"] > row.get("VWMA_20", 0) else 0
-            tmp += 1 if row["RSI_14"] > 50 else 0
-            tmp += 1 if row["MACD"] > row["Signal_Line"] else 0
-            tmp += 1 if row["EMA_50"] > row["EMA_200"] else 0
-            score += tmp
-            total = 5
-        else:
-            pass
-
-    if total == 0:
-        res = "Нет выбранных подтверждений"
-    elif score >= total:
-        res = "Все выбранные фильтры подтверждены"
-    elif score >= max(1, int(total * 0.6)):
-        res = f"Частично подтверждено ({score}/{total})"
+    if not passed:
+        return f"Нет подтверждений ❌", 0, total
+    elif len(passed) == total:
+        return f"Все подтверждения ✅", len(passed), total
     else:
-        res = f"Нет подтверждения ({score}/{total})"
-    return res, score, total
+        return f"Частично подтверждено ({len(passed)}/{total}): " + \
+               ", ".join([f"{i} ✅" for i in passed] + [f"{i} ❌" for i in failed]), len(passed), total
 
-# ===== основной run_analysis с защитой =====
+# ===== основной run_analysis =====
 def run_analysis(symbol, timeframe=None, strategy="Сбалансированная", trading_type="Дейтрейдинг",
                  capital=10000, risk=0.01, range_days=None, confirmation=None):
     try:
@@ -267,11 +202,9 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
 
         df = fetch_ohlcv(symbol, timeframe, history_days=range_days)
         if df.empty:
-            raise ValueError("Пустой DataFrame: нет исторических данных (fetch_ohlcv вернул 0 баров)")
+            raise ValueError("Пустой DataFrame: нет исторических данных")
 
         df = add_indicators(df)
-
-        # дополнительные индикаторы
         df["VWMA_20"] = (df["Close"] * df["Volume"]).rolling(20).sum() / df["Volume"].rolling(20).sum()
         df["BB_middle"] = df["Close"].rolling(20).mean()
         df["BB_std"] = df["Close"].rolling(20).std()
@@ -279,15 +212,13 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
         df["BB_lower"] = df["BB_middle"] - 2 * df["BB_std"]
         df["ADX"] = compute_adx(df).fillna(0)
 
-        df["Auto_Confirmation"] = df.apply(calc_confirmation_type, axis=1)
-
         latest = df.dropna(subset=["Close"]).iloc[-1]
         strat = STRATEGIES.get(strategy, STRATEGIES["Сбалансированная"])
         atr = latest.get("ATR_14", np.nan)
-
         ema20, ema50, ema200 = latest["EMA_20"], latest["EMA_50"], latest["EMA_200"]
         risk_adj = dynamic_risk(risk, latest["RSI_14"], latest["Trend"])
 
+        # --- Уровни ---
         long_entry = ema50 * (1 + strat["ema_buffer"])
         long_sl = long_entry - strat["atr_sl"] * atr
         long_tp = long_entry + strat["atr_tp"] * atr
@@ -301,20 +232,25 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
         rr_long = round((long_tp - long_entry) / (long_entry - long_sl), 2) if (long_entry - long_sl) else 0
         rr_short = round((short_entry - short_tp) / (short_sl - short_entry), 2) if (short_sl - short_entry) else 0
 
-                # ---------- ИЗМЕНЁННЫЙ БЛОК: подтверждения, перспектива, рекомендации ----------
-        # Пользовательские подтверждения
-        if confirmation and isinstance(confirmation, (list, tuple)) and len(confirmation) > 0:
-            user_confirmation_str = ", ".join(map(str, confirmation))
-            user_confirmation_result, score, total = check_confirmations(latest, confirmation)
+        # --- Пользовательские подтверждения ---
+        if not confirmation or str(confirmation).strip().upper() in ("NONE", "", "N/A"):
+            user_selected = []
+        elif str(confirmation).strip().upper() == "ALL":
+            user_selected = ["ALL"]
+        elif isinstance(confirmation, str):
+            user_selected = [s.strip().upper() for s in confirmation.split("+") if s.strip()]
+        elif isinstance(confirmation, (list, tuple)):
+            user_selected = [str(c).strip().upper() for c in confirmation if str(c).strip()]
         else:
-            user_confirmation_str = "Не выбраны (использовано автоопределение)"
-            user_confirmation_result = f"{latest.get('Auto_Confirmation', 'Авто-анализ')}"
+            user_selected = [str(confirmation).strip().upper()]
 
-        # Перспектива рынка
+        user_confirmation_str = "Нет выбранных подтверждений" if not user_selected else "+".join(user_selected)
+        user_confirmation_result, _, _ = check_confirmations(latest, user_selected)
+
+        # --- Перспектива и рекомендации ---
         adx = latest.get("ADX", 0)
         trend = latest.get("Trend", "N/A")
         rsi = latest.get("RSI_14", np.nan)
-
         if adx < 20:
             perspective_bias = "Рынок во флете ⚖️"
         elif 20 <= adx < 25:
@@ -327,7 +263,6 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
             else:
                 perspective_bias = "Тренд выражен, но подтверждения неоднозначны 🔄"
 
-        # --- Динамические рекомендации ---
         rec_list = []
         if adx < 20:
             rec_list.append("Рынок во флете — лучше воздержаться от входов.")
@@ -344,10 +279,10 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
         else:
             rec_list.append("Цена выше VWMA — восходящий импульс сохраняется.")
         recommendations_md = "\n".join([f"- {r}" for r in rec_list])
-        # -------------------------------------------------------------------------
 
         now = datetime.now(LOCAL_TZ)
 
+        # --- Markdown отчёт ---
         report_md = f"""=== Аналитический отчёт по {symbol} ===  
 Сгенерировано: {now.strftime('%Y-%m-%d %H:%M:%S (%Z)')}  
 Текущий рынок (bias): {"Бычий" if ema50 > ema200 else "Медвежий"}
@@ -357,20 +292,18 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
 |------------|-----------|----------------|
 | **Close** | {safe_fmt(latest['Close'])} | Текущая цена |
 | **EMA20 / EMA50 / EMA200** | {safe_fmt(ema20)} / {safe_fmt(ema50)} / {safe_fmt(ema200)} | Направление скользящих |
-| **RSI(14)** | {safe_fmt(latest['RSI_14'])} | {interpret_indicator("RSI_14", latest['RSI_14'], latest)} |
+| **RSI(14)** | {safe_fmt(latest['RSI_14'])} | {latest['RSI_14']:.2f} |
 | **ATR(14)** | {safe_fmt(atr)} | Средняя волатильность рынка |
-| **Trend** | {latest['Trend']} | {interpret_indicator("Trend", latest['Trend'], latest)} |
-| **VWMA(20)** | {safe_fmt(latest.get('VWMA_20', np.nan))} | {interpret_indicator("VWMA", latest.get('VWMA_20', np.nan), latest)} |
-| **BB Upper/Lower** | {safe_fmt(latest.get('BB_upper', np.nan))} / {safe_fmt(latest.get('BB_lower', np.nan))} | {interpret_indicator("BB", None, latest)} |
-| **ADX** | {safe_fmt(latest.get('ADX', np.nan))} | {interpret_indicator("ADX", latest.get('ADX', np.nan), latest)} |
-| **Подтверждение входа (авто)** | {latest['Auto_Confirmation']} | Автоматический анализ индикаторов |
+| **Trend** | {latest['Trend']} | {trend} |
+| **VWMA(20)** | {safe_fmt(latest.get('VWMA_20', np.nan))} | {latest.get('VWMA_20', np.nan):.2f} |
+| **ADX** | {safe_fmt(latest.get('ADX', np.nan))} | {adx:.2f} |
 | **Выбранные подтверждения (пользователь)** | {user_confirmation_str} | Результат: {user_confirmation_result} |
 
 ### ⚙️ Стратегия
 - Тип торговли: {trading_type}
 - Стратегия: {strategy}
 - Капитал: ${capital:,.2f}
-- **Динамический риск:** {risk_adj*100:.2f}% (базовый {risk*100:.2f}%)
+- Динамический риск: {risk_adj*100:.2f}% (базовый {risk*100:.2f}%)
 - Тип подтверждения: {user_confirmation_str}
 
 ### 🎯 Уровни
@@ -398,18 +331,12 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
 
 ### 💰 Перспектива
 - {perspective_bias}
-- Тренд: {trend}
-- {interpret_indicator("RSI_14", latest['RSI_14'], latest)}
-- {interpret_indicator("BB", None, latest)}
-- {interpret_indicator("VWMA", latest.get('VWMA_20', np.nan), latest)}
-- {interpret_indicator("ADX", latest.get('ADX', np.nan), latest)}
 
 ### 💡 Дополнительные рекомендации
 {recommendations_md}
 
 === Конец отчёта ===
 """
-
 
         # --- График ---
         df_plot = df.tail(120)
@@ -441,5 +368,4 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
         tb = traceback.format_exc()
         print("❌ Ошибка в run_analysis:", e)
         print(tb)
-        # Пробрасываем исключение дальше — app.py поймает и вернёт в ответе
         raise
