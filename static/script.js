@@ -54,13 +54,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const confirmationSelect = document.getElementById("confirmation");
 
     // Собираем все выбранные значения
-    const confirmation = Array.from(confirmationSelect.selectedOptions).map(o => o.value);
-    console.log("Выбрано подтверждений:", confirmation);
+    const confirmationSelect = document.getElementById("confirmation");
+	const confirmation = confirmationSelect.value; // просто значение, а не массив
+	console.log("Выбрано подтверждение:", confirmation);
 
-    if (confirmation.length === 0) {
-      showToast("⚠️ Выберите хотя бы одно подтверждение входа", "error");
-      return;
-    }
+	if (!confirmation) {
+	  showToast("⚠️ Выберите подтверждение входа", "error");
+	  return;
+	}
+
 
     progress.classList.remove("hidden");
     progress.classList.add("active");

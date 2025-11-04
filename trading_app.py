@@ -152,7 +152,25 @@ def position_size(capital, risk_pct, entry, stop):
     except Exception:
         return 0, 0
 
-# --- Переписанный блок проверок подтверждений ---
+def dynamic_rr(entry, sl, atr, adx, trend_dir):
+    sl_dist = abs(entry - sl)
+    if sl_dist < 1e-9:
+        return 0
+
+    tp_mult = 1.5
+    if adx >= 25:
+        tp_mult *= 1.2
+    elif adx < 20:
+        tp_mult *= 0.8
+
+    if trend_dir == "Uptrend":
+        tp = entry + tp_mult * atr
+    else:
+        tp = entry - tp_mult * atr
+
+    rr = abs(tp - entry) / sl_dist
+    return round(rr, 2)
+
 def check_confirmations(row, selected):
     indicators_map = {
         "EMA": row["EMA_50"] > row["EMA_200"],
@@ -191,7 +209,6 @@ def check_confirmations(row, selected):
         return f"Частично подтверждено ({len(passed)}/{total}): " + \
                ", ".join([f"{i} ✅" for i in passed] + [f"{i} ❌" for i in failed]), len(passed), total
 
-# ===== основной run_analysis =====
 def run_analysis(symbol, timeframe=None, strategy="Сбалансированная", trading_type="Дейтрейдинг",
                  capital=10000, risk=0.01, range_days=None, confirmation=None):
     try:
@@ -218,7 +235,6 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
         ema20, ema50, ema200 = latest["EMA_20"], latest["EMA_50"], latest["EMA_200"]
         risk_adj = dynamic_risk(risk, latest["RSI_14"], latest["Trend"])
 
-        # --- Уровни ---
         long_entry = ema50 * (1 + strat["ema_buffer"])
         long_sl = long_entry - strat["atr_sl"] * atr
         long_tp = long_entry + strat["atr_tp"] * atr
@@ -229,10 +245,9 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
         long_units, long_dollars = position_size(capital, risk_adj, long_entry, long_sl)
         short_units, short_dollars = position_size(capital, risk_adj, short_entry, short_sl)
 
-        rr_long = round((long_tp - long_entry) / (long_entry - long_sl), 2) if (long_entry - long_sl) else 0
-        rr_short = round((short_entry - short_tp) / (short_sl - short_entry), 2) if (short_sl - short_entry) else 0
+        rr_long = dynamic_rr(long_entry, long_sl, atr, latest["ADX"], latest["Trend"])
+        rr_short = dynamic_rr(short_entry, short_sl, atr, latest["ADX"], latest["Trend"])
 
-        # --- Пользовательские подтверждения ---
         if not confirmation or str(confirmation).strip().upper() in ("NONE", "", "N/A"):
             user_selected = []
         elif str(confirmation).strip().upper() == "ALL":
@@ -247,10 +262,11 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
         user_confirmation_str = "Нет выбранных подтверждений" if not user_selected else "+".join(user_selected)
         user_confirmation_result, _, _ = check_confirmations(latest, user_selected)
 
-        # --- Перспектива и рекомендации ---
         adx = latest.get("ADX", 0)
         trend = latest.get("Trend", "N/A")
         rsi = latest.get("RSI_14", np.nan)
+
+        # --- Перспектива блок ---
         if adx < 20:
             perspective_bias = "Рынок во флете ⚖️"
         elif 20 <= adx < 25:
@@ -263,6 +279,7 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
             else:
                 perspective_bias = "Тренд выражен, но подтверждения неоднозначны 🔄"
 
+        # --- Дополнительные рекомендации ---
         rec_list = []
         if adx < 20:
             rec_list.append("Рынок во флете — лучше воздержаться от входов.")
@@ -330,7 +347,12 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
 | Шорт | {rr_short} |
 
 ### 💰 Перспектива
-- {perspective_bias}
+- Более перспективно: {'Лонг 🚀' if trend == 'Uptrend' else 'Шорт 📉'}  
+- Тренд: {'Бычий рынок' if trend == 'Uptrend' else 'Медвежий рынок'}  
+- RSI: {'Перепроданность' if rsi < 30 else 'Перекупленность' if rsi > 70 else 'Нейтральная зона'}  
+- Диапазон: {'В пределах границ' if latest['Close'] > latest.get('BB_lower',0) and latest['Close'] < latest.get('BB_upper',0) else 'Выход за пределы'}  
+- VWMA: {'Восходящий импульс' if latest['Close'] > latest.get('VWMA_20',0) else 'Нисходящий импульс'}  
+- ADX: {'Сильный тренд' if adx >= 25 else 'Слабый тренд' if adx < 20 else 'Средний тренд'}  
 
 ### 💡 Дополнительные рекомендации
 {recommendations_md}
