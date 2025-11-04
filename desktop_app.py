@@ -8,33 +8,35 @@ from PyQt5.QtWebChannel import QWebChannel
 from PyQt5.QtCore import QObject, pyqtSlot, QUrl
 from app import app  # Flask backend
 
-class Bridge(QObject):
+
+class WebBridge(QObject):
     def __init__(self):
         super().__init__()
-        self.last_zip_base64 = None
-        self.last_symbol = "report"
 
     @pyqtSlot(str, str)
-    def setZipBase64(self, base64data, symbol):
-        self.last_zip_base64 = base64data
-        self.last_symbol = symbol.replace("/", "_")
-        print(f"✅ ZIP для {self.last_symbol} получен и готов к скачиванию")
+    def saveZipFile(self, zip_base64, suggested_name):
+        """
+        Слот вызывается из JS: получает base64 и предлагает пользователю сохранить файл.
+        """
+        try:
+            options = QFileDialog.Options()
+            # Предлагаемый файл имением suggested_name
+            path, _ = QFileDialog.getSaveFileName(None, "Сохранить отчёт", suggested_name, "ZIP Files (*.zip)", options=options)
+            if not path:
+                print("⚠️ Пользователь отменил сохранение")
+                return
+            data = base64.b64decode(zip_base64)
+            with open(path, "wb") as f:
+                f.write(data)
+            print(f"✅ Файл сохранён: {path}")
+        except Exception as e:
+            print("❌ Ошибка при сохранении ZIP:", e)
 
-    @pyqtSlot()
-    def downloadReport(self):
-        if not self.last_zip_base64:
-            print("⚠️ Нет данных для скачивания")
-            return
-        default_name = f"{self.last_symbol}_report.zip"
-        options = QFileDialog.Options()
-        save_path, _ = QFileDialog.getSaveFileName(None, "Сохранить отчёт", default_name, "ZIP Files (*.zip)", options=options)
-        if save_path:
-            with open(save_path, "wb") as f:
-                f.write(base64.b64decode(self.last_zip_base64))
-            print(f"✅ Файл сохранён: {save_path}")
 
 def run_flask():
+    # Запуск flask в том же процессе, в отдельном потоке
     app.run(debug=False, port=5000, use_reloader=False)
+
 
 def wait_for_server(url="http://127.0.0.1:5000", timeout=10):
     import requests
@@ -43,12 +45,12 @@ def wait_for_server(url="http://127.0.0.1:5000", timeout=10):
             r = requests.get(url)
             if r.status_code == 200:
                 return True
-        except:
+        except Exception:
             pass
         time.sleep(0.1)
     return False
 
-# --- 🟢 Главный запуск приложения ---
+
 if __name__ == "__main__":
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
@@ -65,12 +67,12 @@ if __name__ == "__main__":
 
     web = QWebEngineView()
 
-    # 🟢 Добавляем уникальный параметр, чтобы сбросить кеш
+    # кэш-бастер
     cache_buster = int(time.time())
     web.setUrl(QUrl(f"http://127.0.0.1:5000?nocache={cache_buster}"))
 
     channel = QWebChannel()
-    bridge = Bridge()
+    bridge = WebBridge()
     channel.registerObject("pyjs", bridge)
     web.page().setWebChannel(channel)
 
