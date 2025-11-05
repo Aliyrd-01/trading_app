@@ -400,8 +400,25 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
         df_excel.to_excel(buf_excel)
         buf_excel.seek(0)
 
-        # ✅ Возвращаем результаты анализа
-        return report_md, buf_chart, buf_excel, symbol
+        # Определяем направление и цены для новой таблицы
+        direction = "LONG" if trend == "Uptrend" else "SHORT"
+        entry_price = long_entry if direction == "LONG" else short_entry
+        exit_price = long_tp if direction == "LONG" else short_tp
+
+        # ✅ Возвращаем все нужные данные для ReportV2
+        return (
+            report_md,
+            buf_chart,
+            buf_excel,
+            symbol,
+            rr_long,
+            rr_short,
+            entry_price,
+            exit_price,
+            direction,
+            trend
+        )
+
 
     except Exception as e:
         tb = traceback.format_exc()

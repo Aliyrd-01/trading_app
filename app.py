@@ -5,7 +5,7 @@ import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from trading_app import run_analysis
 import traceback
-from models import db, Report
+from models import db, ReportV2
 
 # === Flask App ===
 app = Flask(__name__)
@@ -48,7 +48,19 @@ def analyze():
     )
 
     try:
-        report_text, chart_bytes, excel_bytes, symbol = future.result()
+        (
+    report_text,
+    chart_bytes,
+    excel_bytes,
+    symbol,
+    rr_long,
+    rr_short,
+    entry_price,
+    exit_price,
+    direction,
+    trend
+    ) = future.result()
+
     except Exception as e:
         tb = traceback.format_exc()
         print("❌ Ошибка анализа:", tb)
@@ -56,16 +68,23 @@ def analyze():
 
     # --- Сохраняем отчёт в БД ---
     try:
-        new_report = Report(
-            symbol=symbol,
-            strategy=data.get("strategy"),
-            trading_type=data.get("trading_type"),
-            capital=float(data.get("capital", 0)),
-            risk=float(data.get("risk", 0)),
-            confirmation=str(data.get("confirmation")),
-            report_text=report_text,
-            result_summary="Анализ успешно выполнен",
-        )
+        new_report = ReportV2(
+    user_id=None,  # если есть связь с пользователем, иначе None
+    symbol=symbol,
+    strategy=data.get("strategy"),
+    trading_type=data.get("trading_type"),
+    capital=float(data.get("capital", 0)),
+    risk=float(data.get("risk", 0)),
+    confirmation=str(data.get("confirmation", "")),
+    report_text=report_text,
+    result_summary="Анализ успешно выполнен",
+    rr_long=rr_long,
+    rr_short=rr_short,
+    entry_price=entry_price,
+    exit_price=exit_price,
+    direction=direction,
+    trend=trend
+    )
         db.session.add(new_report)
         db.session.commit()
         print(f"💾 Отчёт сохранён в БД: id={new_report.id}")
@@ -94,7 +113,7 @@ def analyze():
 # === Вспомогательный эндпоинт для просмотра сохранённых отчётов ===
 @app.route("/reports")
 def reports():
-    reports = Report.query.order_by(Report.timestamp.desc()).limit(20).all()
+    reports = ReportV2.query.order_by(ReportV2.created_at.desc()).limit(20).all()
     return jsonify([
         {
             "id": r.id,
