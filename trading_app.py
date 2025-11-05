@@ -212,6 +212,7 @@ def check_confirmations(row, selected):
 def run_analysis(symbol, timeframe=None, strategy="Сбалансированная", trading_type="Дейтрейдинг",
                  capital=10000, risk=0.01, range_days=None, confirmation=None):
     try:
+        report_text = ""  # ✅ Добавь эту строку прямо тут
         if timeframe is None:
             timeframe = DEFAULT_TIMEFRAMES.get(trading_type, "1d")
         if range_days is None:
@@ -405,7 +406,23 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
         entry_price = long_entry if direction == "LONG" else short_entry
         exit_price = long_tp if direction == "LONG" else short_tp
 
-        # ✅ Возвращаем все нужные данные для ReportV2
+        # === Расчёт стоп-лосса и тейк-профита ===
+        rr = rr_long if direction == "LONG" else rr_short
+
+        if direction == "LONG":
+            stop_loss = entry_price - (entry_price * risk)
+            take_profit = entry_price + (entry_price - stop_loss) * rr
+        else:
+            stop_loss = entry_price + (entry_price * risk)
+            take_profit = entry_price - (stop_loss - entry_price) * rr
+
+        # Добавляем их в отчёт
+        report_text += (
+            f"\n\n=== Управление позицией ===\n"
+            f"Stop Loss: {stop_loss:.2f}\n"
+            f"Take Profit: {take_profit:.2f}\n"
+            f"Risk/Reward: {rr:.2f}\n"
+        )
         return (
             report_md,
             buf_chart,
@@ -416,7 +433,9 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
             entry_price,
             exit_price,
             direction,
-            trend
+            trend,
+            stop_loss,
+            take_profit
         )
 
 

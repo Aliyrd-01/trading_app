@@ -29,9 +29,11 @@ class ReportV2(db.Model):
     profit_loss_percent = db.Column(db.Float)
     success = db.Column(db.Boolean)
     trend = db.Column(db.String(20))
+    stop_loss = db.Column(db.Float, nullable=True)        # ← добавлено
+    take_profit = db.Column(db.Float, nullable=True)      # ← добавлено
     report_text = db.Column(db.Text)
     result_summary = db.Column(db.String(200))
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # связь с пользователем
     user = db.relationship("User", backref="reports_v2")
+
