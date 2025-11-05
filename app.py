@@ -5,21 +5,36 @@ import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from trading_app import run_analysis
 import traceback
+from models import db, Report
 
+# === Flask App ===
 app = Flask(__name__)
+app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://u543957720_crypto:AgUbbkD1h!@srv936.hstgr.io/u543957720_cryptoprice"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+db.init_app(app)
+
+# создаём пул потоков
 executor = ThreadPoolExecutor(max_workers=2)
+
+# Создаём таблицы при запуске
+with app.app_context():
+    db.create_all()
+    print("✅ Таблицы созданы или уже существуют в MySQL")
+
+
 
 @app.route("/")
 def index():
     return render_template("index.html")
 
+
 @app.route("/run_analysis", methods=["POST"])
 def analyze():
     data = request.json or {}
     print("🔔 /run_analysis called with:", data)
-    # normalization: confirmation может быть строкой, списком, None
     confirmation = data.get("confirmation")
-    # Запускаем анализ в пуле
+
+    # --- Запуск анализа в отдельном потоке ---
     future = executor.submit(
         run_analysis,
         data.get("symbol"),
@@ -31,6 +46,7 @@ def analyze():
         None,
         confirmation
     )
+
     try:
         report_text, chart_bytes, excel_bytes, symbol = future.result()
     except Exception as e:
@@ -38,6 +54,25 @@ def analyze():
         print("❌ Ошибка анализа:", tb)
         return jsonify({"error": f"Ошибка анализа: {str(e)}", "trace": tb}), 500
 
+    # --- Сохраняем отчёт в БД ---
+    try:
+        new_report = Report(
+            symbol=symbol,
+            strategy=data.get("strategy"),
+            trading_type=data.get("trading_type"),
+            capital=float(data.get("capital", 0)),
+            risk=float(data.get("risk", 0)),
+            confirmation=str(data.get("confirmation")),
+            report_text=report_text,
+            result_summary="Анализ успешно выполнен",
+        )
+        db.session.add(new_report)
+        db.session.commit()
+        print(f"💾 Отчёт сохранён в БД: id={new_report.id}")
+    except Exception as e:
+        print("⚠️ Не удалось сохранить отчёт в БД:", e)
+
+    # --- Формируем ответ ---
     chart_base64 = base64.b64encode(chart_bytes.getvalue()).decode()
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w") as zf:
@@ -45,12 +80,9 @@ def analyze():
         zf.writestr("chart.png", chart_bytes.getvalue())
         zf.writestr("data.xlsx", excel_bytes.getvalue())
 
-    # 🟢 добавляем имя архива по названию валютной пары
     zip_filename = f"{symbol}_report.zip"
-
     zip_base64 = base64.b64encode(zip_buffer.getvalue()).decode()
 
-    # 🟢 добавляем zip_filename в JSON-ответ
     return jsonify({
         "report_text": report_text,
         "chart_base64": chart_base64,
@@ -59,5 +91,22 @@ def analyze():
     })
 
 
+# === Вспомогательный эндпоинт для просмотра сохранённых отчётов ===
+@app.route("/reports")
+def reports():
+    reports = Report.query.order_by(Report.timestamp.desc()).limit(20).all()
+    return jsonify([
+        {
+            "id": r.id,
+            "symbol": r.symbol,
+            "strategy": r.strategy,
+            "trading_type": r.trading_type,
+            "timestamp": r.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+        } for r in reports
+    ])
+
+
 if __name__ == "__main__":
+    with app.app_context():
+        db.create_all()  # ✅ создаём таблицы при первом запуске
     app.run(debug=False, port=5000, use_reloader=False, threaded=True)
