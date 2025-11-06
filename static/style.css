@@ -359,3 +359,6 @@ img {
 #downloadStats:hover:not(:disabled) {
   background-color: #15803d;
 }
+button:focus {
+    outline: none;
+}

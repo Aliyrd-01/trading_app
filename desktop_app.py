@@ -2,10 +2,10 @@ import sys
 import threading
 import time
 import base64
-from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog
-from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QPushButton, QVBoxLayout, QWidget
+from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineSettings
 from PyQt5.QtWebChannel import QWebChannel
-from PyQt5.QtCore import QObject, pyqtSlot, QUrl
+from PyQt5.QtCore import QObject, pyqtSlot, QUrl, Qt
 from app import app  # Flask backend
 
 
@@ -22,11 +22,7 @@ class WebBridge(QObject):
         try:
             options = QFileDialog.Options()
             path, _ = QFileDialog.getSaveFileName(
-                None,
-                "Сохранить отчёт",
-                suggested_name,
-                "ZIP Files (*.zip)",
-                options=options
+                None, "Сохранить отчёт", suggested_name, "ZIP Files (*.zip)", options=options
             )
             if not path:
                 print("⚠️ Пользователь отменил сохранение")
@@ -44,7 +40,6 @@ class WebBridge(QObject):
 
 
 def run_flask():
-    # Запуск Flask в отдельном потоке
     app.run(debug=False, port=5000, use_reloader=False)
 
 
@@ -61,8 +56,47 @@ def wait_for_server(url="http://127.0.0.1:5000", timeout=10):
     return False
 
 
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Crypto Trading Analyzer")
+        self.resize(1200, 800)
+        self.setMinimumSize(1200, 800)
+
+        # Основной виджет и layout
+        central = QWidget()
+        self.setCentralWidget(central)
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        central.setLayout(layout)
+
+        # QWebEngineView
+        self.web = QWebEngineView()
+        layout.addWidget(self.web)
+
+        # аппаратное ускорение
+        self.web.settings().setAttribute(QWebEngineSettings.Accelerated2dCanvasEnabled, True)
+        self.web.settings().setAttribute(QWebEngineSettings.WebGLEnabled, True)
+
+        # кэш-бастер
+        cache_buster = int(time.time())
+        self.web.setUrl(QUrl(f"http://127.0.0.1:5000?nocache={cache_buster}"))
+
+        # WebChannel
+        self.channel = QWebChannel()
+        self.bridge = WebBridge()
+        self.channel.registerObject("pyjs", self.bridge)
+        self.web.page().setWebChannel(self.channel)
+
+    def resizeEvent(self, event):
+        # минимизируем лишние перерисовки при ресайзе
+        self.web.resize(self.size())
+        super().resizeEvent(event)
+
+
 if __name__ == "__main__":
-    # --- Запуск Flask ---
+    # Flask сервер в отдельном потоке
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
 
@@ -70,24 +104,14 @@ if __name__ == "__main__":
     if not wait_for_server():
         print("⚠️ Сервер не запустился вовремя")
 
-    # --- Запуск PyQt приложения ---
     app_qt = QApplication(sys.argv)
-    window = QMainWindow()
-    window.setWindowTitle("Crypto Trading Analyzer")
-    window.resize(1200, 800)
-    window.setMinimumSize(1200, 800)
 
-    web = QWebEngineView()
-    # кэш-бастер, чтобы всегда загружалась последняя версия фронтенда
-    cache_buster = int(time.time())
-    web.setUrl(QUrl(f"http://127.0.0.1:5000?nocache={cache_buster}"))
+    # убираем пунктир вокруг всех QPushButton по умолчанию
+    app_qt.setStyleSheet("""
+        QPushButton { outline: none; }
+        QPushButton:focus { outline: none; }
+    """)
 
-    # --- Настройка WebChannel для связи JS <-> Python ---
-    channel = QWebChannel()
-    bridge = WebBridge()
-    channel.registerObject("pyjs", bridge)
-    web.page().setWebChannel(channel)
-
-    window.setCentralWidget(web)
+    window = MainWindow()
     window.show()
     sys.exit(app_qt.exec_())
