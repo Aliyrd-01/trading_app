@@ -296,3 +296,66 @@ img {
     opacity: 1;
     pointer-events: auto;
 }
+
+/* === Кнопки скачивания === */
+#downloadButtons {
+  display: flex;
+  justify-content: space-between; /* ZIP слева, статистика справа */
+  align-items: center;
+  max-width: 900px;
+  margin: 20px auto;
+  width: 100%;
+  gap: 20px;
+}
+
+/* Универсальный стиль кнопок */
+#downloadButtons button {
+  flex: 0 0 220px; /* фиксированная ширина для симметрии */
+  font-size: 15px;
+  font-weight: 500;
+  border: none;
+  border-radius: 16px; /* ✅ сохраняет скругления при нажатии */
+  padding: 10px 16px;
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+}
+
+/* При наведении */
+#downloadButtons button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* При нажатии */
+#downloadButtons button:active:not(:disabled) {
+  transform: scale(0.98);
+  border-radius: 16px; /* ✅ фикс артефакта: сохраняет радиус */
+}
+
+/* Отключённые кнопки */
+#downloadButtons button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Синие и зелёные цвета отдельно, чтобы hover не ломал форму */
+#downloadZip {
+  background-color: #2563eb; /* синий */
+  color: white;
+}
+
+#downloadZip:hover:not(:disabled) {
+  background-color: #1e40af;
+}
+
+#downloadStats {
+  background-color: #16a34a; /* зелёный */
+  color: white;
+}
+
+#downloadStats:hover:not(:disabled) {
+  background-color: #15803d;
+}

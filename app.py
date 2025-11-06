@@ -1,7 +1,8 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_file
 import base64
 import io
 import zipfile
+import csv
 from concurrent.futures import ThreadPoolExecutor
 from trading_app import run_analysis
 import traceback
@@ -26,7 +27,6 @@ executor = ThreadPoolExecutor(max_workers=2)
 with app.app_context():
     db.create_all()
     print("✅ Таблицы созданы или уже существуют в MySQL")
-
 
 
 @app.route("/")
@@ -68,7 +68,7 @@ def analyze():
             stop_loss,
             take_profit
         ) = future.result()
-        
+
         # --- Вычисление прибыли/успеха ---
         if direction == "LONG":
             if stop_loss and entry_price > stop_loss:
@@ -125,7 +125,6 @@ def analyze():
         print("❌ Ошибка анализа или сохранения в БД:", tb)
         return jsonify({"error": f"Ошибка анализа: {str(e)}", "trace": tb}), 500
 
-
     # --- Формируем ответ ---
     chart_base64 = base64.b64encode(chart_bytes.getvalue()).decode()
     zip_buffer = io.BytesIO()
@@ -147,7 +146,7 @@ def analyze():
 
 # === Вспомогательный эндпоинт для просмотра сохранённых отчётов ===
 @app.route("/reports")
-def reports():
+def reports_list():
     reports = ReportV2.query.order_by(ReportV2.timestamp.desc()).limit(20).all()
     return jsonify([
         {
@@ -160,7 +159,74 @@ def reports():
     ])
 
 
+# === Эндпоинт для скачивания статистики по пользователю ===
+@app.route("/download_user_stats")
+def download_user_stats():
+    user_id = 1  # временно — потом заменим на current_user.id
+
+    reports = ReportV2.query.filter(
+        (ReportV2.user_id == None) | (ReportV2.user_id == 1)
+    ).all()
+    if not reports:
+        return jsonify({"error": "Нет данных для отчёта"}), 404
+
+
+    if reports:
+        total = len(reports)
+        wins = sum(1 for r in reports if getattr(r, "success", False))
+        avg_profit = sum((r.profit_loss_percent or 0) for r in reports) / total
+    else:
+        return jsonify({"error": "Нет данных для отчёта"}), 404
+
+
+    # — текстовый summary
+    summary_text = f"""
+📊 Отчёт по торговле пользователя #{user_id}
+-----------------------------------------
+Всего сделок: {total}
+Win rate: {wins / total * 100:.2f}%
+Средняя прибыль: {avg_profit:.2f}%
+Успешные: {wins}
+Неуспешные: {total - wins}
+    """
+
+    # — CSV со статистикой по символам
+    symbol_stats = {}
+    for r in reports:
+        sym = getattr(r, "symbol", "N/A")
+        if sym not in symbol_stats:
+            symbol_stats[sym] = {"trades": 0, "win": 0, "loss": 0}
+        symbol_stats[sym]["trades"] += 1
+        if getattr(r, "success", False):
+            symbol_stats[sym]["win"] += 1
+        else:
+            symbol_stats[sym]["loss"] += 1
+
+    csv_buffer = io.StringIO()
+    writer = csv.writer(csv_buffer)
+    writer.writerow(["Symbol", "Trades", "Win", "Loss", "Win Rate (%)"])
+    for s, v in symbol_stats.items():
+        win_rate = (v["win"] / v["trades"]) * 100 if v["trades"] > 0 else 0
+        writer.writerow([s, v["trades"], v["win"], v["loss"], f"{win_rate:.2f}"])
+
+    # — создаём ZIP
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w") as zf:
+        zf.writestr("summary.txt", summary_text)
+        zf.writestr("by_symbol.csv", csv_buffer.getvalue())
+
+    zip_buffer.seek(0)
+    return send_file(
+        zip_buffer,
+        as_attachment=True,
+        download_name="user_stats.zip",
+        mimetype="application/zip"
+    )
+
+
+# === Запуск сервера ===
 if __name__ == "__main__":
     with app.app_context():
-        db.create_all()  # ✅ создаём таблицы при первом запуске
+        db.create_all()
+        print("✅ Таблицы созданы или уже существуют в MySQL")
     app.run(debug=False, port=5000, use_reloader=False, threaded=True)

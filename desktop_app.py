@@ -13,28 +13,38 @@ class WebBridge(QObject):
     def __init__(self):
         super().__init__()
 
-    @pyqtSlot(str, str)
+    @pyqtSlot(str, str, result=str)
     def saveZipFile(self, zip_base64, suggested_name):
         """
         Слот вызывается из JS: получает base64 и предлагает пользователю сохранить файл.
+        Возвращает "ok" при успешном сохранении или "cancel", если пользователь отменил.
         """
         try:
             options = QFileDialog.Options()
-            # Предлагаемый файл имением suggested_name
-            path, _ = QFileDialog.getSaveFileName(None, "Сохранить отчёт", suggested_name, "ZIP Files (*.zip)", options=options)
+            path, _ = QFileDialog.getSaveFileName(
+                None,
+                "Сохранить отчёт",
+                suggested_name,
+                "ZIP Files (*.zip)",
+                options=options
+            )
             if not path:
                 print("⚠️ Пользователь отменил сохранение")
-                return
+                return "cancel"
+
             data = base64.b64decode(zip_base64)
             with open(path, "wb") as f:
                 f.write(data)
             print(f"✅ Файл сохранён: {path}")
+            return "ok"
+
         except Exception as e:
             print("❌ Ошибка при сохранении ZIP:", e)
+            return "cancel"
 
 
 def run_flask():
-    # Запуск flask в том же процессе, в отдельном потоке
+    # Запуск Flask в отдельном потоке
     app.run(debug=False, port=5000, use_reloader=False)
 
 
@@ -52,6 +62,7 @@ def wait_for_server(url="http://127.0.0.1:5000", timeout=10):
 
 
 if __name__ == "__main__":
+    # --- Запуск Flask ---
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
 
@@ -59,6 +70,7 @@ if __name__ == "__main__":
     if not wait_for_server():
         print("⚠️ Сервер не запустился вовремя")
 
+    # --- Запуск PyQt приложения ---
     app_qt = QApplication(sys.argv)
     window = QMainWindow()
     window.setWindowTitle("Crypto Trading Analyzer")
@@ -66,11 +78,11 @@ if __name__ == "__main__":
     window.setMinimumSize(1200, 800)
 
     web = QWebEngineView()
-
-    # кэш-бастер
+    # кэш-бастер, чтобы всегда загружалась последняя версия фронтенда
     cache_buster = int(time.time())
     web.setUrl(QUrl(f"http://127.0.0.1:5000?nocache={cache_buster}"))
 
+    # --- Настройка WebChannel для связи JS <-> Python ---
     channel = QWebChannel()
     bridge = WebBridge()
     channel.registerObject("pyjs", bridge)
