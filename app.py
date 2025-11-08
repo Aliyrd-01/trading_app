@@ -1,5 +1,9 @@
-from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for
+import sys
+import threading
+import time
 import base64
+import requests
+from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for
 import io
 import zipfile
 import csv
@@ -8,10 +12,8 @@ from trading_app import run_analysis
 import traceback
 from datetime import datetime
 from werkzeug.security import check_password_hash
-import hashlib
-import binascii
 
-# ✅ правильный импорт из твоего models.py
+# ✅ Импорт моделей
 from models import db, User, ReportV2
 
 # === Flask App ===
@@ -38,41 +40,45 @@ app.config["CURRENT_USER_EMAIL"] = None
 
 
 # ---------------------------
-# Проверка пароля (scrypt + werkzeug)
+# Проверка пароля (только werkzeug, как на сайте)
 # ---------------------------
 def verify_password(plain_password: str, stored_hash: str) -> bool:
     if not stored_hash:
         return False
+    plain_password = plain_password.strip()
+    stored_hash = stored_hash.strip()
     try:
-        if stored_hash.startswith("scrypt:"):
-            # формат scrypt:n:r:p$salt_b64$hex
-            parts = stored_hash.split("$")
-            if len(parts) != 3:
-                return False
-            prefix, salt_b64, key_hex = parts
-            _, n_s, r_s, p_s = prefix.split(":")
-            n, r, p = int(n_s), int(r_s), int(p_s)
-
-            try:
-                salt = base64.b64decode(salt_b64)
-            except Exception:
-                salt = salt_b64.encode()
-
-            dklen = len(key_hex) // 2 or 32
-            derived = hashlib.scrypt(
-                password=plain_password.encode(),
-                salt=salt,
-                n=n, r=r, p=p, dklen=dklen
-            )
-            return binascii.hexlify(derived).decode() == key_hex
-        else:
-            return check_password_hash(stored_hash, plain_password)
-    except Exception:
+        return check_password_hash(stored_hash, plain_password)
+    except Exception as e:
+        print("Ошибка проверки пароля:", e)
         return False
 
-from sqlalchemy import inspect
-inspector = inspect(User)
-print("User columns:", [c.name for c in inspector.columns])
+
+# --- WebBridge для взаимодействия с JS ---
+from PyQt5.QtCore import QObject, pyqtSlot
+from PyQt5.QtWidgets import QFileDialog
+
+class WebBridge(QObject):
+    @pyqtSlot(str, str, result=str)
+    def saveZipFile(self, zip_base64, suggested_name):
+        try:
+            path, _ = QFileDialog.getSaveFileName(
+                None, "Сохранить отчёт", suggested_name, "ZIP Files (*.zip)"
+            )
+            if not path:
+                return "cancel"
+            data = base64.b64decode(zip_base64)
+            with open(path, "wb") as f:
+                f.write(data)
+            return "ok"
+        except Exception as e:
+            print("Ошибка при сохранении ZIP:", e)
+            return "cancel"
+
+    @pyqtSlot(str)
+    def loginSuccess(self, payload_json):
+        print("Login payload from JS:", payload_json)
+
 
 # === API логина ===
 @app.route("/api/login", methods=["POST"])
@@ -135,12 +141,11 @@ def index():
     return render_template("index.html")
 
 
+# ==== Flask анализ и скачивание отчётов (без изменений) ====
 @app.route("/run_analysis", methods=["POST"])
 def analyze():
     data = request.json or {}
-    print("🔔 /run_analysis called with:", data)
     confirmation = data.get("confirmation")
-
     future = executor.submit(
         run_analysis,
         data.get("symbol"),
@@ -152,7 +157,6 @@ def analyze():
         None,
         confirmation
     )
-
     try:
         (
             ReportV2_text,
@@ -169,7 +173,7 @@ def analyze():
             take_profit
         ) = future.result()
 
-        # Вычисляем результат
+        # вычисление прибыли/убытка
         if direction == "LONG":
             if stop_loss and entry_price > stop_loss:
                 profit_loss = stop_loss - entry_price
@@ -184,7 +188,7 @@ def analyze():
             if stop_loss and entry_price < stop_loss:
                 profit_loss = entry_price - stop_loss
                 success = False
-            elif take_profit and take_profit < entry_price:
+            elif take_profit and entry_price < take_profit:
                 profit_loss = entry_price - take_profit
                 success = True
             else:
@@ -193,9 +197,8 @@ def analyze():
 
         profit_loss_percent = (profit_loss / entry_price) * 100 if entry_price else 0
 
-        # Привязываем к пользователю
         user_id = app.config.get("CURRENT_USER")
-        ReportV2 = ReportV2(
+        report = ReportV2(
             user_id=user_id,
             symbol=symbol,
             strategy=data.get("strategy"),
@@ -203,15 +206,15 @@ def analyze():
             capital=float(data.get("capital", 0)),
             risk=float(data.get("risk", 0)),
             confirmation=str(data.get("confirmation", "")),
-            ReportV2_text=ReportV2_text,
+            report_text=ReportV2_text,
             result_summary="Анализ успешно выполнен",
             rr_long=rr_long,
             rr_short=rr_short,
             trend=trend,
         )
-        db.session.add(ReportV2)
+        db.session.add(report)
         db.session.commit()
-        print(f"💾 Отчёт сохранён: id={ReportV2.id}, user_id={user_id}")
+        print(f"💾 Отчёт сохранён: id={report.id}, user_id={user_id}")
 
     except Exception as e:
         tb = traceback.format_exc()
@@ -226,7 +229,6 @@ def analyze():
             zf.writestr("chart.png", chart_bytes.getvalue())
         if excel_bytes:
             zf.writestr("data.xlsx", excel_bytes.getvalue())
-
     zip_base64 = base64.b64encode(zip_buffer.getvalue()).decode()
 
     return jsonify({
@@ -262,6 +264,7 @@ def download_user_stats():
     return send_file(zip_buf, as_attachment=True, download_name="user_stats.zip", mimetype="application/zip")
 
 
+# --- Запуск ---
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
