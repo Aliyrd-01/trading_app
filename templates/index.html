@@ -9,6 +9,33 @@
 <body>
  <div class="container">
     <h1>📊 Crypto Trading Analyzer</h1>
+	<!-- Внутри <div class="container">, например, после <h1> -->
+	<a href="#" id="logoutBtn">Выйти</a>
+
+	<script>
+	document.addEventListener("DOMContentLoaded", () => {
+	  const logoutBtn = document.getElementById("logoutBtn");
+
+	  logoutBtn.addEventListener("click", async () => {
+		try {
+		  // Очистка localStorage
+		  localStorage.removeItem("rememberedUser");
+
+		  // Очистка сессии на сервере
+		  await fetch("/session_set", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ user_id: null, email: null })
+		  });
+
+		  window.location.href = "/login";
+		} catch (e) {
+		  console.error("Ошибка logout:", e);
+		  alert("Ошибка при выходе");
+		}
+	  });
+	});
+	</script>
     <div class="form-grid">
       <label>
         Валютная пара:

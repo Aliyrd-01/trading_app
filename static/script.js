@@ -8,6 +8,24 @@ document.addEventListener("DOMContentLoaded", () => {
   const reportText = document.getElementById("reportText");
   const downloadBtn = document.getElementById("downloadZip");
   const downloadStatsBtn = document.getElementById("downloadStats");
+  const logoutBtn = document.getElementById("logoutBtn");
+	if (logoutBtn) {
+	  logoutBtn.addEventListener("click", async (e) => {
+		e.preventDefault();
+		try {
+		  // Обнуляем сессию на сервере
+		  await fetch("/session_set", {
+			method: "POST",
+			headers: {"Content-Type": "application/json"},
+			body: JSON.stringify({ user_id: null, email: null })
+		  });
+		  // Перенаправление на логин
+		  window.location.href = "/login";
+		} catch (err) {
+		  console.error("Ошибка logout:", err);
+		}
+	  });
+}
 
   const timeframes = {
     "Скальпинг": "5m",

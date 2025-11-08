@@ -3,7 +3,7 @@ import threading
 import time
 import base64
 import requests
-from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for
+from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, session
 import io
 import zipfile
 import csv
@@ -18,29 +18,22 @@ from models import db, User, ReportV2
 
 # === Flask App ===
 app = Flask(__name__)
+app.secret_key = "super-secret-key"  # для сессий
 app.config["SQLALCHEMY_DATABASE_URI"] = (
     "mysql+pymysql://u543957720_crypto:AgUbbkD1h%21@srv936.hstgr.io/u543957720_cryptoprice"
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_pre_ping": True,
-    "pool_recycle": 280,
-}
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True, "pool_recycle": 280}
 
 db.init_app(app)
-
 executor = ThreadPoolExecutor(max_workers=2)
 
 with app.app_context():
     db.create_all()
     print("✅ Таблицы созданы или уже существуют в MySQL")
 
-app.config["CURRENT_USER"] = None
-app.config["CURRENT_USER_EMAIL"] = None
-
-
 # ---------------------------
-# Проверка пароля (только werkzeug, как на сайте)
+# Проверка пароля
 # ---------------------------
 def verify_password(plain_password: str, stored_hash: str) -> bool:
     if not stored_hash:
@@ -52,7 +45,6 @@ def verify_password(plain_password: str, stored_hash: str) -> bool:
     except Exception as e:
         print("Ошибка проверки пароля:", e)
         return False
-
 
 # --- WebBridge для взаимодействия с JS ---
 from PyQt5.QtCore import QObject, pyqtSlot
@@ -78,7 +70,6 @@ class WebBridge(QObject):
     @pyqtSlot(str)
     def loginSuccess(self, payload_json):
         print("Login payload from JS:", payload_json)
-
 
 # === API логина ===
 @app.route("/api/login", methods=["POST"])
@@ -110,38 +101,42 @@ def api_login():
         "user": {"id": user.id, "email": user.email, "plan": user.plan}
     })
 
-
+# === Сессии ===
 @app.route("/session_set", methods=["POST"])
 def session_set():
     data = request.json or {}
     user_id = data.get("user_id")
     email = data.get("email")
-    if user_id is None:
+    if not user_id:
         return jsonify({"error": "user_id required"}), 400
 
-    try:
-        app.config["CURRENT_USER"] = int(user_id)
-    except Exception:
-        app.config["CURRENT_USER"] = None
-    app.config["CURRENT_USER_EMAIL"] = email
-    print(f"👤 Текущий пользователь установлен: {app.config['CURRENT_USER']} ({email})")
+    session["user_id"] = int(user_id)
+    session["email"] = email
+    print(f"👤 Сессия установлена: {user_id} ({email})")
+    return jsonify({"ok": True, "current_user": user_id, "email": email})
 
-    return jsonify({"ok": True, "current_user": app.config["CURRENT_USER"], "email": email}), 200
+@app.route("/session_check")
+def session_check():
+    logged_in = session.get("user_id") is not None
+    return jsonify({"logged_in": logged_in})
 
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
 
+# === Рендер страниц ===
 @app.route("/login")
 def login():
     return render_template("login.html")
 
-
 @app.route("/")
 def index():
-    if not app.config.get("CURRENT_USER"):
+    if not session.get("user_id"):
         return redirect(url_for("login"))
     return render_template("index.html")
 
-
-# ==== Flask анализ и скачивание отчётов (без изменений) ====
+# ==== Анализ и скачивание отчётов (без изменений) ====
 @app.route("/run_analysis", methods=["POST"])
 def analyze():
     data = request.json or {}
@@ -173,31 +168,7 @@ def analyze():
             take_profit
         ) = future.result()
 
-        # вычисление прибыли/убытка
-        if direction == "LONG":
-            if stop_loss and entry_price > stop_loss:
-                profit_loss = stop_loss - entry_price
-                success = False
-            elif take_profit and take_profit > entry_price:
-                profit_loss = take_profit - entry_price
-                success = True
-            else:
-                profit_loss = exit_price - entry_price
-                success = profit_loss > 0
-        else:
-            if stop_loss and entry_price < stop_loss:
-                profit_loss = entry_price - stop_loss
-                success = False
-            elif take_profit and entry_price < take_profit:
-                profit_loss = entry_price - take_profit
-                success = True
-            else:
-                profit_loss = entry_price - exit_price
-                success = profit_loss > 0
-
-        profit_loss_percent = (profit_loss / entry_price) * 100 if entry_price else 0
-
-        user_id = app.config.get("CURRENT_USER")
+        user_id = session.get("user_id")
         report = ReportV2(
             user_id=user_id,
             symbol=symbol,
@@ -237,10 +208,9 @@ def analyze():
         "zip_base64": zip_base64
     })
 
-
 @app.route("/download_user_stats")
 def download_user_stats():
-    user_id = app.config.get("CURRENT_USER") or 1
+    user_id = session.get("user_id") or 1
     ReportV2s = ReportV2.query.filter(
         (ReportV2.user_id == None) | (ReportV2.user_id == user_id)
     ).all()
@@ -262,7 +232,6 @@ def download_user_stats():
 
     zip_buf.seek(0)
     return send_file(zip_buf, as_attachment=True, download_name="user_stats.zip", mimetype="application/zip")
-
 
 # --- Запуск ---
 if __name__ == "__main__":
