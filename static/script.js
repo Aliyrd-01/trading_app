@@ -9,23 +9,23 @@ document.addEventListener("DOMContentLoaded", () => {
   const downloadBtn = document.getElementById("downloadZip");
   const downloadStatsBtn = document.getElementById("downloadStats");
   const logoutBtn = document.getElementById("logoutBtn");
-	if (logoutBtn) {
-	  logoutBtn.addEventListener("click", async (e) => {
-		e.preventDefault();
-		try {
-		  // Обнуляем сессию на сервере
-		  await fetch("/session_set", {
-			method: "POST",
-			headers: {"Content-Type": "application/json"},
-			body: JSON.stringify({ user_id: null, email: null })
-		  });
-		  // Перенаправление на логин
-		  window.location.href = "/login";
-		} catch (err) {
-		  console.error("Ошибка logout:", err);
-		}
-	  });
-}
+
+  // --- Logout ---
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      try {
+        await fetch("/session_set", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ user_id: null, email: null })
+        });
+        window.location.href = "/login";
+      } catch (err) {
+        console.error("Ошибка logout:", err);
+      }
+    });
+  }
 
   const timeframes = {
     "Скальпинг": "5m",
@@ -99,7 +99,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     startProgress();
-    result.classList.add("demo");
     document.querySelector("#result h2").textContent = "📄 Отчёт";
     downloadBtn.disabled = true;
     downloadStatsBtn.disabled = true;
@@ -121,14 +120,16 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      if (data.report_text) {
+      if (data.ReportV2_text) {
         reportText.innerHTML = "";
         const pre = document.createElement("pre");
-        pre.textContent = data.report_text;
+        pre.textContent = data.ReportV2_text;
         pre.style.whiteSpace = "pre-wrap";
         reportText.appendChild(pre);
 
+        // Убираем блюр после анализа
         result.classList.remove("demo");
+
         showToast("✅ Анализ завершён", "success");
 
         // график

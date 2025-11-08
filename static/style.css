@@ -420,20 +420,39 @@ button:focus { outline: none; }
   font-size: 15px;
   margin-top: 10px;
 }
+.header {
+  display: flex;
+  justify-content: space-between; /* заголовок слева, Выйти справа */
+  align-items: center;
+  padding: 10px 20px;            /* отступы сверху/снизу и слева/справа */
+  background: transparent;        /* без фонового цвета */
+}
+
+#logoutContainer {
+  display: flex;
+  justify-content: flex-end; /* "Выйти" справа */
+    top: 2vh;             /* 2% от высоты окна сверху */
+  right: 2vw;       /* небольшой отступ от краев */
+}
+
 #logoutBtn {
-    position: fixed;       /* фиксируем в окне, чтобы всегда в верхнем правом углу */
-    top: 15px;             /* отступ сверху */
-    right: 20px;           /* отступ справа */
-    font-size: 16px;
-    color: #3fa9f5;
-    text-decoration: none; /* убираем подчеркивание */
-    cursor: pointer;
-    transition: color 0.2s ease;
-    z-index: 1000;         /* чтобы не перекрывалось другими элементами */
+  top: 2vh;             /* 2% от высоты окна сверху */
+  right: 2vw;           /* 2% от ширины окна справа */
+  color: #007BFF;
+  text-decoration: none;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: color 0.2s;
+  z-index: 9999;
 }
 
 #logoutBtn:hover {
-    color: #1e90ff;        /* легкий ховер */
+  color: #007BFE;
 }
+
+
+
+
+
 
 
