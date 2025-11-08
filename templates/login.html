@@ -1,70 +1,76 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crypto Analyzer — Login</title>
-    <link rel="stylesheet" href="/static/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crypto Analyzer — Login</title>
+  <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
-    <div class="container" id="login-container">
-        <h1>Crypto Analyzer</h1>
-        <div class="form-grid">
-            <label>
-                Email:
-                <input type="text" id="email" placeholder="Введите email">
-            </label>
-            <label>
-                Пароль:
-                <input type="password" id="password" placeholder="Введите пароль">
-            </label>
-            <button id="loginBtn">Войти</button>
-            <p id="errorMsg" style="color: red; margin-top:10px;"></p>
-        </div>
+<body id="login-page">
+  <div class="login-card">
+    <h1>Crypto Analyzer</h1>
+    <div class="login-form">
+      <label>
+        Email:
+        <input type="text" id="email" placeholder="Введите email">
+      </label>
+      <label>
+        Пароль:
+        <input type="password" id="password" placeholder="Введите пароль">
+      </label>
+      <button id="loginBtn">Войти</button>
+      <p id="errorMsg"></p>
     </div>
+  </div>
 
-    <script>
-        const loginBtn = document.getElementById("loginBtn");
-        const errorMsg = document.getElementById("errorMsg");
+  <script>
+    const loginBtn = document.getElementById("loginBtn");
+    const errorMsg = document.getElementById("errorMsg");
 
-        loginBtn.addEventListener("click", async () => {
-            errorMsg.textContent = "";
+    window.addEventListener("load", async () => {
+      try {
+        const res = await fetch("/session_check");
+        const data = await res.json();
+        if (data.logged_in) window.location.href = "/";
+      } catch (e) {
+        console.error("Session check failed:", e);
+      }
+    });
 
-            const email = document.getElementById('email').value.trim();
-            const password = document.getElementById('password').value.trim();
+    loginBtn.addEventListener("click", async () => {
+      errorMsg.textContent = "";
 
-            if (!email || !password) {
-                errorMsg.textContent = "Email и пароль обязательны";
-                return;
-            }
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value.trim();
 
-            try {
-                const response = await fetch("/api/login", {
-                    method: "POST",
-                    headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({email, password})
-                });
+      if (!email || !password) {
+        errorMsg.textContent = "Email и пароль обязательны";
+        return;
+      }
 
-                const data = await response.json();
-
-                if (response.ok && data.token) {
-                    // Устанавливаем session на сервере
-                    await fetch("/session_set", {
-                        method: "POST",
-                        headers: {"Content-Type": "application/json"},
-                        body: JSON.stringify({user_id: data.user.id, email: data.user.email})
-                    });
-
-                    // Редирект на главное приложение
-                    window.location.href = "/";
-                } else {
-                    errorMsg.textContent = data.error || "Ошибка авторизации";
-                }
-            } catch (e) {
-                errorMsg.textContent = "Ошибка соединения с сервером";
-                console.error(e);
-            }
+      try {
+        const response = await fetch("/api/login", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({email, password})
         });
-    </script>
+
+        const data = await response.json();
+
+        if (response.ok && data.token) {
+          await fetch("/session_set", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({user_id: data.user.id, email: data.user.email})
+          });
+          window.location.href = "/";
+        } else {
+          errorMsg.textContent = data.error || "Ошибка авторизации";
+        }
+      } catch (e) {
+        errorMsg.textContent = "Ошибка соединения с сервером";
+      }
+    });
+  </script>
 </body>
 </html>
