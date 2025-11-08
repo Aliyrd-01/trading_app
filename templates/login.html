@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Analyzer</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container" id="login-container">
+        <h1>Crypto Analyzer</h1>
+        <div class="form-grid">
+            <label>
+                Email:
+                <input type="text" id="email" placeholder="Введите email">
+            </label>
+            <label>
+                Пароль:
+                <input type="password" id="password" placeholder="Введите пароль">
+            </label>
+            <button onclick="login()">Войти</button>
+        </div>
+    </div>
+
+    <div class="container hidden" id="app-content">
+        <h1>Добро пожаловать!</h1>
+    </div>
+
+    <script>
+        function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            fetch('/session_set', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({user_id: 1, email})
+            }).then(r => r.json())
+              .then(res => {
+                  if(res.ok){
+                      document.getElementById('login-container').classList.add('hidden');
+                      document.getElementById('app-content').classList.remove('hidden');
+                      if(window.pyjs) {
+                          pyjs.loginSuccess(JSON.stringify({user_id:1, email: email, token: "dummy"}));
+                      }
+                  } else {
+                      alert("Ошибка авторизации");
+                  }
+              }).catch(err => {
+                  console.error(err);
+                  alert("Ошибка соединения с сервером");
+              });
+        }
+    </script>
+</body>
+</html>

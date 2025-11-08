@@ -2,53 +2,51 @@ import sys
 import threading
 import time
 import base64
-from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QPushButton, QVBoxLayout, QWidget
+import requests
+
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QFileDialog
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineSettings
 from PyQt5.QtWebChannel import QWebChannel
-from PyQt5.QtCore import QObject, pyqtSlot, QUrl, Qt
-from app import app  # Flask backend
+from PyQt5.QtCore import QObject, pyqtSlot, QUrl
+
+# импорт твоего backend Flask
+from app import app  # Flask backend на 5050
 
 
+# --- WebBridge для взаимодействия с JS (сохранение ZIP, уведомление о login) ---
 class WebBridge(QObject):
-    def __init__(self):
-        super().__init__()
-
     @pyqtSlot(str, str, result=str)
     def saveZipFile(self, zip_base64, suggested_name):
-        """
-        Слот вызывается из JS: получает base64 и предлагает пользователю сохранить файл.
-        Возвращает "ok" при успешном сохранении или "cancel", если пользователь отменил.
-        """
         try:
-            options = QFileDialog.Options()
             path, _ = QFileDialog.getSaveFileName(
-                None, "Сохранить отчёт", suggested_name, "ZIP Files (*.zip)", options=options
+                None, "Сохранить отчёт", suggested_name, "ZIP Files (*.zip)"
             )
             if not path:
-                print("⚠️ Пользователь отменил сохранение")
                 return "cancel"
-
             data = base64.b64decode(zip_base64)
             with open(path, "wb") as f:
                 f.write(data)
-            print(f"✅ Файл сохранён: {path}")
             return "ok"
-
         except Exception as e:
-            print("❌ Ошибка при сохранении ZIP:", e)
+            print("Ошибка при сохранении ZIP:", e)
             return "cancel"
 
+    @pyqtSlot(str)
+    def loginSuccess(self, payload_json):
+        # JS сообщает о успешном логине
+        print("Login payload from JS:", payload_json)
 
+
+# --- Функция запуска Flask в отдельном потоке ---
 def run_flask():
-    app.run(debug=False, port=5000, use_reloader=False)
+    app.run(debug=False, port=5050, use_reloader=False, threaded=True)
 
 
-def wait_for_server(url="http://127.0.0.1:5000", timeout=10):
-    import requests
+def wait_for_server(url="http://127.0.0.1:5050", timeout=10):
     for _ in range(timeout * 10):
         try:
-            r = requests.get(url)
-            if r.status_code == 200:
+            r = requests.get(url, timeout=1.0)
+            if r.status_code in (200, 302):
                 return True
         except Exception:
             pass
@@ -56,6 +54,7 @@ def wait_for_server(url="http://127.0.0.1:5000", timeout=10):
     return False
 
 
+# --- Главное окно с QWebEngineView ---
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -63,7 +62,6 @@ class MainWindow(QMainWindow):
         self.resize(1200, 800)
         self.setMinimumSize(1200, 800)
 
-        # Основной виджет и layout
         central = QWidget()
         self.setCentralWidget(central)
         layout = QVBoxLayout()
@@ -71,17 +69,12 @@ class MainWindow(QMainWindow):
         layout.setSpacing(0)
         central.setLayout(layout)
 
-        # QWebEngineView
         self.web = QWebEngineView()
         layout.addWidget(self.web)
 
-        # аппаратное ускорение
+        # Ускорение WebEngine
         self.web.settings().setAttribute(QWebEngineSettings.Accelerated2dCanvasEnabled, True)
         self.web.settings().setAttribute(QWebEngineSettings.WebGLEnabled, True)
-
-        # кэш-бастер
-        cache_buster = int(time.time())
-        self.web.setUrl(QUrl(f"http://127.0.0.1:5000?nocache={cache_buster}"))
 
         # WebChannel
         self.channel = QWebChannel()
@@ -89,29 +82,29 @@ class MainWindow(QMainWindow):
         self.channel.registerObject("pyjs", self.bridge)
         self.web.page().setWebChannel(self.channel)
 
-    def resizeEvent(self, event):
-        # минимизируем лишние перерисовки при ресайзе
-        self.web.resize(self.size())
-        super().resizeEvent(event)
+        # Загружаем страницу логина
+        self.web.setUrl(QUrl("http://127.0.0.1:5050/login"))
+
+        self.web.loadFinished.connect(self._on_page_load)
+
+    def _on_page_load(self, ok):
+        if not ok:
+            print("Не удалось загрузить страницу")
+            return
 
 
+# --- Основной запуск ---
 if __name__ == "__main__":
-    # Flask сервер в отдельном потоке
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
-    flask_thread.start()
-
-    print("⏳ Запуск Flask-сервера...")
+    # Запуск Flask в отдельном потоке
+    threading.Thread(target=run_flask, daemon=True).start()
+    print("Запуск Flask-сервера...")
     if not wait_for_server():
-        print("⚠️ Сервер не запустился вовремя")
+        print("⚠️ Сервер не доступен на http://127.0.0.1:5050")
 
     app_qt = QApplication(sys.argv)
+    app_qt.setStyleSheet("QPushButton { outline: none; } QPushButton:focus { outline: none; }")
 
-    # убираем пунктир вокруг всех QPushButton по умолчанию
-    app_qt.setStyleSheet("""
-        QPushButton { outline: none; }
-        QPushButton:focus { outline: none; }
-    """)
+    main_window = MainWindow()
+    main_window.show()
 
-    window = MainWindow()
-    window.show()
     sys.exit(app_qt.exec_())
