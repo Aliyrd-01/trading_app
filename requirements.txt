@@ -10,4 +10,8 @@ PyQt5==5.15.9
 PyQtWebEngine==5.15.9
 Flask==2.3.3
 requests==2.31.0
+flask-sqlalchemy
+psycopg2-binary
+pymysql
+cryptography
 

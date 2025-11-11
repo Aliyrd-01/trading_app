@@ -7,38 +7,17 @@
   <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
 </head>
 <body>
-	 <div class="container">
-	<div id="logoutContainer">
-	  <a href="#" id="logoutBtn">Выйти</a>
-	</div>
+  <div class="container">
+    <div id="logoutContainer">
+      <a href="#" id="logoutBtn">Выйти</a>
+    </div>
 
-	<h1>📊 Crypto Trading Analyzer</h1>
+    <h1>📊 Crypto Trading Analyzer</h1>
 
-	<script>
-	document.addEventListener("DOMContentLoaded", () => {
-	  const logoutBtn = document.getElementById("logoutBtn");
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
 
-	  logoutBtn.addEventListener("click", async () => {
-		try {
-		  // Очистка localStorage
-		  localStorage.removeItem("rememberedUser");
-
-		  // Очистка сессии на сервере
-		  await fetch("/session_set", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ user_id: null, email: null })
-		  });
-
-		  window.location.href = "/login";
-		} catch (e) {
-		  console.error("Ошибка logout:", e);
-		  alert("Ошибка при выходе");
-		}
-	  });
-	});
-	</script>
     <div class="form-grid">
+      <!-- Настройки анализа -->
       <label>
         Валютная пара:
         <select id="symbol">
@@ -94,34 +73,23 @@
         <input type="number" id="risk" value="1" step="0.1" min="0.1" max="5">
       </label>
 
-      <!-- ✅ заменено: группа чекбоксов для подтверждений -->
-			  <label class="with-info">
-		  <div class="label-row">
-			<span>Тип подтверждения входа:</span>
-			<span class="info" data-tip="Можно выбрать один из готовых вариантов:
-		▪ EMA — структура тренда
-		▪ RSI — сила импульса
-		▪ MACD — пересечение направлений
-		▪ VWMA — подтверждение объёмом
-		▪ ADX — сила тренда
-		▪ RSI + MACD — импульс и направление
-		▪ EMA + ADX + VWMA — тренд + сила + объём
-		▪ Все фильтры подтверждены — строгий режим
-		▪ Без фильтров — анализ без ограничений">ℹ️</span>
-		  </div>
-		  <select id="confirmation">
-			<option value="EMA">EMA</option>
-			<option value="RSI">RSI</option>
-			<option value="MACD">MACD</option>
-			<option value="VWMA">VWMA</option>
-			<option value="ADX">ADX</option>
-			<option value="RSI+MACD">RSI + MACD</option>
-			<option value="EMA+ADX+VWMA">EMA + ADX + VWMA</option>
-			<option value="ALL">Все фильтры подтверждены</option>
-			<option value="NONE">Без фильтров</option>
-		  </select>
-		</label>
-
+      <label class="with-info">
+        <div class="label-row">
+          <span>Тип подтверждения входа:</span>
+          <span class="info" data-tip="Можно выбрать один из готовых вариантов: EMA, RSI, MACD, VWMA, ADX, комбинации или все фильтры">ℹ️</span>
+        </div>
+        <select id="confirmation">
+          <option value="EMA">EMA</option>
+          <option value="RSI">RSI</option>
+          <option value="MACD">MACD</option>
+          <option value="VWMA">VWMA</option>
+          <option value="ADX">ADX</option>
+          <option value="RSI+MACD">RSI + MACD</option>
+          <option value="EMA+ADX+VWMA">EMA + ADX + VWMA</option>
+          <option value="ALL">Все фильтры подтверждены</option>
+          <option value="NONE">Без фильтров</option>
+        </select>
+      </label>
 
       <p id="tfInfo" class="info-text">Таймфрейм: 5m</p>
 
@@ -195,36 +163,60 @@
 
 === Конец отчёта ===
       </pre>
-	  <div id="chartContainer" class="hidden">
-  <h3>📉 График анализа</h3>
-  <img id="chartImage" src="" alt="График анализа">
-  </div>
 
+      <div id="chartContainer" class="hidden">
+        <h3>📉 График анализа</h3>
+        <img id="chartImage" src="" alt="График анализа">
+      </div>
 
-	<!-- === Кнопки скачивания === -->
-	<div id="downloadButtons"
-		 class="mt-4 flex justify-between items-center w-full max-w-4xl mx-auto px-4">
-	  <!-- Левая кнопка: Скачать ZIP -->
-	  <button id="downloadZip"
-			  disabled
-			  class="px-4 py-2 bg-blue-600 text-white rounded-2xl shadow-md hover:bg-blue-700 
-					 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200">
-		📦 Скачать ZIP
-	  </button>
-
-	  <!-- Правая кнопка: Скачать статистику -->
-	  <button id="downloadStats"
-			  disabled
-			  class="px-4 py-2 bg-green-600 text-white rounded-2xl shadow-md hover:bg-green-700 
-					 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200">
-		📊 Скачать статистику
-	  </button>
-	</div>
-
+      <!-- Кнопки скачивания -->
+      <div id="downloadButtons" class="mt-4 flex justify-between items-center w-full max-w-4xl mx-auto px-4">
+        <button id="downloadZip" disabled>📦 Скачать ZIP</button>
+        <button id="downloadStats" disabled>📊 Скачать статистику</button>
+      </div>
     </div>
   </div>
 
   <div id="toastContainer"></div>
-  <script src="{{ url_for('static', filename='script.js') }}"></script>
+
+  <script>
+    // Инициализация Qt WebChannel, чтобы window.pyjs был доступен в JS
+    try {
+      if (window.QWebChannel && window.qt && window.qt.webChannelTransport) {
+        new QWebChannel(window.qt.webChannelTransport, function (channel) {
+          window.pyjs = channel.objects.pyjs;
+        });
+      }
+    } catch (e) {
+      console.warn("WebChannel init failed or not in Qt:", e);
+    }
+
+    // 🔒 Проверка сессии при загрузке страницы
+    async function checkSession() {
+      try {
+        const res = await fetch("/session_check");
+        const data = await res.json();
+        if (!data.logged_in) {
+          // если сессия неактивна, уходим на логин
+          window.location.href = "/login";
+        }
+      } catch (err) {
+        console.error("Ошибка проверки сессии:", err);
+        window.location.href = "/login";
+      }
+    }
+    checkSession();
+
+    // 🚪 Обработчик выхода
+    document.getElementById("logoutBtn").addEventListener("click", async (e) => {
+      e.preventDefault();
+      try {
+        await fetch("/api/logout", { method: "POST", headers: { "Content-Type": "application/json" } });
+      } catch (err) {
+        console.error("Ошибка logout:", err);
+      }
+      window.location.href = "/login";
+    });
+  </script>
 </body>
 </html>

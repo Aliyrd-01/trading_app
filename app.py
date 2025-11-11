@@ -1,77 +1,94 @@
-import sys
-import threading
-import time
+import os
 import base64
-import requests
-from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, session
 import io
 import zipfile
 import csv
-from concurrent.futures import ThreadPoolExecutor
-from trading_app import run_analysis
 import traceback
 from datetime import datetime
+from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, session
 from werkzeug.security import check_password_hash
+import bcrypt
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import func
+from trading_app import run_analysis  # твой модуль анализа
 
-# ✅ Импорт моделей
-from models import db, User, ReportV2
-
-# === Flask App ===
+# === Flask app ===
 app = Flask(__name__)
-app.secret_key = "super-secret-key"  # для сессий
-app.config["SQLALCHEMY_DATABASE_URI"] = (
-    "mysql+pymysql://u543957720_crypto:AgUbbkD1h%21@srv936.hstgr.io/u543957720_cryptoprice"
-)
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True, "pool_recycle": 280}
+app.secret_key = os.urandom(24)
 
-db.init_app(app)
-executor = ThreadPoolExecutor(max_workers=2)
+# === MySQL ===
+app.config['SQLALCHEMY_DATABASE_URI'] = "mysql+pymysql://u543957720_crypto:AgUbbkD1h!@auth-db936.hstgr.io/u543957720_cryptoprice"
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"pool_recycle": 280, "pool_pre_ping": True}
+
+db = SQLAlchemy(app)
+
+# === Модели ===
+class User(db.Model):
+    __tablename__ = "user"
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(256), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    plan = db.Column(db.String(20), default="free")
+
+
+class ReportV2(db.Model):
+    __tablename__ = "report_v2"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    symbol = db.Column(db.String(20))
+    strategy = db.Column(db.String(50))
+    trading_type = db.Column(db.String(50))
+    capital = db.Column(db.Float)
+    risk = db.Column(db.Float)
+    confirmation = db.Column(db.String(100))
+    direction = db.Column(db.String(10))
+    entry_price = db.Column(db.Float)
+    exit_price = db.Column(db.Float)
+    rr_long = db.Column(db.Float)
+    rr_short = db.Column(db.Float)
+    profit_loss = db.Column(db.Float)
+    profit_loss_percent = db.Column(db.Float)
+    success = db.Column(db.Boolean)
+    trend = db.Column(db.String(20))
+    stop_loss = db.Column(db.Float, nullable=True)
+    take_profit = db.Column(db.Float, nullable=True)
+    report_text = db.Column(db.Text)
+    result_summary = db.Column(db.String(200))
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship("User", backref="reports_v2")
+
 
 with app.app_context():
     db.create_all()
-    print("✅ Таблицы созданы или уже существуют в MySQL")
 
-# ---------------------------
-# Проверка пароля
-# ---------------------------
+# === Проверка пароля ===
 def verify_password(plain_password: str, stored_hash: str) -> bool:
-    if not stored_hash:
+    if not stored_hash or not plain_password:
         return False
     plain_password = plain_password.strip()
     stored_hash = stored_hash.strip()
-    try:
-        return check_password_hash(stored_hash, plain_password)
-    except Exception as e:
-        print("Ошибка проверки пароля:", e)
-        return False
-
-# --- WebBridge для взаимодействия с JS ---
-from PyQt5.QtCore import QObject, pyqtSlot
-from PyQt5.QtWidgets import QFileDialog
-
-class WebBridge(QObject):
-    @pyqtSlot(str, str, result=str)
-    def saveZipFile(self, zip_base64, suggested_name):
+    # Поддержка PHP bcrypt ($2y$) и стандартных $2b$/$2a$
+    if stored_hash.startswith("$2y$") or stored_hash.startswith("$2b$") or stored_hash.startswith("$2a$"):
         try:
-            path, _ = QFileDialog.getSaveFileName(
-                None, "Сохранить отчёт", suggested_name, "ZIP Files (*.zip)"
-            )
-            if not path:
-                return "cancel"
-            data = base64.b64decode(zip_base64)
-            with open(path, "wb") as f:
-                f.write(data)
-            return "ok"
-        except Exception as e:
-            print("Ошибка при сохранении ZIP:", e)
-            return "cancel"
+            # Нормализуем $2y$ -> $2b$ для совместимости с python-bcrypt
+            hash_for_check = stored_hash
+            if stored_hash.startswith("$2y$"):
+                hash_for_check = "$2b$" + stored_hash[4:]
+            return bcrypt.checkpw(plain_password.encode("utf-8"), hash_for_check.encode("utf-8"))
+        except Exception:
+            return False
+    try:
+        if stored_hash.startswith(("pbkdf2:", "scrypt:", "bcrypt:")):
+            return check_password_hash(stored_hash, plain_password)
+    except Exception:
+        pass
+    return stored_hash == plain_password
 
-    @pyqtSlot(str)
-    def loginSuccess(self, payload_json):
-        print("Login payload from JS:", payload_json)
 
-# === API логина ===
+# === API: Login ===
 @app.route("/api/login", methods=["POST"])
 def api_login():
     data = request.json or {}
@@ -81,80 +98,59 @@ def api_login():
     if not email or not password:
         return jsonify({"error": "Email и пароль обязательны"}), 400
 
-    try:
-        user = User.query.filter_by(email=email).first()
-    except Exception as e:
-        print("❌ Ошибка обращения к БД:", e)
-        return jsonify({"error": "Ошибка доступа к БД"}), 500
-
+    user = User.query.filter(func.lower(User.email) == email).first()
     if not user:
         return jsonify({"error": "Пользователь не найден"}), 404
 
     if not verify_password(password, user.password_hash):
         return jsonify({"error": "Неверный пароль"}), 401
 
-    token = base64.b64encode(f"{email}:{password}".encode()).decode()
+    session["user_id"] = user.id
+    session["email"] = user.email
 
     return jsonify({
         "ok": True,
-        "token": token,
         "user": {"id": user.id, "email": user.email, "plan": user.plan}
     })
 
-# === Сессии ===
-@app.route("/session_set", methods=["POST"])
-def session_set():
-    data = request.json or {}
-    user_id = data.get("user_id")
-    email = data.get("email")
-    if not user_id:
-        return jsonify({"error": "user_id required"}), 400
 
-    session["user_id"] = int(user_id)
-    session["email"] = email
-    print(f"👤 Сессия установлена: {user_id} ({email})")
-    return jsonify({"ok": True, "current_user": user_id, "email": email})
+# === API: Logout ===
+@app.route("/api/logout", methods=["POST"])
+def api_logout():
+    session.clear()
+    return jsonify({"ok": True})
 
+
+# === Проверка сессии ===
 @app.route("/session_check")
 def session_check():
-    logged_in = session.get("user_id") is not None
-    return jsonify({"logged_in": logged_in})
+    return jsonify({"logged_in": bool(session.get("user_id"))})
 
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect("/login")
 
-# === Рендер страниц ===
+# === Страницы ===
 @app.route("/login")
-def login():
+def login_page():
     return render_template("login.html")
 
 @app.route("/")
-def index():
+def index_page():
     if not session.get("user_id"):
-        return redirect(url_for("login"))
+        return redirect(url_for("login_page"))
     return render_template("index.html")
 
-# ==== Анализ и скачивание отчётов (без изменений) ====
-@app.route("/run_analysis", methods=["POST"])
-def analyze():
+
+# === API: Анализ ===
+@app.route("/api/analyze", methods=["POST"])
+def run_analysis_route():
+    if not session.get("user_id"):
+        return jsonify({"error": "Требуется авторизация"}), 401
+
     data = request.json or {}
-    confirmation = data.get("confirmation")
-    future = executor.submit(
-        run_analysis,
-        data.get("symbol"),
-        None,
-        data.get("strategy"),
-        data.get("trading_type"),
-        float(data.get("capital", 10000)),
-        float(data.get("risk", 1)) / 100,
-        None,
-        confirmation
-    )
+    user_id = session["user_id"]
+
     try:
         (
-            ReportV2_text,
+            report_text,
             chart_bytes,
             excel_bytes,
             symbol,
@@ -166,9 +162,21 @@ def analyze():
             trend,
             stop_loss,
             take_profit
-        ) = future.result()
+        ) = run_analysis(
+            data.get("symbol"),
+            None,
+            data.get("strategy"),
+            data.get("trading_type"),
+            float(data.get("capital", 10000)),
+            float(data.get("risk", 1)) / 100,
+            None,
+            data.get("confirmation")
+        )
 
-        user_id = session.get("user_id")
+        profit_loss = ((exit_price - entry_price) * data.get("capital", 0) / entry_price) if entry_price and exit_price else None
+        profit_loss_percent = ((exit_price - entry_price) / entry_price * 100) if entry_price and exit_price else None
+        success = ((exit_price > entry_price) if direction == "long" else (exit_price < entry_price)) if entry_price and exit_price and direction else None
+
         report = ReportV2(
             user_id=user_id,
             symbol=symbol,
@@ -177,66 +185,80 @@ def analyze():
             capital=float(data.get("capital", 0)),
             risk=float(data.get("risk", 0)),
             confirmation=str(data.get("confirmation", "")),
-            report_text=ReportV2_text,
-            result_summary="Анализ успешно выполнен",
+            report_text=report_text,
             rr_long=rr_long,
             rr_short=rr_short,
             trend=trend,
+            entry_price=entry_price,
+            exit_price=exit_price,
+            direction=direction,
+            stop_loss=stop_loss,
+            take_profit=take_profit,
+            profit_loss=profit_loss,
+            profit_loss_percent=profit_loss_percent,
+            success=success,
+            result_summary="Анализ завершён"
         )
+
         db.session.add(report)
         db.session.commit()
-        print(f"💾 Отчёт сохранён: id={report.id}, user_id={user_id}")
+        print(f"💾 Отчёт сохранён: id={report.id}, user={user_id}")
 
+        chart_base64 = base64.b64encode(chart_bytes.getvalue()).decode() if chart_bytes else None
+        zip_buf = io.BytesIO()
+        with zipfile.ZipFile(zip_buf, "w") as z:
+            z.writestr("report.txt", report_text)
+            if chart_bytes:
+                z.writestr("chart.png", chart_bytes.getvalue())
+            if excel_bytes:
+                z.writestr("data.xlsx", excel_bytes.getvalue())
+        zip_base64 = base64.b64encode(zip_buf.getvalue()).decode()
+
+        return jsonify({
+            "report_text": report_text,
+            "chart_base64": chart_base64,
+            "zip_base64": zip_base64
+        })
     except Exception as e:
-        tb = traceback.format_exc()
-        print("❌ Ошибка анализа или сохранения в БД:", tb)
-        return jsonify({"error": f"Ошибка анализа: {str(e)}"}), 500
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
-    chart_base64 = base64.b64encode(chart_bytes.getvalue()).decode() if chart_bytes else None
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w") as zf:
-        zf.writestr("ReportV2.txt", ReportV2_text)
-        if chart_bytes:
-            zf.writestr("chart.png", chart_bytes.getvalue())
-        if excel_bytes:
-            zf.writestr("data.xlsx", excel_bytes.getvalue())
-    zip_base64 = base64.b64encode(zip_buffer.getvalue()).decode()
 
-    return jsonify({
-        "ReportV2_text": ReportV2_text,
-        "chart_base64": chart_base64,
-        "zip_base64": zip_base64
-    })
-
+# === API: Скачивание статистики ===
 @app.route("/download_user_stats")
 def download_user_stats():
-    user_id = session.get("user_id") or 1
-    ReportV2s = ReportV2.query.filter(
-        (ReportV2.user_id == None) | (ReportV2.user_id == user_id)
-    ).all()
-    if not ReportV2s:
-        return jsonify({"error": "Нет данных для отчёта"}), 404
+    if not session.get("user_id"):
+        return jsonify({"error": "Неавторизован"}), 401
 
-    total = len(ReportV2s)
-    summary = f"📊 Отчёт по пользователю {user_id}\nВсего отчётов: {total}\n"
+    user_id = session["user_id"]
+    reports = ReportV2.query.filter_by(user_id=user_id).all()
+    if not reports:
+        return jsonify({"error": "Нет данных"}), 404
+
     csv_buf = io.StringIO()
     writer = csv.writer(csv_buf)
-    writer.writerow(["Symbol", "Strategy", "Trading Type", "Date"])
-    for r in ReportV2s:
-        writer.writerow([r.symbol, r.strategy, r.trading_type, r.timestamp.strftime("%Y-%m-%d %H:%M")])
+    writer.writerow([
+        "symbol", "strategy", "type", "entry_price", "exit_price", "direction",
+        "profit_loss", "profit_loss_percent", "success", "stop_loss", "take_profit", "date"
+    ])
+    for r in reports:
+        writer.writerow([
+            r.symbol, r.strategy, r.trading_type,
+            r.entry_price, r.exit_price, r.direction,
+            r.profit_loss, r.profit_loss_percent, r.success,
+            r.stop_loss, r.take_profit,
+            r.timestamp.strftime("%Y-%m-%d %H:%M")
+        ])
 
     zip_buf = io.BytesIO()
     with zipfile.ZipFile(zip_buf, "w") as z:
-        z.writestr("summary.txt", summary)
-        z.writestr("ReportV2s.csv", csv_buf.getvalue())
-
+        z.writestr("stats.csv", csv_buf.getvalue())
     zip_buf.seek(0)
     return send_file(zip_buf, as_attachment=True, download_name="user_stats.zip", mimetype="application/zip")
 
-# --- Запуск ---
+
+# === Запуск ===
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
-        print("✅ Таблицы созданы или уже существуют в MySQL")
-    print("🖥️ Flask backend starting on http://127.0.0.1:5050 ...")
-    app.run(debug=False, port=5050, use_reloader=False, threaded=True)
+    port = 5050
+    print(f"🖥️ Flask сервер запущен на http://127.0.0.1:{port}")
+    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False, threaded=True)

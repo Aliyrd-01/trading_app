@@ -47,82 +47,71 @@
     </div>
   </div>
 
-  <script>
-    const loginBtn = document.getElementById("loginBtn");
-    const errorMsg = document.getElementById("errorMsg");
-    const rememberMe = document.getElementById("rememberMe");
+	  <script>
+	const loginBtn = document.getElementById("loginBtn");
+	const errorMsg = document.getElementById("errorMsg");
+	const rememberMe = document.getElementById("rememberMe");
 
-    // Автологин при наличии localStorage
-    window.addEventListener("load", async () => {
-      try {
-        const stored = localStorage.getItem("rememberedUser");
-        if (stored) {
-          const data = JSON.parse(stored);
-          const res = await fetch("/api/login", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ email: data.email, password: data.password })
-          });
-          const result = await res.json();
-          if (res.ok && result.token) {
-            await fetch("/session_set", {
-              method: "POST",
-              headers: {"Content-Type": "application/json"},
-              body: JSON.stringify({ user_id: result.user.id, email: result.user.email })
-            });
-            window.location.href = "/";
-          }
-        } else {
-          const res = await fetch("/session_check");
-          const data = await res.json();
-          if (data.logged_in) window.location.href = "/";
-        }
-      } catch (e) {
-        console.error("Session check failed:", e);
-      }
-    });
+	// Автологин при наличии localStorage
+	window.addEventListener("load", async () => {
+	  try {
+		const stored = localStorage.getItem("rememberedUser");
+		if (stored) {
+		  const data = JSON.parse(stored);
+		  const res = await fetch("/api/login", {
+			method: "POST",
+			headers: {"Content-Type": "application/json"},
+			body: JSON.stringify({ email: data.email, password: data.password })
+		  });
+		  const result = await res.json();
+		  if (res.ok && result.ok) {
+			window.location.href = "/";
+		  }
+		} else {
+		  const res = await fetch("/session_check");
+		  const data = await res.json();
+		  if (data.logged_in) window.location.href = "/";
+		}
+	  } catch (e) {
+		console.error("Session check failed:", e);
+	  }
+	});
 
-    loginBtn.addEventListener("click", async () => {
-      errorMsg.textContent = "";
+	loginBtn.addEventListener("click", async () => {
+	  errorMsg.textContent = "";
 
-      const email = document.getElementById('email').value.trim();
-      const password = document.getElementById('password').value.trim();
+	  const email = document.getElementById('email').value.trim();
+	  const password = document.getElementById('password').value.trim();
 
-      if (!email || !password) {
-        errorMsg.textContent = "Email и пароль обязательны";
-        return;
-      }
+	  if (!email || !password) {
+		errorMsg.textContent = "Email и пароль обязательны";
+		return;
+	  }
 
-      try {
-        const response = await fetch("/api/login", {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({email, password})
-        });
+	  try {
+		const response = await fetch("/api/login", {
+		  method: "POST",
+		  headers: {"Content-Type": "application/json"},
+		  body: JSON.stringify({email, password})
+		});
 
-        const data = await response.json();
+		const data = await response.json();
 
-        if (response.ok && data.token) {
-          await fetch("/session_set", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({user_id: data.user.id, email: data.user.email})
-          });
+		if (response.ok && data.ok) {
+		  if (rememberMe.checked) {
+			localStorage.setItem("rememberedUser", JSON.stringify({email, password}));
+		  } else {
+			localStorage.removeItem("rememberedUser");
+		  }
 
-          if (rememberMe.checked) {
-            localStorage.setItem("rememberedUser", JSON.stringify({email, password}));
-          } else {
-            localStorage.removeItem("rememberedUser");
-          }
-
-          window.location.href = "/";
-        } else {
-          errorMsg.textContent = data.error || "Ошибка авторизации";
-        }
-      } catch (e) {
-        errorMsg.textContent = "Ошибка соединения с сервером";
-      }
-    });
-  </script>
+		  window.location.href = "/";
+		} else {
+		  errorMsg.textContent = data.error || "Ошибка авторизации";
+		}
+	  } catch (e) {
+		errorMsg.textContent = "Ошибка соединения с сервером";
+	  }
+	});
+	</script>
 </body>
 </html>
