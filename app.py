@@ -11,6 +11,11 @@ import bcrypt
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func
 from trading_app import run_analysis  # твой модуль анализа
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+import numpy as np
 
 # === Flask app ===
 app = Flask(__name__)
@@ -255,6 +260,75 @@ def download_user_stats():
         z.writestr("stats.csv", csv_buf.getvalue())
     zip_buf.seek(0)
     return send_file(zip_buf, as_attachment=True, download_name="user_stats.zip", mimetype="application/zip")
+
+
+# === ZIP: PDF диаграммы + Excel таблица ===
+@app.route("/download_user_stats_bundle")
+def download_user_stats_bundle():
+    if not session.get("user_id"):
+        return jsonify({"error": "Неавторизован"}), 401
+
+    user_id = session["user_id"]
+    reports = ReportV2.query.filter_by(user_id=user_id).all()
+    if not reports:
+        return jsonify({"error": "Нет данных"}), 404
+
+    # Подготовка данных
+    symbols = [r.symbol or "N/A" for r in reports]
+    successes = [(1 if r.success else 0) if r.success is not None else None for r in reports]
+    success_count = sum(1 for s in successes if s == 1)
+    fail_count = sum(1 for s in successes if s == 0)
+
+    symbol_counts = {}
+    for s in symbols:
+        symbol_counts[s] = symbol_counts.get(s, 0) + 1
+
+    # 1) PDF с диаграммами
+    buf_pdf = io.BytesIO()
+    with PdfPages(buf_pdf) as pdf:
+        # Страница 1: Заголовок и круговые диаграммы
+        fig, axs = plt.subplots(1, 2, figsize=(11.69, 8.27))  # A4 landscape
+        # Пирог 1: успех/неуспех
+        axs[0].pie([success_count, fail_count], labels=["Успешные", "Неуспешные"],
+                   autopct="%1.1f%%", colors=["#34D399", "#EF4444"], startangle=140)
+        axs[0].set_title("Распределение сделок по результату")
+        # Пирог 2: по символам
+        labels = list(symbol_counts.keys())
+        sizes = [symbol_counts[k] for k in labels]
+        axs[1].pie(sizes, labels=labels, autopct="%1.1f%%", startangle=140)
+        axs[1].set_title("Распределение сделок по инструментам")
+        pdf.savefig(fig, bbox_inches="tight")
+        plt.close(fig)
+
+    buf_pdf.seek(0)
+
+    # 2) Excel с таблицей всех сделок
+    import pandas as pd  # локальный импорт, чтобы не ломать окружение
+    cols = ["symbol","strategy","type","entry_price","exit_price","direction","profit_loss","profit_loss_percent","success","stop_loss","take_profit","date"]
+    rows = []
+    for r in reports:
+        rows.append([
+            r.symbol, r.strategy, r.trading_type,
+            r.entry_price, r.exit_price, r.direction,
+            r.profit_loss, r.profit_loss_percent,
+            bool(r.success) if r.success is not None else None,
+            r.stop_loss, r.take_profit,
+            r.timestamp.strftime("%Y-%m-%d %H:%M"),
+        ])
+    df = pd.DataFrame(rows, columns=cols)
+    buf_xlsx = io.BytesIO()
+    with pd.ExcelWriter(buf_xlsx, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="user_stats")
+    buf_xlsx.seek(0)
+
+    # 3) ZIP обеих
+    zip_buf = io.BytesIO()
+    with zipfile.ZipFile(zip_buf, "w") as z:
+        z.writestr("user_stats.pdf", buf_pdf.getvalue())
+        z.writestr("user_stats.xlsx", buf_xlsx.getvalue())
+    zip_buf.seek(0)
+
+    return send_file(zip_buf, as_attachment=True, download_name="user_stats_bundle.zip", mimetype="application/zip")
 
 
 # === Запуск ===

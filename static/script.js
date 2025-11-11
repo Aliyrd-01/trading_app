@@ -105,6 +105,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     startProgress();
+    analyzeBtn.disabled = true;
     document.querySelector("#result h2").textContent = "📄 Отчёт";
     downloadBtn.disabled = true;
     downloadStatsBtn.disabled = true;
@@ -123,6 +124,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (data.error) {
         showToast("❌ " + data.error, "error");
+        analyzeBtn.disabled = false;
         return;
       }
 
@@ -184,6 +186,7 @@ document.addEventListener("DOMContentLoaded", () => {
       stopProgress();
       console.error("Ошибка анализа:", err);
       showToast("❌ Ошибка анализа: " + err.message, "error");
+      analyzeBtn.disabled = false;
     }
   });
 
@@ -193,7 +196,7 @@ document.addEventListener("DOMContentLoaded", () => {
     downloadStatsBtn.disabled = true;
 
     try {
-      const res = await fetch("/download_user_stats");
+      const res = await fetch("/download_user_stats_bundle");
       if (!res.ok) {
         showToast("⚠️ Нет данных для отчёта или ошибка при загрузке", "error");
         downloadStatsBtn.disabled = false;
@@ -204,23 +207,22 @@ document.addEventListener("DOMContentLoaded", () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
 
-      // Если доступен мост PyQt — сохраняем через системный диалог
+      // Если доступен мост PyQt — сохраняем через системный диалог (ZIP)
       if (window.pyjs && typeof window.pyjs.saveZipFile === "function") {
         const reader = new FileReader();
         reader.onload = async () => {
           try {
             const base64 = (reader.result || "").toString().split(",")[1] || "";
-            const res2 = await window.pyjs.saveZipFile(base64, "user_stats.zip");
+            const res2 = await window.pyjs.saveZipFile(base64, "user_stats_bundle.zip");
             if (res2 === "ok") {
-              showToast("📊 Статистика успешно сохранена", "success");
+              showToast("📦 Архив сохранён", "success");
             } else {
               showToast("⚠️ Сохранение отменено", "error");
             }
           } catch (err) {
             console.error("Ошибка сохранения через мост:", err);
-            // Фолбэк: сохранение через браузер
             a.href = url;
-            a.download = "user_stats.zip";
+            a.download = "user_stats_bundle.zip";
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -229,9 +231,8 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         };
         reader.onerror = () => {
-          // Фолбэк: сохранение через браузер
           a.href = url;
-          a.download = "user_stats.zip";
+          a.download = "user_stats_bundle.zip";
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
@@ -240,9 +241,8 @@ document.addEventListener("DOMContentLoaded", () => {
         };
         reader.readAsDataURL(blob);
       } else {
-        // Обычный браузер: скачивание в папку загрузок
         a.href = url;
-        a.download = "user_stats.zip";
+        a.download = "user_stats_bundle.zip";
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);

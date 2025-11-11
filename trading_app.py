@@ -171,13 +171,30 @@ def dynamic_rr(entry, sl, atr, adx, trend_dir):
     rr = abs(tp - entry) / sl_dist
     return round(rr, 2)
 
-def check_confirmations(row, selected):
+def check_confirmations(row, selected, prev_row=None):
     indicators_map = {
         "EMA": row["EMA_50"] > row["EMA_200"],
         "RSI": row["RSI_14"] > 50,
         "MACD": row["MACD"] > row["Signal_Line"],
         "ADX": row["ADX"] > 25,
         "VWMA": row["Close"] > row.get("VWMA_20", 0),
+        # BB: консервативный «возврат внутрь полос»
+        "BB": (
+            (
+                prev_row is not None and
+                prev_row["Close"] < prev_row.get("BB_lower", 0) and
+                row["Close"] >= row.get("BB_lower", 0)
+            ) or (
+                prev_row is not None and
+                prev_row["Close"] > prev_row.get("BB_upper", 0) and
+                row["Close"] <= row.get("BB_upper", 0)
+            ) or (
+                # если нет prev_row — просто внутри полос
+                prev_row is None and
+                row["Close"] >= row.get("BB_lower", 0) and
+                row["Close"] <= row.get("BB_upper", 0)
+            )
+        ),
     }
     if not selected:
         return "Нет выбранных подтверждений", 0, 0
@@ -249,19 +266,25 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
         rr_long = dynamic_rr(long_entry, long_sl, atr, latest["ADX"], latest["Trend"])
         rr_short = dynamic_rr(short_entry, short_sl, atr, latest["ADX"], latest["Trend"])
 
-        if not confirmation or str(confirmation).strip().upper() in ("NONE", "", "N/A"):
-            user_selected = []
-        elif str(confirmation).strip().upper() == "ALL":
-            user_selected = ["ALL"]
-        elif isinstance(confirmation, str):
-            user_selected = [s.strip().upper() for s in confirmation.split("+") if s.strip()]
-        elif isinstance(confirmation, (list, tuple)):
-            user_selected = [str(c).strip().upper() for c in confirmation if str(c).strip()]
-        else:
-            user_selected = [str(confirmation).strip().upper()]
+        conf = confirmation
+        user_selected = []
+        if isinstance(conf, str):
+            conf_str = conf.strip()
+            if conf_str.upper() in ("NONE", "", "N/A"):
+                user_selected = []
+            elif conf_str.upper() == "ALL":
+                user_selected = ["ALL"]
+            else:
+                user_selected = [s.strip().upper() for s in conf_str.split("+") if s.strip()]
+        elif isinstance(conf, (list, tuple)):
+            user_selected = [str(c).strip().upper() for c in conf if str(c).strip()]
+        elif conf is not None:
+            user_selected = [str(conf).strip().upper()]
 
         user_confirmation_str = "Нет выбранных подтверждений" if not user_selected else "+".join(user_selected)
-        user_confirmation_result, _, _ = check_confirmations(latest, user_selected)
+        # передаём предыдущую свечу для BB-логики возврата
+        prev = df.dropna(subset=["Close"]).iloc[-2] if len(df.dropna(subset=["Close"])) >= 2 else None
+        user_confirmation_result, _, _ = check_confirmations(latest, user_selected, prev_row=prev)
 
         adx = latest.get("ADX", 0)
         trend = latest.get("Trend", "N/A")
@@ -402,29 +425,40 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
         buf_excel.seek(0)
 
         # Определяем направление и цены для новой таблицы
-        direction = "LONG" if trend == "Uptrend" else "SHORT"
-        entry_price = long_entry if direction == "LONG" else short_entry
-        exit_price = long_tp if direction == "LONG" else short_tp
-
-        # === Расчёт стоп-лосса и тейк-профита ===
-        rr = rr_long if direction == "LONG" else rr_short
-
-        if direction == "LONG":
-            stop_loss = entry_price - (entry_price * risk)
-            take_profit = entry_price + (entry_price - stop_loss) * rr
+        direction = "long" if trend == "Uptrend" else "short"
+        entry_price = long_entry if direction == "long" else short_entry
+        # Базовая дистанция SL по ATR из стратегии (согласованно с rr)
+        sl_dist = strat["atr_sl"] * atr
+        rr = rr_long if direction == "long" else rr_short
+        if direction == "long":
+            stop_loss = entry_price - sl_dist
+            take_profit = entry_price + rr * sl_dist
+            exit_price = take_profit
         else:
-            stop_loss = entry_price + (entry_price * risk)
-            take_profit = entry_price - (stop_loss - entry_price) * rr
+            stop_loss = entry_price + sl_dist
+            take_profit = entry_price - rr * sl_dist
+            exit_price = take_profit
 
-        # Добавляем их в отчёт
-        report_text += (
-            f"\n\n=== Управление позицией ===\n"
+        # Размер позиции уже считан ранее с учётом risk_adj
+        position_units = long_units if direction == "long" else short_units
+        position_dollars = long_dollars if direction == "long" else short_dollars
+
+        # Текст блока «Управление позицией»
+        management_text = (
+            f"\n=== Управление позицией ===\n"
             f"Stop Loss: {stop_loss:.2f}\n"
             f"Take Profit: {take_profit:.2f}\n"
             f"Risk/Reward: {rr:.2f}\n"
+            f"Position: {position_units:.6f} units ≈ ${position_dollars:,.2f}\n"
         )
+        # Вставляем блок перед разделом «Дополнительные рекомендации»
+        insertion_key = "### 💡 Дополнительные рекомендации"
+        if insertion_key in report_md:
+            full_report = report_md.replace(insertion_key, management_text + "\n\n" + insertion_key)
+        else:
+            full_report = report_md + management_text
         return (
-            report_md,
+            full_report,
             buf_chart,
             buf_excel,
             symbol,

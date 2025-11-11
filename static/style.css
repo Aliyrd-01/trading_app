@@ -146,6 +146,17 @@ button:hover {
   box-shadow: 0 4px 15px rgba(63, 169, 245, 0.3);
 }
 
+/* Неактивная основная кнопка */
+button:disabled,
+button:disabled:hover {
+  background: #2a3147 !important;
+  color: #9aa6bf !important;
+  cursor: not-allowed;
+  box-shadow: none !important;
+  transform: none !important;
+  pointer-events: none;
+}
+
 
 /* === Индикатор выполнения === */
 #progressBar {

@@ -31,6 +31,22 @@ class WebBridge(QObject):
             print("Ошибка при сохранении ZIP:", e)
             return "cancel"
 
+    @pyqtSlot(str, str, result=str)
+    def savePdfFile(self, pdf_base64, suggested_name):
+        try:
+            path, _ = QFileDialog.getSaveFileName(
+                None, "Сохранить PDF", suggested_name, "PDF Files (*.pdf)"
+            )
+            if not path:
+                return "cancel"
+            data = base64.b64decode(pdf_base64)
+            with open(path, "wb") as f:
+                f.write(data)
+            return "ok"
+        except Exception as e:
+            print("Ошибка при сохранении PDF:", e)
+            return "cancel"
+
     @pyqtSlot(str)
     def loginSuccess(self, payload_json):
         # JS сообщает о успешном логине
