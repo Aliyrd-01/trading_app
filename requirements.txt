@@ -14,4 +14,5 @@ flask-sqlalchemy
 psycopg2-binary
 pymysql
 cryptography
+scipy
 

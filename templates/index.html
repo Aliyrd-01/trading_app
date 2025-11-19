@@ -5,6 +5,8 @@
   <title>📊 Crypto Trading Analyzer</title>
   <link rel="stylesheet" href="/static/style.css">
   <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+  <!-- Chart.js для real-time графика -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <div class="container">
@@ -92,7 +94,155 @@
         </select>
       </label>
 
-      <p id="tfInfo" class="info-text">Таймфрейм: 5m</p>
+      <label class="with-info">
+        <div class="label-row">
+          <span>📊 Таймфрейм:</span>
+          <span class="info" data-tip="Выберите таймфрейм для анализа. 'Автоматически' использует рекомендуемый таймфрейм для выбранного типа торговли.&#10;&#10;Рекомендации:&#10;• Скальпинг: 1m, 3m, 5m, 15m&#10;• Дейтрейдинг: 15m, 30m, 1h, 2h&#10;• Свинг: 4h, 6h, 12h, 1d&#10;• Среднесрочная/Долгосрочная: 1d, 3d, 1w">ℹ️</span>
+        </div>
+        <select id="timeframe">
+          <option value="auto">Автоматически (рекомендуемый)</option>
+          <option value="1m">1 минута</option>
+          <option value="3m">3 минуты</option>
+          <option value="5m">5 минут</option>
+          <option value="15m">15 минут</option>
+          <option value="30m">30 минут</option>
+          <option value="1h">1 час</option>
+          <option value="2h">2 часа</option>
+          <option value="4h">4 часа</option>
+          <option value="6h">6 часов</option>
+          <option value="8h">8 часов</option>
+          <option value="12h">12 часов</option>
+          <option value="1d">1 день</option>
+          <option value="3d">3 дня</option>
+          <option value="1w">1 неделя</option>
+          <option value="1M">1 месяц</option>
+        </select>
+      </label>
+
+      <label class="with-info">
+        <div class="label-row">
+          <span>📈 Таймфрейм графика:</span>
+          <span class="info" data-tip="Выберите таймфрейм для отображения графика в реальном времени. Для долгосрочной торговли рекомендуется использовать более длинные таймфреймы (1d, 1w), чтобы график не обновлялся слишком часто.">ℹ️</span>
+        </div>
+        <select id="chartTimeframe">
+          <option value="1m">1 минута</option>
+          <option value="3m">3 минуты</option>
+          <option value="5m">5 минут</option>
+          <option value="15m">15 минут</option>
+          <option value="30m">30 минут</option>
+          <option value="1h" selected>1 час</option>
+          <option value="2h">2 часа</option>
+          <option value="4h">4 часа</option>
+          <option value="6h">6 часов</option>
+          <option value="8h">8 часов</option>
+          <option value="12h">12 часов</option>
+          <option value="1d">1 день</option>
+          <option value="3d">3 дня</option>
+          <option value="1w">1 неделя</option>
+          <option value="1M">1 месяц</option>
+        </select>
+      </label>
+
+      <p id="tfInfo" class="info-text">Рекомендуемый таймфрейм: 5m</p>
+
+      <!-- ⚙️ Продвинутые настройки -->
+      <div class="advanced-toggle-container">
+        <button type="button" id="toggleAdvanced" class="toggle-advanced-btn">
+          <span>⚙️ Продвинутые настройки</span>
+          <span id="toggleIcon">🔽</span>
+        </button>
+      </div>
+
+      <div id="advancedSettings" class="advanced-settings hidden">
+        <div class="advanced-option">
+          <div class="option-label">🎯 Минимальный рейтинг сигнала (%):</div>
+          <div class="option-info">
+            <span class="info" data-tip="Показывать только сигналы с рейтингом выше указанного. Рейтинг рассчитывается на основе количества совпавших индикаторов.">ℹ️</span>
+          </div>
+          <input type="number" id="minReliability" value="50" min="0" max="100" step="5">
+        </div>
+
+        <div class="advanced-option checkbox-option">
+          <div class="option-label">📊 Показывать прогноз на основе истории</div>
+          <div class="option-info">
+            <span class="info" data-tip="Анализирует похожие ситуации в истории и показывает ожидаемую прибыль и вероятность успеха">ℹ️</span>
+          </div>
+          <input type="checkbox" id="enableForecast">
+        </div>
+
+        <div class="advanced-option checkbox-option">
+          <div class="option-label">📈 Включить бэктестинг стратегии</div>
+          <div class="option-info">
+            <span class="info" data-tip="Тестирует стратегию на исторических данных и показывает метрики: Win Rate, прибыль, просадка">ℹ️</span>
+          </div>
+          <input type="checkbox" id="enableBacktest">
+        </div>
+
+        <div class="advanced-option checkbox-option">
+          <div class="option-label">🤖 Использовать ML-прогноз вероятности успеха</div>
+          <div class="option-info">
+            <span class="info" data-tip="Анализирует похожие паттерны из истории и предсказывает вероятность успеха сделки на основе машинного обучения">ℹ️</span>
+          </div>
+          <input type="checkbox" id="enableML">
+        </div>
+
+        <div id="backtestPeriod" class="advanced-option hidden">
+          <div class="option-label">Период бэктеста (дней):</div>
+          <div class="option-info">
+            <span class="info" data-tip="Выберите период для бэктестинга. Автоматически использует удвоенный период анализа.">ℹ️</span>
+          </div>
+          <select id="backtestDays">
+            <option value="auto">Автоматически (x2 от периода анализа)</option>
+            <option value="30">30 дней</option>
+            <option value="60">60 дней</option>
+            <option value="90">90 дней</option>
+            <option value="180">180 дней</option>
+          </select>
+        </div>
+
+        <!-- Трейлинг-логика -->
+        <div class="advanced-option checkbox-option">
+          <div class="option-label">📈 Включить трейлинг-стоп</div>
+          <div class="option-info">
+            <span class="info" data-tip="⚠️ ВНИМАНИЕ: Текущая реализация рассчитывает уровни стоп-лосса на основе прогнозируемой прибыли.&#10;&#10;Для реального использования в торговле требуется:&#10;1. Мониторинг цены в реальном времени (WebSocket/API)&#10;2. Автоматическое обновление стоп-лосса при изменении цены&#10;3. Интеграция с торговым API биржи&#10;&#10;Сейчас это работает только в режиме анализа/прогноза.">ℹ️</span>
+          </div>
+          <input type="checkbox" id="enableTrailing">
+        </div>
+
+        <div id="trailingSettings" class="advanced-option hidden">
+          <div class="option-label">Процент трейлинга (%):</div>
+          <div class="option-info">
+            <span class="info" data-tip="Процент от прибыли, на который будет двигаться стоп-лосс. Например, 50% означает, что стоп будет на 50% от максимальной прибыли">ℹ️</span>
+          </div>
+          <input type="number" id="trailingPercent" value="50" min="10" max="90" step="5">
+        </div>
+
+        <div class="smart-combine-container">
+          <button type="button" id="smartCombineBtn" class="smart-combine-btn">
+            🎯 Автоподбор индикаторов
+          </button>
+          <p class="smart-combine-hint">Автоматически выберет оптимальные индикаторы под текущий режим рынка</p>
+        </div>
+
+        <!-- Alert-система (закомментировано - будет полезно при добавлении автоматического мониторинга) -->
+        <!--
+        <div class="advanced-option checkbox-option">
+          <div class="option-label">📧 Email уведомления (опционально)</div>
+          <div class="option-info">
+            <span class="info" data-tip="Отправлять уведомления на email после анализа.&#10;&#10;⚠️ Примечание: При ручном запуске анализа результаты сразу видны на экране, поэтому уведомления не обязательны.&#10;&#10;Могут быть полезны в будущем при добавлении автоматического мониторинга рынка.">ℹ️</span>
+          </div>
+          <input type="checkbox" id="enableEmail">
+        </div>
+
+        <div class="advanced-option">
+          <div class="option-label">Минимальный рейтинг для уведомления (%):</div>
+          <div class="option-info">
+            <span class="info" data-tip="Отправлять уведомления только если рейтинг сигнала выше указанного">ℹ️</span>
+          </div>
+          <input type="number" id="alertMinReliability" value="60" min="0" max="100" step="5">
+        </div>
+        -->
+      </div>
 
       <button id="analyzeBtn">🚀 Запустить анализ</button>
 
@@ -105,10 +255,10 @@
     <!-- 📄 Демонстрационный отчёт -->
     <div id="result" class="demo">
       <h2 style="margin:0;">📄 Отчёт (демо)</h2>
-      <pre id="reportText">
-=== Аналитический отчёт по BTC/USDT ===  
+      <div id="reportText"></div>
+      <script id="demoReport" type="text/plain">=== Аналитический отчёт по BTC/USDT ===  
 Сгенерировано: 2025-10-31 17:42:18 (Europe/Kyiv)  
-Текущий рынок (bias): Бычий
+Текущий рынок (bias):  Бычий
 
 ### 📈 Краткое резюме
 | Показатель | Значение | Интерпретация |
@@ -121,15 +271,14 @@
 | **VWMA(20)** | 67,050 | Цена выше VWMA — восходящий импульс |
 | **BB Upper/Lower** | 68,000 / 65,000 | В пределах диапазона |
 | **ADX** | 27.3 | Сильный тренд |
-| **Подтверждение входа (авто)** | EMA + ADX + VWMA | Автоматический анализ индикаторов |
+| **Выбранные подтверждения (пользователь)** | EMA+ADX+VWMA | Результат: Все подтверждения ✅ |
 
 ### ⚙️ Стратегия
 - Тип торговли: Дейтрейдинг  
 - Стратегия: Сбалансированная  
 - Капитал: $10,000.00  
-- **Динамический риск:** 0.90% (базовый 1.00%)  
-- Подтверждения: EMA, RSI, MACD  
-- Авто-анализ: EMA + ADX + VWMA  
+- Динамический риск: 0.90% (базовый 1.00%)  
+- Тип подтверждения: EMA+ADX+VWMA
 
 ### 🎯 Уровни
 **Лонг**
@@ -154,7 +303,7 @@
 | Лонг | 1.6 |
 | Шорт | 1.3 |
 
-### 💡 Перспектива
+### 💰 Перспектива
 - Более перспективно: Лонг 🚀  
 - Тренд: Бычий рынок  
 - RSI: Нейтральная зона  
@@ -162,18 +311,63 @@
 - VWMA: Восходящий импульс  
 - ADX: Сильный тренд  
 
-=== Конец отчёта ===
-      </pre>
+### 💡 Дополнительные рекомендации
+- Рынок во флете — лучше воздержаться от входов до появления четкого тренда
+- RSI < 30 — перепроданность, возможен отскок вверх, рассмотрите лонг-позиции
 
-      <div id="chartContainer" class="hidden">
-        <h3>📉 График анализа</h3>
-        <img id="chartImage" src="" alt="График анализа">
+=== Конец отчёта ===</script>
+
+      <!-- Real-Time график -->
+      <div id="realtimeChartContainer">
+        <h3 style="margin-top: 0; margin-bottom: 20px; padding: 0 10px;">📈 Real-Time график</h3>
+        <div id="priceInfo">
+          <div class="price-item">
+            <strong>Текущая цена:</strong> 
+            <span id="currentPrice">--</span>
+          </div>
+          <div class="price-item">
+            <strong>Изменение:</strong> 
+            <span id="priceChange">--</span>
+          </div>
+          <div class="price-item">
+            <button id="stopRealtimeBtn" type="button" style="padding: 5px 15px; background: #ef4444; color: white; border: none; border-radius: 5px; cursor: pointer;">⏹ Остановить</button>
+          </div>
+        </div>
+        <canvas id="realtimeChart"></canvas>
       </div>
 
       <!-- Кнопки скачивания -->
       <div id="downloadButtons" class="mt-4 flex justify-between items-center w-full max-w-4xl mx-auto px-4">
         <button id="downloadZip" disabled>📦 Скачать ZIP</button>
         <button id="downloadStats" disabled>📊 Скачать статистику</button>
+        <button id="loadStrategyAnalysis" type="button">📈 Анализ стратегий</button>
+      </div>
+    </div>
+
+    <!-- 📊 Анализ стратегий -->
+    <div id="strategyAnalysis" class="strategy-analysis hidden">
+      <h2>📊 Анализ стратегий</h2>
+      
+      <div id="autoSummary" class="auto-summary">
+        <h3>🤖 Автоматический отчёт</h3>
+        <div id="autoSummaryText" class="summary-text"></div>
+      </div>
+
+      <div id="strategyStats" class="strategy-stats">
+        <h3>📈 Сравнение стратегий</h3>
+        <div id="strategyStatsTable" class="stats-table"></div>
+      </div>
+
+      <div id="benchmarkComparison" class="benchmark-comparison">
+        <h3>⚖️ Benchmark: Стратегия vs "Купить и держать"</h3>
+        <div id="benchmarkContent" class="benchmark-content"></div>
+      </div>
+
+      <div id="heatmapSection" class="heatmap-section">
+        <h3>🔥 Heatmap: Прибыльность по времени и инструментам</h3>
+        <div id="heatmapContent" class="heatmap-content">
+          <div id="heatmapImageContainer" class="heatmap-image-container"></div>
+        </div>
       </div>
     </div>
   </div>
