@@ -165,6 +165,25 @@
 	const loginBtn = document.getElementById("loginBtn");
 	const errorMsg = document.getElementById("errorMsg");
 	const rememberMe = document.getElementById("rememberMe");
+	const emailInput = document.getElementById("email");
+	const passwordInput = document.getElementById("password");
+
+	// Флаги для отслеживания состояния ввода (IME для кириллицы)
+	let isComposing = false;
+	let isSubmitting = false;
+	
+	// Обработка событий композиции (IME) для предотвращения зависания при вводе кириллицы
+	if (emailInput) {
+		emailInput.addEventListener('compositionstart', () => { isComposing = true; });
+		emailInput.addEventListener('compositionend', () => { isComposing = false; });
+		emailInput.addEventListener('compositionupdate', () => { isComposing = true; });
+	}
+	
+	if (passwordInput) {
+		passwordInput.addEventListener('compositionstart', () => { isComposing = true; });
+		passwordInput.addEventListener('compositionend', () => { isComposing = false; });
+		passwordInput.addEventListener('compositionupdate', () => { isComposing = true; });
+	}
 
 	// Автологин при наличии localStorage
 	window.addEventListener("load", async () => {
@@ -174,7 +193,7 @@
 		  const data = JSON.parse(stored);
 		  const res = await fetch("/api/login", {
 			method: "POST",
-			headers: {"Content-Type": "application/json"},
+			headers: {"Content-Type": "application/json; charset=utf-8"},
 			body: JSON.stringify({ email: data.email, password: data.password })
 		  });
 		  const result = await res.json();
@@ -191,21 +210,34 @@
 	  }
 	});
 
-	loginBtn.addEventListener("click", async () => {
+	// Функция обработки логина
+	async function handleLogin() {
+	  // Предотвращаем отправку во время ввода кириллицы или повторную отправку
+	  if (isComposing || isSubmitting) {
+		return;
+	  }
+	  
+	  isSubmitting = true;
+	  loginBtn.disabled = true;
 	  errorMsg.textContent = "";
 
-	  const email = document.getElementById('email').value.trim();
-	  const password = document.getElementById('password').value.trim();
+	  const email = emailInput.value.trim();
+	  const password = passwordInput.value.trim();
 
 	  if (!email || !password) {
 		errorMsg.textContent = "Email и пароль обязательны";
+		isSubmitting = false;
+		loginBtn.disabled = false;
 		return;
 	  }
 
 	  try {
+		// Кодируем данные в UTF-8 для корректной передачи кириллицы
 		const response = await fetch("/api/login", {
 		  method: "POST",
-		  headers: {"Content-Type": "application/json"},
+		  headers: {
+			"Content-Type": "application/json; charset=utf-8"
+		  },
 		  body: JSON.stringify({email, password})
 		});
 
@@ -213,7 +245,12 @@
 
 		if (response.ok && data.ok) {
 		  if (rememberMe.checked) {
-			localStorage.setItem("rememberedUser", JSON.stringify({email, password}));
+			// Безопасное сохранение в localStorage с обработкой кириллицы
+			try {
+			  localStorage.setItem("rememberedUser", JSON.stringify({email, password}));
+			} catch (e) {
+			  console.warn("Не удалось сохранить в localStorage:", e);
+			}
 		  } else {
 			localStorage.removeItem("rememberedUser");
 		  }
@@ -221,11 +258,36 @@
 		  window.location.href = "/";
 		} else {
 		  errorMsg.textContent = data.error || "Ошибка авторизации";
+		  isSubmitting = false;
+		  loginBtn.disabled = false;
 		}
 	  } catch (e) {
 		errorMsg.textContent = "Ошибка соединения с сервером";
+		isSubmitting = false;
+		loginBtn.disabled = false;
 	  }
-	});
+	}
+	
+	loginBtn.addEventListener("click", handleLogin);
+	
+	// Обработка Enter в полях ввода (только если не идет ввод кириллицы)
+	if (emailInput) {
+		emailInput.addEventListener("keydown", (e) => {
+			if (e.key === "Enter" && !isComposing) {
+				e.preventDefault();
+				handleLogin();
+			}
+		});
+	}
+	
+	if (passwordInput) {
+		passwordInput.addEventListener("keydown", (e) => {
+			if (e.key === "Enter" && !isComposing) {
+				e.preventDefault();
+				handleLogin();
+			}
+		});
+	}
 	</script>
 </body>
 </html>
