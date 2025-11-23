@@ -3,6 +3,231 @@
 .hidden {
   display: none !important;
 }
+
+/* === Контейнер выхода и языка === */
+#logoutContainer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 32px; /* Явный большой отступ между языком и кнопкой выхода */
+  margin-top: 10px;
+  margin-bottom: 20px;
+}
+
+#logoutBtn {
+  padding: 8px 15px;
+  text-decoration: none;
+  color: #fff;
+  background: #3fa9f5;
+  border-radius: 5px;
+  transition: background 0.2s;
+  margin-left: 0; /* Отступ делается через gap у контейнера */
+}
+
+#logoutBtn:hover {
+  background: #2d8cd6;
+}
+
+#languageToggle {
+  background: transparent !important;
+  border: none !important;
+  color: #fff !important;
+  font-size: 22px !important;
+  cursor: pointer !important;
+  padding: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 5px !important;
+  transition: background 0.2s, opacity 0.2s !important;
+  margin-top: 5px !important;
+}
+
+#languageToggle:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  opacity: 0.9;
+}
+
+#languageSelect {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 10;
+  font-size: 14px;
+  padding: 8px 12px; /* Отступы от краев */
+}
+
+
+/* Более агрессивные стили для option в QWebEngineView */
+select#languageSelect option,
+#languageSelect option {
+  padding: 15px 25px !important; /* Увеличенные отступы */
+  background: #23283b !important;
+  color: #fff !important;
+  font-size: 14px !important;
+  margin: 5px 0 !important; /* Отступы между пунктами */
+  line-height: 2 !important;
+  height: 45px !important; /* Фиксированная высота */
+  display: block !important;
+}
+
+/* Альтернативный подход - стили для самого select при открытии */
+#languageSelect:focus option:checked,
+#languageSelect option:checked {
+  background: #3fa9f5 !important;
+  padding: 15px 25px !important;
+}
+
+/* === Кастомный дропдаун для языка === */
+.custom-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.custom-dropdown-toggle {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 5px;
+  transition: background 0.2s;
+}
+
+.custom-dropdown-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.custom-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 5px;
+  background: #23283b;
+  border: 1px solid #2c3245;
+  border-radius: 8px;
+  padding: 8px 0; /* Отступы от краев дропдауна */
+  list-style: none;
+  min-width: 200px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  display: none;
+  margin: 0;
+}
+
+.custom-dropdown-menu.show {
+  display: block;
+}
+
+.custom-dropdown-menu li {
+  padding: 12px 20px; /* Отступы внутри каждого пункта */
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+  margin: 0;
+}
+
+.custom-dropdown-menu li:hover {
+  background: rgba(63, 169, 245, 0.2);
+}
+
+.custom-dropdown-menu li.selected {
+  background: #3fa9f5;
+  color: #fff;
+}
+
+/* Результат автоподбора индикаторов под кнопкой */
+.smart-combine-result {
+  margin-top: 8px;
+  font-size: 14px;
+  color: #9aa6bf;
+  line-height: 1.4;
+}
+
+/* === Стили для отключенных элементов Free плана === */
+.disabled-free {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  /* pointer-events: none убран, чтобы тултипы работали */
+}
+
+.disabled-free-container {
+  opacity: 0.6 !important;
+  position: relative;
+}
+
+.disabled-free-container::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.1);
+  pointer-events: none;
+  border-radius: 5px;
+}
+
+/* Стили для disabled кнопок */
+button.disabled-free,
+input.disabled-free,
+select.disabled-free {
+  background: #2c3245 !important;
+  color: #6b7280 !important;
+  border-color: #3a3f52 !important;
+}
+
+/* Tooltip для отключенных элементов - теперь создается через JavaScript (как для кнопок скачивания) */
+/* CSS подсказка удалена, используется JavaScript для единообразия */
+
+/* Tooltip для отключенных кнопок статистики и анализа */
+button.disabled-free[data-tooltip] {
+  position: relative;
+}
+
+button.disabled-free[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #3a3f52;
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 5px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 1000;
+  margin-bottom: 5px;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+button.disabled-free[data-tooltip]:hover::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #3a3f52;
+  z-index: 1000;
+  margin-bottom: -5px;
+  pointer-events: none;
+}
 /* === Оптимальный fullscreen стиль для PyQt-десктопа === */
 html, body {
   height: 100%;
@@ -365,8 +590,16 @@ img {
 
 #downloadZip { background-color: #2563eb; color: white; }
 #downloadZip:hover:not(:disabled) { background-color: #1e40af; }
-#downloadStats { background-color: #16a34a; color: white; }
+#downloadStats { 
+  background-color: #16a34a; 
+  color: white; 
+  margin-top: 15px;
+}
 #downloadStats:hover:not(:disabled) { background-color: #15803d; }
+
+#loadStrategyAnalysis {
+  margin-top: 15px;
+}
 
 button:focus { outline: none; }
 
@@ -464,28 +697,6 @@ button:focus { outline: none; }
   align-items: center;
   padding: 10px 20px;            /* отступы сверху/снизу и слева/справа */
   background: transparent;        /* без фонового цвета */
-}
-
-#logoutContainer {
-  display: flex;
-  justify-content: flex-end; /* "Выйти" справа */
-    top: 2vh;             /* 2% от высоты окна сверху */
-  right: 2vw;       /* небольшой отступ от краев */
-}
-
-#logoutBtn {
-  top: 2vh;             /* 2% от высоты окна сверху */
-  right: 2vw;           /* 2% от ширины окна справа */
-  color: #007BFF;
-  text-decoration: none;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: color 0.2s;
-  z-index: 9999;
-}
-
-#logoutBtn:hover {
-  color: #007BFE;
 }
 
 /* === Продвинутые настройки === */
@@ -702,6 +913,25 @@ button:focus { outline: none; }
   color: #e8e8e8;
   line-height: 1.8;
   font-size: 16px;
+  white-space: pre-wrap; /* Сохраняем переносы строк */
+  word-wrap: break-word; /* Переносим длинные слова */
+  max-width: 100%;
+}
+
+/* Улучшаем отображение текста в отчете */
+.report-text {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  line-height: 1.8;
+  margin: 10px 0;
+}
+
+/* Разделители для лучшей читаемости */
+.backtest-divider {
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(to right, transparent, #3fa9f5, transparent);
+  margin: 15px 0;
 }
 
 .summary-text strong {
@@ -978,21 +1208,26 @@ button:focus { outline: none; }
   border: 1px solid #2a3147;
   border-radius: 10px;
   overflow: hidden;
+  margin: 15px 0;
 }
 
 .report-table th, .report-table td {
   border-bottom: 1px solid #1f2537;
   border-right: 1px solid #1f2537;
-  padding: 8px 10px;
+  padding: 12px 15px;
   font-size: 14px;
+  text-align: left;
 }
 .report-table th {
   background: #0f1525;
   color: #a8c1ff;
-  text-align: left;
+  font-weight: 600;
 }
 .report-table td {
   color: #e8e8e8;
+}
+.report-table tr:hover {
+  background: rgba(63, 169, 245, 0.05);
 }
 .report-table tr:last-child td { border-bottom: none; }
 .report-table tr td:last-child, .report-table tr th:last-child { border-right: none; }

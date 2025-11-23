@@ -212,6 +212,13 @@ function updateTranslations() {
   if (typeof ProTooltipManager !== 'undefined') {
     ProTooltipManager.updateAllTooltips();
   }
+  
+  // Обновляем кнопку режима новичка в зависимости от текущего состояния
+  const modeToggleBtn = document.getElementById('modeToggleBtn');
+  // Проверяем глобальную переменную isBeginnerMode (объявлена в DOMContentLoaded)
+  if (modeToggleBtn && window.isBeginnerMode !== undefined) {
+    modeToggleBtn.textContent = window.isBeginnerMode ? t('beginner_mode_advanced') : t('beginner_mode');
+  }
 }
 
 // --- Обновление таймфрейма ---
@@ -255,58 +262,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const enableForecast = document.getElementById("enableForecast");
   const enableBacktest = document.getElementById("enableBacktest");
   const enableML = document.getElementById("enableML");
-  const beginnerMode = document.getElementById("beginnerMode");
-  const chartTimeframe = document.getElementById("chartTimeframe");
-
-  // === Режим новичка ===
-  function updateBeginnerMode() {
-    const isBeginnerMode = beginnerMode && beginnerMode.checked;
-    
-    if (isBeginnerMode) {
-      // Скрываем продвинутые настройки
-      if (advancedSettings) {
-        advancedSettings.classList.add("hidden");
-      }
-      if (toggleAdvanced) {
-        toggleAdvanced.style.display = "none";
-      }
-      // Скрываем таймфрейм графика (для упрощения)
-      const chartTimeframeLabel = chartTimeframe ? chartTimeframe.closest("label") : null;
-      if (chartTimeframeLabel) {
-        chartTimeframeLabel.style.display = "none";
-      }
-    } else {
-      // Показываем все элементы
-      if (toggleAdvanced) {
-        toggleAdvanced.style.display = "";
-      }
-      const chartTimeframeLabel = chartTimeframe ? chartTimeframe.closest("label") : null;
-      if (chartTimeframeLabel) {
-        chartTimeframeLabel.style.display = "";
-      }
-    }
-    
-    // Сохраняем состояние
-    if (beginnerMode) {
-      localStorage.setItem("beginnerMode", isBeginnerMode ? "true" : "false");
-    }
-  }
-
-  if (beginnerMode) {
-    // Восстанавливаем состояние из localStorage
-    const savedBeginnerMode = localStorage.getItem("beginnerMode");
-    if (savedBeginnerMode === "true" || savedBeginnerMode === null) {
-      beginnerMode.checked = true;
-    } else {
-      beginnerMode.checked = false;
-    }
-    
-    // Применяем режим при загрузке
-    updateBeginnerMode();
-    
-    // Обработчик изменения
-    beginnerMode.addEventListener("change", updateBeginnerMode);
-  }
 
   // === Logout ===
   if (logoutBtn) {
@@ -443,9 +398,9 @@ document.addEventListener("DOMContentLoaded", () => {
     
     function updateDropdownText(lang) {
       const langMap = {
-        'uk': '🇺🇦',
-        'en': '🇬🇧',
-        'ru': '🇷🇺'
+        'uk': 'UA',
+        'en': 'EN',
+        'ru': 'RU'
       };
       if (toggleText) {
         toggleText.textContent = langMap[lang] || '🌐';
@@ -596,6 +551,8 @@ document.addEventListener("DOMContentLoaded", () => {
   updateTimeframeInfo();
 
   // === Продвинутые настройки: раскрытие/сворачивание ===
+  // ИСПРАВЛЕНО: Инициализируем ПОСЛЕ загрузки информации о плане пользователя
+  // Но обработчик должен работать всегда, даже для Free плана (просто показывать тултип)
   if (toggleAdvanced && advancedSettings && toggleIcon) {
     // Функция обновления иконки в зависимости от состояния
     function updateToggleIcon() {
@@ -609,28 +566,26 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
     
-    // Восстанавливаем состояние из localStorage (только если не режим новичка)
-    if (!beginnerMode || !beginnerMode.checked) {
-      const savedState = localStorage.getItem("advancedSettingsExpanded");
-      if (savedState === "true") {
-        advancedSettings.classList.remove("hidden");
-      } else {
-        advancedSettings.classList.add("hidden");
-      }
+    // Восстанавливаем состояние из localStorage
+    const savedState = localStorage.getItem("advancedSettingsExpanded");
+    if (savedState === "true") {
+      advancedSettings.classList.remove("hidden");
     } else {
-      // В режиме новичка всегда скрываем
       advancedSettings.classList.add("hidden");
     }
     updateToggleIcon();
 
+    // ИСПРАВЛЕНО: Обработчик должен работать всегда, но проверяем disabled ПЕРЕД действием
     toggleAdvanced.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
       // Проверяем, не отключен ли элемент для Free плана
       if (toggleAdvanced.disabled || toggleAdvanced.classList.contains('disabled-free')) {
+        // Для Free плана просто показываем тултип, но не открываем настройки
         return;
       }
       
-      e.preventDefault();
-      e.stopPropagation();
       const isHidden = advancedSettings.classList.contains("hidden");
       if (isHidden) {
         advancedSettings.classList.remove("hidden");
@@ -844,9 +799,14 @@ document.addEventListener("DOMContentLoaded", () => {
             confirmationSelect.value = indicatorValue;
           }
           
-          // Показываем понятное сообщение с подсказкой (увеличенное время показа)
+          // Показываем результат под кнопкой (не исчезает до следующего запуска анализа)
           const indicatorNames = data.indicators.join(" + ");
-          showToast(`🎯 Автоподбор завершён: ${indicatorNames} (${data.reason}). Теперь нажмите "🚀 Запустить анализ" для получения отчёта.`, "success", 6500);
+          const resultEl = document.getElementById("smartCombineResult");
+          if (resultEl) {
+            resultEl.textContent = `Рекомендуемые индикаторы: ${indicatorNames}. Причина: ${data.reason}.`;
+          }
+          // Дополнительно показываем краткий toast
+          showToast(`🎯 Автоподбор: ${indicatorNames}`, "success", 5000);
           
           // Подсвечиваем кнопку анализа для привлечения внимания
           if (analyzeBtn) {
@@ -1004,6 +964,10 @@ document.addEventListener("DOMContentLoaded", () => {
           // Сначала обрабатываем [DIVIDER] - заменяем на специальный маркер, который не будет экранирован
           processedText = processedText.replace(/\[DIVIDER\]/g, '___DIVIDER_MARKER___');
           
+          // Обрабатываем строки вида "💰 Общая прибыль: 123%" - сохраняем на одной строке
+          // Заменяем переносы строк после двоеточия на пробел
+          processedText = processedText.replace(/:\s*\n/g, ': ');
+          
           // Обрабатываем Markdown жирный текст
           processedText = processedText.replace(/\*\*(.*?)\*\*/g, '___STRONG_START___$1___STRONG_END___');
           
@@ -1013,6 +977,14 @@ document.addEventListener("DOMContentLoaded", () => {
           // Восстанавливаем наши специальные маркеры в HTML
           processedText = processedText.replace(/___DIVIDER_MARKER___/g, '<div class="backtest-divider"></div>');
           processedText = processedText.replace(/___STRONG_START___(.*?)___STRONG_END___/g, '<strong>$1</strong>');
+          
+          // Разбиваем на строки для правильного отображения
+          processedText = processedText.split('\n').map(line => {
+            line = line.trim();
+            if (!line) return '';
+            // Если строка начинается с эмодзи или содержит двоеточие, сохраняем как есть
+            return `<div style="margin: 4px 0;">${line}</div>`;
+          }).join('');
           
           cardsHtml += `<div class="report-text">${processedText}</div>`;
         }
@@ -1056,7 +1028,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const symbol = document.getElementById("symbol").value;
     const strategy = document.getElementById("strategy").value;
     const trading_type = tradingType.value;
-    const capital = parseFloat(document.getElementById("capital").value);
+    const capitalInput = document.getElementById("capital");
+    const capital = parseFloat(capitalInput?.value || "10000");
+    // ИСПРАВЛЕНО: Проверяем валидность капитала перед отправкой
+    if (isNaN(capital) || capital <= 0) {
+      showToast("⚠️ Неверное значение капитала. Используйте положительное число.", "error");
+      analyzeBtn.disabled = false;
+      analyzeBtn.textContent = originalBtnText;
+      return;
+    }
     const risk = parseFloat(document.getElementById("risk").value);
     const confirmation = document.getElementById("confirmation").value;
     const timeframe = timeframeSelect && timeframeSelect.value !== "auto" ? timeframeSelect.value : null;
@@ -1127,6 +1107,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         analyzeBtn.disabled = false;
         analyzeBtn.textContent = originalBtnText;
+        // ИСПРАВЛЕНО: Включаем кнопки даже при ошибке (для повторной попытки)
+        if (downloadBtn) {
+          downloadBtn.disabled = false;
+        }
+        if (downloadStatsBtn && userPlan && userPlan !== 'free') {
+          downloadStatsBtn.disabled = false;
+        }
         return;
       }
 
@@ -1142,21 +1129,44 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         // === Real-Time график ===
-        // График уже должен быть виден и работать
-        // Просто накладываем линии анализа, если они есть
-        if (data.entry_price && data.stop_loss && data.take_profit && data.symbol) {
+        // ИСПРАВЛЕНО: Не меняем символ графика при анализе - используем текущий график
+        // Если график пустой или еще не подключен - подключаемся к символу из анализа
+        if (!realtimeChart) {
+          const ctx = document.getElementById('realtimeChart');
+          if (ctx) {
+            initRealtimeChart();
+          }
+        }
+        
+        // Если график пустой и нет подключения - подключаемся к символу из анализа
+        if (realtimeChart && (!wsConnection || wsConnection.readyState === WebSocket.CLOSED)) {
+          const analysisSymbol = data.symbol || symbol.value || 'BTC/USDT';
+          // ИСПРАВЛЕНО: Получаем элемент напрямую, так как chartTimeframeSelect определена только в другом блоке
+          const chartTimeframeSelectEl = document.getElementById('chartTimeframe');
+          const analysisTimeframe = chartTimeframeSelectEl?.value || '1h';
+          
+          // Подключаемся к символу из анализа, если график пустой
+          if (priceHistory.length === 0) {
+            connectWebSocket(analysisSymbol, analysisTimeframe);
+          }
+        }
+        
+        // Накладываем линии анализа, если они есть
+        // ИСПРАВЛЕНО: Не меняем символ графика - используем текущий график независимо от символа анализа
+        if (data.entry_price && data.stop_loss && data.take_profit) {
           // Удаляем старые линии анализа, если есть (оставляем только график цены)
           if (realtimeChart && realtimeChart.data.datasets.length > 1) {
             realtimeChart.data.datasets = [realtimeChart.data.datasets[0]];
             realtimeChart.update();
           }
           
-          // Отображаем точки входа/выхода
+          // Отображаем точки входа/выхода на текущем графике
           displaySignalLevels({
             entry_price: data.entry_price,
             stop_loss: data.stop_loss,
             take_profit: data.take_profit,
-            direction: data.direction
+            direction: data.direction,
+            enable_trailing: data.enable_trailing || false
           });
           
           // Запускаем таймер автоматического скрытия линий
@@ -1179,10 +1189,35 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }
 
-        downloadBtn.disabled = false;
-        // Восстанавливаем disabled только если не Free план
-        if (userPlan !== 'free') {
-        downloadStatsBtn.disabled = false;
+        // === Визуализация сравнительного бэктеста всех стратегий ===
+        if (data.backtest_all_strategies && Object.keys(data.backtest_all_strategies).length > 0) {
+          displayCompareBacktest(data.backtest_all_strategies);
+        } else {
+          hideCompareBacktest();
+        }
+
+        // ИСПРАВЛЕНО: Кнопка "Скачать ZIP" доступна всем после успешного анализа (только если есть данные)
+        if (downloadBtn && data.zip_base64) {
+          downloadBtn.disabled = false;
+          // Удаляем класс disabled-free, если он есть (может быть установлен при инициализации)
+          downloadBtn.classList.remove('disabled-free');
+        } else if (downloadBtn) {
+          // Если нет данных ZIP - оставляем кнопку отключенной
+          downloadBtn.disabled = true;
+        }
+        
+        // Кнопка "Скачать статистику" доступна только для Pro/Pro+ планов
+        if (downloadStatsBtn) {
+          // Восстанавливаем disabled только если не Free план
+          if (userPlan && userPlan !== 'free') {
+            downloadStatsBtn.disabled = false;
+            // Удаляем класс disabled-free для Pro планов
+            downloadStatsBtn.classList.remove('disabled-free');
+          } else {
+            // Для Free плана кнопка остается отключенной (уже установлено при загрузке)
+            downloadStatsBtn.disabled = true;
+            downloadStatsBtn.classList.add('disabled-free');
+          }
         }
         
         // Восстанавливаем кнопку после успешного анализа
@@ -1190,7 +1225,8 @@ document.addEventListener("DOMContentLoaded", () => {
         analyzeBtn.textContent = originalBtnText;
 
         // === Скачать ZIP отчёт ===
-        downloadBtn.onclick = async (e) => {
+        if (downloadBtn && data.zip_base64) {
+          downloadBtn.onclick = async (e) => {
           e.preventDefault();
           try {
             if (window.pyjs && typeof window.pyjs.saveZipFile === "function") {
@@ -1216,9 +1252,23 @@ document.addEventListener("DOMContentLoaded", () => {
             console.error("Ошибка скачивания:", err);
             showToast("⚠️ Не удалось сохранить файл", "error");
           }
-        };
+          };
+        } else if (downloadBtn) {
+          // Если нет данных ZIP - отключаем обработчик
+          downloadBtn.onclick = null;
+          downloadBtn.disabled = true;
+        }
       } else {
         showToast("⚠️ Не удалось получить отчёт", "error");
+        // ИСПРАВЛЕНО: Включаем кнопки даже если нет отчета (для предыдущего анализа)
+        if (downloadBtn) {
+          downloadBtn.disabled = false;
+          downloadBtn.classList.remove('disabled-free');
+        }
+        if (downloadStatsBtn && userPlan && userPlan !== 'free') {
+          downloadStatsBtn.disabled = false;
+          downloadStatsBtn.classList.remove('disabled-free');
+        }
       }
     } catch (err) {
       stopProgress();
@@ -1226,6 +1276,15 @@ document.addEventListener("DOMContentLoaded", () => {
       showToast("❌ Ошибка анализа: " + err.message, "error");
       analyzeBtn.disabled = false;
       analyzeBtn.textContent = originalBtnText;
+      // ИСПРАВЛЕНО: Включаем кнопки даже при ошибке (для предыдущего анализа)
+      if (downloadBtn) {
+        downloadBtn.disabled = false;
+        downloadBtn.classList.remove('disabled-free');
+      }
+      if (downloadStatsBtn && userPlan && userPlan !== 'free') {
+        downloadStatsBtn.disabled = false;
+        downloadStatsBtn.classList.remove('disabled-free');
+      }
     }
   });
 
@@ -1325,9 +1384,16 @@ document.addEventListener("DOMContentLoaded", () => {
         // Auto Summary
         const autoSummaryText = document.getElementById("autoSummaryText");
         if (autoSummaryText) {
-          autoSummaryText.innerHTML = data.auto_summary ? 
-            data.auto_summary.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') : 
-            "Недостаточно данных для анализа.";
+          if (data.auto_summary) {
+            // Разбиваем текст на строки и добавляем переносы для читаемости
+            let formattedSummary = data.auto_summary
+              .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+              .replace(/\n\n+/g, '\n\n') // Убираем множественные переносы
+              .replace(/\n/g, '<br>'); // Заменяем переносы строк на <br>
+            autoSummaryText.innerHTML = formattedSummary;
+          } else {
+            autoSummaryText.innerHTML = "Недостаточно данных для анализа.";
+          }
         }
         
         // Таблица стратегий
@@ -1668,12 +1734,22 @@ document.addEventListener("DOMContentLoaded", () => {
     // Правильно закрываем старое подключение
     if (wsConnection) {
       wsManuallyStopped = true;
+      
+      // Убираем все обработчики перед закрытием
+      wsConnection.onopen = null;
       wsConnection.onclose = null;
       wsConnection.onerror = null;
       wsConnection.onmessage = null;
+      
+      // Закрываем соединение только если оно открыто или подключается
       if (wsConnection.readyState === WebSocket.OPEN || wsConnection.readyState === WebSocket.CONNECTING) {
-        wsConnection.close(1000, 'Switching symbol');
+        try {
+          wsConnection.close(1000, 'Switching symbol');
+        } catch (e) {
+          console.warn('Ошибка при закрытии WebSocket:', e);
+        }
       }
+      
       wsConnection = null;
     }
     
@@ -1705,10 +1781,14 @@ document.addEventListener("DOMContentLoaded", () => {
     else if (timeframe === '3m') limit = 480; // ~1 день (3мин * 480 = 24 часа)
     else if (timeframe === '1m') limit = 1440; // ~1 день (1мин * 1440 = 24 часа)
     
-    // ШАГ 1: Загружаем исторические данные через REST API (как на Binance)
-    fetch(`https://api.binance.com/api/v3/klines?symbol=${wsSymbol.toUpperCase()}&interval=${timeframe}&limit=${limit}`)
+    // ШАГ 1: Загружаем исторические данные через наш backend (избегаем CORS)
+    fetch(`/api/klines?symbol=${wsSymbol.toUpperCase()}&interval=${timeframe}&limit=${limit}`)
       .then(res => {
-        if (!res.ok) throw new Error('Network response was not ok');
+        if (!res.ok) {
+          return res.json().then(err => {
+            throw new Error(err.error || 'Network response was not ok');
+          });
+        }
         return res.json();
       })
       .then(klines => {
@@ -1744,11 +1824,18 @@ document.addEventListener("DOMContentLoaded", () => {
         showToast('📡 Real-Time котировки подключены', 'success');
         
         // ШАГ 2: Подключаемся к WebSocket только для обновления последней свечи в реальном времени
-        const wsUrl = `wss://stream.binance.com:9443/ws/${wsSymbol}@kline_${timeframe}`;
-        
+        // Делаем паузу перед подключением, чтобы старое соединение точно закрылось
         setTimeout(() => {
+          // Проверяем, что не было ручной остановки
+          if (wsManuallyStopped) {
+            return;
+          }
+          
+          const wsUrl = `wss://stream.binance.com:9443/ws/${wsSymbol}@kline_${timeframe}`;
           wsManuallyStopped = false;
-          wsConnection = new WebSocket(wsUrl);
+          
+          try {
+            wsConnection = new WebSocket(wsUrl);
           
           wsConnection.onopen = () => {
             console.log('✅ WebSocket подключен для обновлений', symbol, 'таймфрейм:', timeframe);
@@ -1809,6 +1896,12 @@ document.addEventListener("DOMContentLoaded", () => {
               
               // Обновляем информацию о цене
               updatePriceInfo(price);
+              
+              // Обновляем трейлинг-стоп в реальном времени
+              if (trailingStopState.enabled) {
+                updateTrailingStop(price);
+              }
+              
               lastPrice = price;
               
               // Проверяем TP/SL если есть анализ
@@ -1825,9 +1918,20 @@ document.addEventListener("DOMContentLoaded", () => {
           };
           
           wsConnection.onclose = (event) => {
+            // Игнорируем события закрытия если соединение было закрыто вручную
+            if (wsManuallyStopped) {
+              return;
+            }
+            
             console.log('WebSocket закрыт', event.code, event.reason);
-            // Переподключаемся только если не было ручной остановки и код не 1000
-            if (!wsManuallyStopped && event.code !== 1000 && currentSymbol) {
+            
+            // Переподключаемся только если не было ручной остановки и код не 1000 (нормальное закрытие)
+            if (event.code !== 1000 && currentSymbol && !wsManuallyStopped) {
+              // Очищаем предыдущий таймер если есть
+              if (wsReconnectTimer) {
+                clearTimeout(wsReconnectTimer);
+              }
+              
               wsReconnectTimer = setTimeout(() => {
                 if (!wsManuallyStopped && currentSymbol) {
                   console.log('🔄 Переподключение к WebSocket...');
@@ -1836,11 +1940,28 @@ document.addEventListener("DOMContentLoaded", () => {
               }, 3000);
             }
           };
-        }, 100);
+          } catch (e) {
+            console.error('Ошибка создания WebSocket:', e);
+            showToast('⚠️ Ошибка подключения к WebSocket', 'error');
+          }
+        }, 500); // Увеличена задержка до 500мс для корректного закрытия старого соединения
       })
       .catch(err => {
         console.error('Ошибка загрузки исторических данных:', err);
-        showToast('⚠️ Ошибка загрузки исторических данных', 'error');
+        const errorMsg = err.message || 'Ошибка загрузки данных';
+        
+        // Показываем понятное сообщение пользователю
+        if (errorMsg.includes('не найдена на бирже')) {
+          showToast(`⚠️ ${errorMsg}\nВозможно, данная пара не торгуется на Binance.`, 'error', 8000);
+        } else if (errorMsg.includes('Network') || errorMsg.includes('fetch')) {
+          showToast('⚠️ Ошибка подключения к серверу. Проверьте интернет-соединение.', 'error', 5000);
+        } else {
+          showToast(`⚠️ Ошибка загрузки данных: ${errorMsg}`, 'error', 5000);
+        }
+        
+        // Скрываем индикатор загрузки, если есть
+        const progressBar = document.getElementById('progressBar');
+        if (progressBar) progressBar.classList.add('hidden');
       });
   }
 
@@ -1943,16 +2064,16 @@ document.addEventListener("DOMContentLoaded", () => {
     };
     
     const stopLossLine = {
-      label: 'Stop Loss',
+      label: analysis.enable_trailing ? 'Trailing Stop Loss' : 'Stop Loss',
       data: lineData.map(() => analysis.stop_loss),
-      borderColor: 'rgb(239, 68, 68)', // Красный
-      backgroundColor: 'rgba(239, 68, 68, 0.8)', // Красный для легенды
-      borderWidth: 2,
-      borderDash: [5, 5],
+      borderColor: analysis.enable_trailing ? '#ff9800' : 'rgb(239, 68, 68)',
+      backgroundColor: analysis.enable_trailing ? 'rgba(255, 152, 0, 0.8)' : 'rgba(239, 68, 68, 0.8)',
+      borderWidth: analysis.enable_trailing ? 3 : 2,
+      borderDash: analysis.enable_trailing ? [10, 4] : [5, 5],
       pointRadius: 0,
       pointHoverRadius: 6,
-      pointBackgroundColor: 'rgb(239, 68, 68)',
-      pointBorderColor: 'rgb(239, 68, 68)',
+      pointBackgroundColor: analysis.enable_trailing ? '#ff9800' : 'rgb(239, 68, 68)',
+      pointBorderColor: analysis.enable_trailing ? '#ff9800' : 'rgb(239, 68, 68)',
       fill: false,
       spanGaps: true
     };
@@ -1975,7 +2096,113 @@ document.addEventListener("DOMContentLoaded", () => {
     // Добавляем новые линии
     realtimeChart.data.datasets.push(entryLine, stopLossLine, takeProfitLine);
     
+    // Инициализируем трейлинг-стоп, если включен
+    if (analysis.enable_trailing && analysis.trailing_percent) {
+      initTrailingStop(analysis, analysis.trailing_percent);
+    } else {
+      trailingStopState.enabled = false;
+    }
+    
     realtimeChart.update();
+  }
+
+  // === Динамический трейлинг-стоп в реальном времени ===
+  let trailingStopState = {
+    enabled: false,
+    entry: null,
+    baseSl: null,
+    trailingPercent: 0.5,
+    direction: null, // 'long' or 'short'
+    currentPrice: null,
+    bestPrice: null, // Лучшая цена для расчета трейлинга
+    currentSl: null
+  };
+
+  // Функция обновления трейлинг-стопа в реальном времени
+  function updateTrailingStop(price) {
+    if (!trailingStopState.enabled || !trailingStopState.entry || !realtimeChart) {
+      return;
+    }
+
+    const { entry, baseSl, trailingPercent, direction, bestPrice } = trailingStopState;
+    trailingStopState.currentPrice = price;
+
+    let newSl = baseSl;
+    let slUpdated = false;
+
+    if (direction === 'long') {
+      // Для лонга: обновляем лучшую цену и двигаем SL вверх
+      if (price > entry) {
+        const newBestPrice = bestPrice ? Math.max(bestPrice, price) : price;
+        trailingStopState.bestPrice = newBestPrice;
+        
+        // Прибыль от входа
+        const profitPotential = newBestPrice - entry;
+        // Трейлинг-стоп на trailing_percent от прибыли
+        const trailingSl = entry + (profitPotential * trailingPercent);
+        // SL не может быть ниже базового
+        newSl = Math.max(baseSl, trailingSl);
+        
+        if (Math.abs(newSl - (trailingStopState.currentSl || baseSl)) > 0.001) {
+          slUpdated = true;
+          trailingStopState.currentSl = newSl;
+        }
+      }
+    } else if (direction === 'short') {
+      // Для шорта: обновляем лучшую цену и двигаем SL вниз
+      if (price < entry) {
+        const newBestPrice = bestPrice ? Math.min(bestPrice, price) : price;
+        trailingStopState.bestPrice = newBestPrice;
+        
+        // Прибыль от входа
+        const profitPotential = entry - newBestPrice;
+        // Трейлинг-стоп на trailing_percent от прибыли
+        const trailingSl = entry - (profitPotential * trailingPercent);
+        // SL не может быть выше базового
+        newSl = Math.min(baseSl, trailingSl);
+        
+        if (Math.abs(newSl - (trailingStopState.currentSl || baseSl)) > 0.001) {
+          slUpdated = true;
+          trailingStopState.currentSl = newSl;
+        }
+      }
+    }
+
+    // Обновляем линию стоп-лосса на графике
+    if (slUpdated && realtimeChart.data.datasets.length > 2) {
+      const slDataset = realtimeChart.data.datasets.find(d => 
+        d.label === 'Stop Loss' || d.label === 'Trailing Stop Loss'
+      );
+      if (slDataset) {
+        const labelsCount = realtimeChart.data.labels.length || 1;
+        slDataset.data = Array(labelsCount).fill(newSl);
+        slDataset.label = 'Trailing Stop Loss';
+        slDataset.borderColor = '#ff9800'; // Оранжевый цвет
+        slDataset.borderWidth = 2;
+        slDataset.borderDash = [10, 5]; // Пунктир
+        realtimeChart.update('none');
+        
+        console.log(`📈 Trailing SL updated: ${newSl.toFixed(2)} (price: ${price.toFixed(2)})`);
+      }
+    }
+  }
+
+  // Инициализация трейлинг-стопа при отображении уровней
+  function initTrailingStop(analysis, trailingPercent) {
+    if (!analysis || !analysis.enable_trailing) {
+      trailingStopState.enabled = false;
+      return;
+    }
+
+    trailingStopState.enabled = true;
+    trailingStopState.entry = analysis.entry_price;
+    trailingStopState.baseSl = analysis.stop_loss;
+    trailingStopState.currentSl = analysis.stop_loss;
+    trailingStopState.trailingPercent = (trailingPercent || 50) / 100; // Преобразуем из процентов
+    trailingStopState.direction = analysis.direction;
+    trailingStopState.bestPrice = null;
+    
+    console.log('🔄 Trailing stop initialized:', trailingStopState);
   }
 
   // Функция автоматического скрытия линий анализа
@@ -2122,13 +2349,28 @@ document.addEventListener("DOMContentLoaded", () => {
     const symbolSelect = document.getElementById('symbol');
     const chartTimeframeSelect = document.getElementById('chartTimeframe');
     
+    // ИСПРАВЛЕНО: Инициализируем график при загрузке страницы
     // Подключаемся независимо от состояния wsConnection (может быть null при первой загрузке)
     if (symbolSelect && chartTimeframeSelect) {
       const initialSymbol = symbolSelect.value;
       const initialChartTimeframe = chartTimeframeSelect.value || '1h';
       
-      // Подключаемся только если еще не подключены
-      if (!wsConnection || wsConnection.readyState === WebSocket.CLOSED) {
+      // Инициализируем график, если еще не инициализирован
+      if (!realtimeChart) {
+        const ctx = document.getElementById('realtimeChart');
+        if (ctx) {
+          initRealtimeChart();
+        }
+      }
+      
+      // ИСПРАВЛЕНО: Подключаемся всегда при загрузке, если график пустой или нет подключения
+      // Не ждем проверки priceHistory.length, так как подключение должно произойти сразу
+      if (!wsConnection || wsConnection.readyState === WebSocket.CLOSED || wsConnection.readyState === WebSocket.CLOSING) {
+        // Всегда подключаемся при первой загрузке (график должен быть заполнен)
+        connectWebSocket(initialSymbol, initialChartTimeframe);
+      } else if (priceHistory.length === 0) {
+        // Если подключение есть, но график пустой - переподключаемся
+        wsManuallyStopped = false;
         connectWebSocket(initialSymbol, initialChartTimeframe);
       }
       
@@ -2198,5 +2440,431 @@ document.addEventListener("DOMContentLoaded", () => {
         }, 500);
       });
     }
-  }, 100);
+    }, 100);
+
+  // === Режим новичка ===
+  const modeToggleBtn = document.getElementById('modeToggleBtn');
+  const beginnerForm = document.getElementById('beginnerForm');
+  const advancedForm = document.getElementById('advancedForm');
+  const beginnerResult = document.getElementById('beginnerResult');
+  window.isBeginnerMode = false; // Объявляем глобально для updateTranslations
+  
+  if (modeToggleBtn) {
+    modeToggleBtn.addEventListener('click', () => {
+      window.isBeginnerMode = !window.isBeginnerMode;
+      
+      if (window.isBeginnerMode) {
+        // Режим новичка
+        modeToggleBtn.textContent = t('beginner_mode_advanced');
+        if (beginnerForm) beginnerForm.style.display = 'grid';
+        if (advancedForm) advancedForm.style.display = 'none';
+        if (result) result.style.display = 'none';
+        if (beginnerResult) beginnerResult.style.display = 'none';
+      } else {
+        // Расширенный режим
+        modeToggleBtn.textContent = t('beginner_mode');
+        if (beginnerForm) beginnerForm.style.display = 'none';
+        if (advancedForm) advancedForm.style.display = 'grid';
+        if (beginnerResult) beginnerResult.style.display = 'none';
+        if (result) result.style.display = 'block';
+      }
+    });
+  }
+
+  // Упрощенный анализ для новичка
+  const beginnerAnalyzeBtn = document.getElementById('beginnerAnalyzeBtn');
+  const progressBarBeginner = document.getElementById('progressBarBeginner');
+  
+  if (beginnerAnalyzeBtn) {
+    beginnerAnalyzeBtn.addEventListener('click', async () => {
+      const beginnerCapitalInput = document.getElementById('beginnerCapital');
+      const capital = parseFloat(beginnerCapitalInput?.value || "10000");
+      // ИСПРАВЛЕНО: Проверяем валидность капитала для режима новичка
+      if (isNaN(capital) || capital <= 0) {
+        showToast("⚠️ Неверное значение капитала. Используйте положительное число.", "error");
+        beginnerAnalyzeBtn.disabled = false;
+        beginnerAnalyzeBtn.textContent = t('beginner_analyze');
+        if (progressBarBeginner) progressBarBeginner.classList.add('hidden');
+        return;
+      }
+      const symbol = document.getElementById('beginnerSymbol')?.value || 'BTC/USDT';
+      
+      beginnerAnalyzeBtn.disabled = true;
+      beginnerAnalyzeBtn.textContent = t('analyzing');
+      if (progressBarBeginner) progressBarBeginner.classList.remove('hidden');
+      if (beginnerResult) beginnerResult.style.display = 'none';
+      
+      try {
+        const res = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            symbol: symbol,
+            capital: capital,
+            trading_type: 'daytrading',
+            strategy: 'balanced',
+            risk: 1,
+            confirmation: 'EMA+RSI',
+            timeframe: 'auto',
+            min_reliability: 50,
+            enable_forecast: false,
+            enable_backtest: false,
+            enable_ml: false,
+            enable_trailing: false
+          })
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok && data.report_text) {
+          displayBeginnerResult(data, symbol, capital);
+        } else {
+          alert('Ошибка: ' + (data.error || 'Не удалось выполнить анализ'));
+        }
+      } catch (err) {
+        console.error('Ошибка:', err);
+        alert('Ошибка соединения с сервером');
+      } finally {
+        beginnerAnalyzeBtn.disabled = false;
+        beginnerAnalyzeBtn.textContent = t('beginner_analyze');
+        if (progressBarBeginner) progressBarBeginner.classList.add('hidden');
+      }
+    });
+  }
+
+  // Функция отображения упрощенного результата для новичка
+  function displayBeginnerResult(data, symbol, capital) {
+    const entryPrice = data.entry_price;
+    const stopLoss = data.stop_loss;
+    const takeProfit = data.take_profit;
+    const direction = data.direction;
+    const reliability = data.reliability_rating || 0;
+    
+    let action = '⏸ ' + t('beginner_when_to_buy');
+    let actionColor = '#f59e0b';
+    let entryLabel = t('beginner_entry_price');
+    let entryValue = '-';
+    let targetLabel = t('beginner_target_price');
+    let targetValue = '-';
+    let stopLabel = t('beginner_stop_loss');
+    let stopValue = '-';
+    let riskLevel = t('beginner_risk_medium');
+    let riskColor = '#f59e0b';
+    
+    if (entryPrice && stopLoss && takeProfit) {
+      if (direction === 'long') {
+        action = '✅ ' + t('beginner_when_to_buy') + ' (' + t('beginner_long') + ')';
+        actionColor = '#34d399';
+        entryValue = `$${entryPrice.toFixed(2)}`;
+        targetValue = `$${takeProfit.toFixed(2)}`;
+        stopValue = `$${stopLoss.toFixed(2)}`;
+      } else if (direction === 'short') {
+        action = '📉 ' + t('beginner_when_to_sell') + ' (' + t('beginner_short') + ')';
+        actionColor = '#ef4444';
+        entryValue = `$${entryPrice.toFixed(2)}`;
+        targetValue = `$${takeProfit.toFixed(2)}`;
+        stopValue = `$${stopLoss.toFixed(2)}`;
+      }
+      
+      const riskPercent = Math.abs((entryPrice - stopLoss) / entryPrice * 100);
+      if (riskPercent < 2) {
+        riskLevel = t('beginner_risk_low');
+        riskColor = '#34d399';
+      } else if (riskPercent > 5) {
+        riskLevel = t('beginner_risk_high');
+        riskColor = '#ef4444';
+      }
+    }
+    
+    if (beginnerResult) {
+      beginnerResult.innerHTML = `
+        <div style="margin-bottom: 20px;">
+          <div style="font-size: 24px; font-weight: bold; color: ${actionColor}; margin-bottom: 10px;">${action}</div>
+          <div style="color: #9aa6bf; font-size: 16px;">${t('beginner_recommendation_for')} ${symbol}</div>
+          ${reliability > 0 ? `<div style="color: #9aa6bf; font-size: 14px; margin-top: 5px;">Надежность: ${reliability}%</div>` : ''}
+        </div>
+        
+        ${entryValue !== '-' ? `
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin: 20px 0;">
+          <div style="background: #323544; padding: 15px; border-radius: 8px;">
+            <div style="color: #9aa6bf; font-size: 14px; margin-bottom: 5px;">💰 ${entryLabel}:</div>
+            <div style="font-size: 20px; font-weight: bold; color: #fff;">${entryValue}</div>
+          </div>
+          <div style="background: #323544; padding: 15px; border-radius: 8px;">
+            <div style="color: #9aa6bf; font-size: 14px; margin-bottom: 5px;">🎯 ${targetLabel}:</div>
+            <div style="font-size: 20px; font-weight: bold; color: #34d399;">${targetValue}</div>
+          </div>
+          <div style="background: #323544; padding: 15px; border-radius: 8px;">
+            <div style="color: #9aa6bf; font-size: 14px; margin-bottom: 5px;">🛑 ${stopLabel}:</div>
+            <div style="font-size: 20px; font-weight: bold; color: #ef4444;">${stopValue}</div>
+          </div>
+        </div>
+        ` : ''}
+        
+        <div style="background: #323544; padding: 15px; border-radius: 8px; display: inline-block; margin-top: 10px;">
+          <div style="color: #9aa6bf; font-size: 14px; margin-bottom: 12px;">${t('beginner_risk_level')}</div>
+          <div style="margin-top: 8px;">
+            <span style="background: ${riskColor}20; color: ${riskColor}; padding: 5px 15px; border-radius: 5px; font-weight: bold;">${riskLevel}</span>
+          </div>
+        </div>
+        
+        <div style="margin-top: 20px; color: #9aa6bf; font-size: 12px;">
+          💡 Это упрощенный анализ. Для детальной информации переключитесь в расширенный режим.
+        </div>
+      `;
+      beginnerResult.style.display = 'block';
+    }
+  }
 });
+
+// === Функция отображения кривой баланса бэктеста ===
+function displayBacktestEquityCurve(backtestData) {
+  const container = document.getElementById('backtestChartContainer');
+  const canvas = document.getElementById('backtestChart');
+  
+  if (!container || !canvas || !backtestData || !backtestData.equity_curve) {
+    return;
+  }
+
+  container.classList.remove('hidden');
+
+  // Уничтожаем предыдущий график, если он существует
+  if (window.backtestChartInstance) {
+    window.backtestChartInstance.destroy();
+  }
+
+  const equityCurve = backtestData.equity_curve;
+  const labels = equityCurve.map((_, index) => index + 1);
+
+  window.backtestChartInstance = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Капитал',
+        data: equityCurve,
+        borderColor: 'rgb(63, 169, 245)',
+        backgroundColor: 'rgba(63, 169, 245, 0.1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4,
+        pointRadius: 0,
+        pointHoverRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top'
+        },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          callbacks: {
+            label: function(context) {
+              return `Капитал: $${context.parsed.y.toFixed(2)}`;
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: false,
+          ticks: {
+            callback: function(value) {
+              return '$' + value.toLocaleString();
+            }
+          },
+          title: {
+            display: true,
+            text: 'Капитал ($)'
+          }
+        },
+        x: {
+          title: {
+            display: true,
+            text: 'Период'
+          }
+        }
+      }
+    }
+  });
+}
+
+// === Функция отображения сравнительного бэктеста всех стратегий ===
+function displayCompareBacktest(allStrategiesData) {
+  const container = document.getElementById('compareBacktestContainer');
+  const resultsDiv = document.getElementById('compareBacktestResults');
+  const chartCanvas = document.getElementById('compareBacktestChart');
+  const tableDiv = document.getElementById('compareBacktestTable');
+  
+  if (!container || !resultsDiv || !chartCanvas || !tableDiv) {
+    return;
+  }
+
+  container.classList.remove('hidden');
+  resultsDiv.style.display = 'block';
+
+  // Цвета для каждой стратегии
+  const strategyColors = {
+    'Консервативная': 'rgb(34, 211, 153)',  // Зеленый
+    'Сбалансированная': 'rgb(63, 169, 245)', // Синий
+    'Агрессивная': 'rgb(239, 68, 68)'      // Красный
+  };
+
+  // Подготовка данных для графика
+  const datasets = [];
+  const maxLength = Math.max(...Object.values(allStrategiesData).map(s => s.equity_curve ? s.equity_curve.length : 0));
+  const labels = Array.from({ length: maxLength }, (_, i) => i + 1);
+
+  for (const [strategyName, data] of Object.entries(allStrategiesData)) {
+    if (data.equity_curve && data.equity_curve.length > 0) {
+      datasets.push({
+        label: strategyName,
+        data: data.equity_curve,
+        borderColor: strategyColors[strategyName] || 'rgb(128, 128, 128)',
+        backgroundColor: (strategyColors[strategyName] || 'rgb(128, 128, 128)').replace('rgb', 'rgba').replace(')', ', 0.1)'),
+        borderWidth: 2,
+        fill: false,
+        tension: 0.4,
+        pointRadius: 0,
+        pointHoverRadius: 4
+      });
+    }
+  }
+
+  // Уничтожаем предыдущий график, если он существует
+  if (window.compareBacktestChartInstance) {
+    window.compareBacktestChartInstance.destroy();
+  }
+
+  // Создаем график сравнения
+  window.compareBacktestChartInstance = new Chart(chartCanvas, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: datasets
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top'
+        },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          callbacks: {
+            label: function(context) {
+              return `${context.dataset.label}: $${context.parsed.y.toFixed(2)}`;
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: false,
+          ticks: {
+            callback: function(value) {
+              return '$' + value.toLocaleString();
+            }
+          },
+          title: {
+            display: true,
+            text: 'Капитал ($)'
+          }
+        },
+        x: {
+          title: {
+            display: true,
+            text: 'Период'
+          }
+        }
+      }
+    }
+  });
+
+  // Создаем сравнительную таблицу
+  let tableHTML = '<table style="width: 100%; border-collapse: collapse; margin-top: 20px; background: #2a2d3a; border-radius: 8px; overflow: hidden;">';
+  tableHTML += '<thead><tr style="background: #3a3f52; color: #fff;">';
+  tableHTML += '<th style="padding: 12px; text-align: left; border-bottom: 2px solid #3fa9f5;">Стратегия</th>';
+  tableHTML += '<th style="padding: 12px; text-align: right; border-bottom: 2px solid #3fa9f5;">Win Rate</th>';
+  tableHTML += '<th style="padding: 12px; text-align: right; border-bottom: 2px solid #3fa9f5;">Прибыль (%)</th>';
+  tableHTML += '<th style="padding: 12px; text-align: right; border-bottom: 2px solid #3fa9f5;">Сделок</th>';
+  tableHTML += '<th style="padding: 12px; text-align: right; border-bottom: 2px solid #3fa9f5;">Просадка (%)</th>';
+  tableHTML += '<th style="padding: 12px; text-align: right; border-bottom: 2px solid #3fa9f5;">Средний R:R</th>';
+  tableHTML += '<th style="padding: 12px; text-align: right; border-bottom: 2px solid #3fa9f5;">Финальный капитал</th>';
+  tableHTML += '</tr></thead><tbody>';
+
+  // Сортируем стратегии по прибыли (от лучшей к худшей)
+  const sortedStrategies = Object.entries(allStrategiesData).sort((a, b) => 
+    (b[1].total_profit_pct || 0) - (a[1].total_profit_pct || 0)
+  );
+
+  // Маппинг кодов стратегий в читаемые имена
+  // ИСПРАВЛЕНО: Добавлена функция для нормализации названий стратегий
+  const normalizeStrategyName = (name) => {
+    if (!name) return name;
+    const nameLower = name.toLowerCase().trim();
+    
+    // Английские названия
+    if (nameLower.includes('conservative') || nameLower === 'conservative') return 'Консервативная';
+    if (nameLower.includes('balanced') || nameLower === 'balanced') return 'Сбалансированная';
+    if (nameLower.includes('aggressive') || nameLower === 'aggressive') return 'Агрессивная';
+    
+    // Русские названия (уже правильные)
+    if (name === 'Консервативная') return 'Консервативная';
+    if (name === 'Сбалансированная') return 'Сбалансированная';
+    if (name === 'Агрессивная') return 'Агрессивная';
+    
+    // Fallback: возвращаем как есть, но пробуем найти частичное совпадение
+    if (name.includes('Консерватив')) return 'Консервативная';
+    if (name.includes('Сбалансирован')) return 'Сбалансированная';
+    if (name.includes('Агрессив')) return 'Агрессивная';
+    
+    return name; // Если не нашли - возвращаем как есть
+  };
+
+  sortedStrategies.forEach(([strategyName, data], index) => {
+    const displayName = normalizeStrategyName(strategyName);
+    const rowColor = index % 2 === 0 ? '#2a2d3a' : '#323544';
+    const profitColor = data.total_profit_pct >= 0 ? '#22d399' : '#ef4444';
+    const winRateColor = data.win_rate >= 50 ? '#22d399' : data.win_rate >= 40 ? '#f59e0b' : '#ef4444';
+    
+    tableHTML += `<tr style="background: ${rowColor}; color: #e8e8e8;">`;
+    tableHTML += `<td style="padding: 12px; font-weight: bold; color: ${strategyColors[displayName] || '#fff'};">${displayName}</td>`;
+    tableHTML += `<td style="padding: 12px; text-align: right; color: ${winRateColor};">${data.win_rate.toFixed(1)}%</td>`;
+    tableHTML += `<td style="padding: 12px; text-align: right; color: ${profitColor};">${data.total_profit_pct >= 0 ? '+' : ''}${data.total_profit_pct.toFixed(2)}%</td>`;
+    tableHTML += `<td style="padding: 12px; text-align: right;">${data.total_trades || 0}</td>`;
+    tableHTML += `<td style="padding: 12px; text-align: right; color: #ef4444;">${data.max_drawdown.toFixed(2)}%</td>`;
+    tableHTML += `<td style="padding: 12px; text-align: right;">${data.avg_rr.toFixed(2)}</td>`;
+    tableHTML += `<td style="padding: 12px; text-align: right; color: ${profitColor};">$${data.final_capital.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>`;
+    tableHTML += '</tr>';
+  });
+
+  tableHTML += '</tbody></table>';
+  tableDiv.innerHTML = tableHTML;
+
+  // Скрываем кнопку "Запустить сравнительный бэктест", так как данные уже есть
+  const runCompareBtn = document.getElementById('runCompareBacktestBtn');
+  if (runCompareBtn) {
+    runCompareBtn.style.display = 'none';
+  }
+}
+
+// === Обработка случая, когда сравнительных данных нет ===
+function hideCompareBacktest() {
+  const container = document.getElementById('compareBacktestContainer');
+  if (container) {
+    container.classList.add('hidden');
+  }
+  const runCompareBtn = document.getElementById('runCompareBacktestBtn');
+  if (runCompareBtn) {
+    runCompareBtn.style.display = 'block';
+  }
+}
