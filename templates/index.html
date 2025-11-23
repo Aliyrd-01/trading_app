@@ -18,6 +18,14 @@
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 
+    <!-- Режим новичка -->
+    <div style="margin-bottom: 20px; text-align: center;">
+      <label style="display: inline-flex; align-items: center; gap: 10px; cursor: pointer;">
+        <input type="checkbox" id="beginnerMode" checked style="width: 18px; height: 18px; cursor: pointer;">
+        <span>👶 Режим новичка (упрощенный интерфейс)</span>
+      </label>
+    </div>
+
     <div class="form-grid">
       <!-- Настройки анализа -->
       <label>
@@ -31,6 +39,8 @@
           <option>TRX/USDT</option>
           <option>DOGE/USDT</option>
           <option>ADA/USDT</option>
+          <option>LINK/USDT</option>
+          <option>ZEC/USDT</option>
         </select>
       </label>
 

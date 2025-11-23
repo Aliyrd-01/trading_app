@@ -1,15 +1,239 @@
+// --- Модуль универсальных тултипов (не зависит от стилей родителя) ---
+const ProTooltipManager = {
+  tooltips: new Map(), // Хранит данные тултипов для каждого элемента
+  
+  create(element, message = null) {
+    // Используем перевод по умолчанию, если сообщение не указано
+    if (!message) {
+      message = t('pro_only_tooltip');
+    }
+    // Проверяем, что элемент существует
+    if (!element || !document.body) {
+      return;
+    }
+    
+    // Проверяем, не создан ли уже тултип
+    if (this.tooltips.has(element)) {
+      return;
+    }
+    
+    // Находим родительский контейнер для привязки событий (disabled элементы не получают события)
+    let eventTarget = element;
+    const parent = element.parentElement;
+    
+    // Для toggleAdvanced используем advanced-toggle-container
+    if (element.id === 'toggleAdvanced' && parent && parent.classList.contains('advanced-toggle-container')) {
+      eventTarget = parent;
+    }
+    // Для кнопок статистики и анализа используем downloadButtons контейнер
+    else if ((element.id === 'downloadStats' || element.id === 'loadStrategyAnalysis') && parent && parent.id === 'downloadButtons') {
+      // Для каждой кнопки создаем индивидуальную обертку
+      if (!element.parentElement.classList.contains('tooltip-wrapper')) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'tooltip-wrapper';
+        wrapper.style.cssText = 'position: relative; display: inline-block;';
+        element.parentNode.insertBefore(wrapper, element);
+        wrapper.appendChild(element);
+        eventTarget = wrapper;
+      } else {
+        eventTarget = element.parentElement;
+      }
+    }
+    // Для других элементов создаем обертку, если элемент disabled
+    else if (element.disabled || element.classList.contains('disabled-free')) {
+      if (!parent.classList.contains('tooltip-wrapper')) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'tooltip-wrapper';
+        wrapper.style.cssText = 'position: relative; display: inline-block;';
+        element.parentNode.insertBefore(wrapper, element);
+        wrapper.appendChild(element);
+        eventTarget = wrapper;
+      } else {
+        eventTarget = parent;
+      }
+    }
+    
+    // Создаем тултип и добавляем в body (не зависит от opacity родителя)
+    const tooltip = document.createElement('div');
+    tooltip.className = 'pro-tooltip-fixed';
+    tooltip.textContent = message;
+    tooltip.style.cssText = 'position: fixed; background: #3a3f52; color: #fff; padding: 6px 12px; border-radius: 5px; font-size: 12px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.2s; z-index: 10000; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); visibility: hidden; left: 0; top: 0;';
+    document.body.appendChild(tooltip);
+    
+    // Функции для показа/скрытия
+    const showTooltip = () => {
+      if (!element || !tooltip.parentNode) return;
+      
+      try {
+        const rect = element.getBoundingClientRect();
+        if (!rect || rect.width === 0 || rect.height === 0) return;
+        
+        // Используем фиксированные размеры для быстрого позиционирования
+        const tooltipWidth = 220;
+        const tooltipHeight = 32;
+        
+        // Позиционируем тултип над элементом по центру
+        let left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+        let top = rect.top - tooltipHeight - 8;
+        
+        // Проверяем границы экрана
+        if (left < 10) left = 10;
+        if (left + tooltipWidth > window.innerWidth - 10) {
+          left = window.innerWidth - tooltipWidth - 10;
+        }
+        if (top < 10) {
+          top = rect.bottom + 8; // Показываем снизу, если не помещается сверху
+        }
+        
+        // Устанавливаем финальную позицию и показываем
+        tooltip.style.left = left + 'px';
+        tooltip.style.top = top + 'px';
+        tooltip.style.visibility = 'visible';
+        tooltip.style.opacity = '1';
+      } catch (e) {
+        console.error('Ошибка показа тултипа:', e);
+      }
+    };
+    
+    const hideTooltip = () => {
+      if (tooltip.parentNode) {
+        tooltip.style.opacity = '0';
+        setTimeout(() => {
+          if (tooltip.parentNode) {
+            tooltip.style.visibility = 'hidden';
+          }
+        }, 200);
+      }
+    };
+    
+    // Привязываем события к контейнеру, а не к disabled элементу
+    eventTarget.addEventListener('mouseenter', showTooltip);
+    eventTarget.addEventListener('mouseleave', hideTooltip);
+    eventTarget.addEventListener('mousemove', showTooltip);
+    
+    // Сохраняем данные для удаления
+    this.tooltips.set(element, {
+      tooltip: tooltip,
+      showTooltip: showTooltip,
+      hideTooltip: hideTooltip,
+      eventTarget: eventTarget
+    });
+  },
+  
+  remove(element) {
+    const data = this.tooltips.get(element);
+    if (data) {
+      // Удаляем обработчики с правильного элемента (контейнера)
+      const target = data.eventTarget || element;
+      target.removeEventListener('mouseenter', data.showTooltip);
+      target.removeEventListener('mouseleave', data.hideTooltip);
+      target.removeEventListener('mousemove', data.showTooltip);
+      
+      // Удаляем тултип из DOM
+      if (data.tooltip && data.tooltip.parentNode) {
+        data.tooltip.remove();
+      }
+      
+      // Удаляем обертку, если она была создана
+      if (data.eventTarget && data.eventTarget.classList.contains('tooltip-wrapper')) {
+        const wrapper = data.eventTarget;
+        if (element.parentNode === wrapper) {
+          wrapper.parentNode.insertBefore(element, wrapper);
+          wrapper.remove();
+        }
+      }
+      
+      // Удаляем из Map
+      this.tooltips.delete(element);
+    }
+  },
+  
+  removeAll() {
+    this.tooltips.forEach((data, element) => {
+      this.remove(element);
+    });
+  },
+  
+  // Обновляет текст всех тултипов при смене языка
+  updateAllTooltips() {
+    this.tooltips.forEach((data, element) => {
+      if (data.tooltip && data.tooltip.parentNode) {
+        data.tooltip.textContent = t('pro_only_tooltip');
+      }
+    });
+  }
+};
+
+// --- Система переводов ---
+let currentLanguage = localStorage.getItem('language') || 'ru';
+let userPlan = null;
+
+function t(key, params = {}) {
+  const translation = translations[currentLanguage]?.[key] || translations['ru'][key] || key;
+  if (Object.keys(params).length === 0) {
+    return translation;
+  }
+  return translation.replace(/\{(\w+)\}/g, (match, param) => params[param] || match);
+}
+
+function updateTranslations() {
+  // Обновляем тексты элементов с data-i18n
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (el.tagName === 'OPTION') {
+      // Для option сохраняем значение, обновляем только текст
+      const value = el.value;
+      el.textContent = t(key);
+      el.value = value;
+    } else {
+      el.textContent = t(key);
+    }
+  });
+  
+  // Обновляем tooltips с data-tip-key
+  document.querySelectorAll('[data-tip-key]').forEach(el => {
+    const tipKey = el.getAttribute('data-tip-key');
+    el.setAttribute('data-tip', t(tipKey));
+  });
+  
+  // Обновляем placeholder
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    el.placeholder = t(key);
+  });
+  
+  // Обновляем title
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    const key = el.getAttribute('data-i18n-title');
+    el.title = t(key);
+  });
+  
+  // Обновляем тултипы ProTooltipManager
+  if (typeof ProTooltipManager !== 'undefined') {
+    ProTooltipManager.updateAllTooltips();
+  }
+}
+
 // --- Обновление таймфрейма ---
 function updateTimeframeInfo() {
   const tfMap = { 
-    "Скальпинг": "5m", 
-    "Дейтрейдинг": "1h", 
-    "Свинг": "4h", 
-    "Среднесрочная": "1d", 
-    "Долгосрочная": "1w" 
+    "scalping": "5m", 
+    "daytrading": "1h", 
+    "swing": "4h", 
+    "medium_term": "1d", 
+    "long_term": "1w" 
   };
-  const val = document.getElementById("trading_type").value;
-  document.getElementById("tfInfo").textContent = "Таймфрейм: " + tfMap[val];
+  const tradingTypeSelect = document.getElementById("trading_type");
+  if (!tradingTypeSelect) return;
+  
+  const val = tradingTypeSelect.value;
+  const recommendedTf = tfMap[val] || "1h";
+  const tfInfo = document.getElementById("tfInfo");
+  if (tfInfo) {
+    tfInfo.textContent = t("recommended") + ": " + recommendedTf;
+  }
 }
+
 document.addEventListener("DOMContentLoaded", () => {
   const tradingType = document.getElementById("trading_type");
   const tfInfo = document.getElementById("tfInfo");
@@ -31,6 +255,58 @@ document.addEventListener("DOMContentLoaded", () => {
   const enableForecast = document.getElementById("enableForecast");
   const enableBacktest = document.getElementById("enableBacktest");
   const enableML = document.getElementById("enableML");
+  const beginnerMode = document.getElementById("beginnerMode");
+  const chartTimeframe = document.getElementById("chartTimeframe");
+
+  // === Режим новичка ===
+  function updateBeginnerMode() {
+    const isBeginnerMode = beginnerMode && beginnerMode.checked;
+    
+    if (isBeginnerMode) {
+      // Скрываем продвинутые настройки
+      if (advancedSettings) {
+        advancedSettings.classList.add("hidden");
+      }
+      if (toggleAdvanced) {
+        toggleAdvanced.style.display = "none";
+      }
+      // Скрываем таймфрейм графика (для упрощения)
+      const chartTimeframeLabel = chartTimeframe ? chartTimeframe.closest("label") : null;
+      if (chartTimeframeLabel) {
+        chartTimeframeLabel.style.display = "none";
+      }
+    } else {
+      // Показываем все элементы
+      if (toggleAdvanced) {
+        toggleAdvanced.style.display = "";
+      }
+      const chartTimeframeLabel = chartTimeframe ? chartTimeframe.closest("label") : null;
+      if (chartTimeframeLabel) {
+        chartTimeframeLabel.style.display = "";
+      }
+    }
+    
+    // Сохраняем состояние
+    if (beginnerMode) {
+      localStorage.setItem("beginnerMode", isBeginnerMode ? "true" : "false");
+    }
+  }
+
+  if (beginnerMode) {
+    // Восстанавливаем состояние из localStorage
+    const savedBeginnerMode = localStorage.getItem("beginnerMode");
+    if (savedBeginnerMode === "true" || savedBeginnerMode === null) {
+      beginnerMode.checked = true;
+    } else {
+      beginnerMode.checked = false;
+    }
+    
+    // Применяем режим при загрузке
+    updateBeginnerMode();
+    
+    // Обработчик изменения
+    beginnerMode.addEventListener("change", updateBeginnerMode);
+  }
 
   // === Logout ===
   if (logoutBtn) {
@@ -52,28 +328,38 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // === Таймфреймы ===
   const timeframes = {
-    "Скальпинг": "5m",
-    "Дейтрейдинг": "1h",
-    "Свинг": "4h",
-    "Среднесрочная": "1d",
-    "Долгосрочная": "1w"
+    "scalping": "5m",
+    "daytrading": "1h",
+    "swing": "4h",
+    "medium_term": "1d",
+    "long_term": "1w"
+  };
+  
+  // Маппинг для обратной совместимости (старые значения)
+  const tradingTypeMap = {
+    "Скальпинг": "scalping",
+    "Дейтрейдинг": "daytrading",
+    "Свинг": "swing",
+    "Среднесрочная": "medium_term",
+    "Долгосрочная": "long_term"
   };
 
   // === Время показа линий анализа по типу торговли ===
   const linesDisplayDuration = {
-    "Скальпинг": 5 * 60 * 1000,      // 5 минут
-    "Дейтрейдинг": 15 * 60 * 1000,   // 15 минут
-    "Свинг": 30 * 60 * 1000,         // 30 минут
-    "Среднесрочная": 60 * 60 * 1000, // 1 час
-    "Долгосрочная": 2 * 60 * 60 * 1000 // 2 часа
+    "scalping": 5 * 60 * 1000,      // 5 минут
+    "daytrading": 15 * 60 * 1000,   // 15 минут
+    "swing": 30 * 60 * 1000,         // 30 минут
+    "medium_term": 60 * 60 * 1000, // 1 час
+    "long_term": 2 * 60 * 60 * 1000 // 2 часа
   };
 
   const timeframeSelect = document.getElementById("timeframe");
 
   // Обновляем рекомендуемый таймфрейм при изменении типа торговли
   tradingType.addEventListener("change", () => {
-    const recommendedTf = timeframes[tradingType.value] || "1h";
-    tfInfo.textContent = "Рекомендуемый таймфрейм: " + recommendedTf;
+    const tradingTypeValue = tradingType.value;
+    const recommendedTf = timeframes[tradingTypeValue] || "1h";
+    tfInfo.textContent = t("recommended") + ": " + recommendedTf;
     
     // Если выбран "Автоматически", обновляем текст, но не меняем значение
     if (timeframeSelect && timeframeSelect.value === "auto") {
@@ -85,13 +371,229 @@ document.addEventListener("DOMContentLoaded", () => {
   if (timeframeSelect) {
     timeframeSelect.addEventListener("change", () => {
       if (timeframeSelect.value === "auto") {
-        const recommendedTf = timeframes[tradingType.value] || "1h";
-        tfInfo.textContent = "Рекомендуемый таймфрейм: " + recommendedTf;
+        const tradingTypeValue = tradingType.value;
+        const recommendedTf = timeframes[tradingTypeValue] || "1h";
+        tfInfo.textContent = t("recommended") + ": " + recommendedTf;
       } else {
-        tfInfo.textContent = "Выбранный таймфрейм: " + timeframeSelect.value;
+        tfInfo.textContent = t("selected") + ": " + timeframeSelect.value;
       }
     });
   }
+  
+  // === Инициализация кастомного дропдауна для языка ===
+  function initCustomDropdown() {
+    const dropdown = document.getElementById('languageDropdown');
+    const toggle = document.getElementById('languageToggleBtn');
+    const menu = document.getElementById('languageDropdownMenu');
+    const toggleText = document.getElementById('languageToggleText');
+  
+    if (!dropdown || !toggle || !menu) return;
+    
+    // Устанавливаем текущий язык
+    const currentLang = localStorage.getItem('language') || 'ru';
+    updateDropdownText(currentLang);
+    
+    // Отмечаем выбранный пункт
+    menu.querySelectorAll('li').forEach(li => {
+      if (li.getAttribute('data-value') === currentLang) {
+        li.classList.add('selected');
+      } else {
+        li.classList.remove('selected');
+      }
+    });
+    
+    // Открытие/закрытие меню
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      menu.classList.toggle('show');
+    });
+    
+    // Закрытие при клике вне
+    document.addEventListener('click', (e) => {
+      if (!dropdown.contains(e.target)) {
+        menu.classList.remove('show');
+      }
+    });
+    
+    // Выбор языка
+    menu.querySelectorAll('li').forEach(li => {
+      li.addEventListener('click', () => {
+        const value = li.getAttribute('data-value');
+        currentLanguage = value;
+        localStorage.setItem('language', value);
+      updateTranslations();
+        updateDropdownText(value);
+        menu.classList.remove('show');
+        
+        // Обновляем выбранный пункт
+        menu.querySelectorAll('li').forEach(item => {
+          item.classList.remove('selected');
+        });
+        li.classList.add('selected');
+        
+      // Обновляем информацию о таймфрейме после смены языка
+      updateTimeframeInfo();
+        
+        // Обновляем язык на странице логина
+        if (typeof updateLoginTranslations === 'function') {
+          updateLoginTranslations();
+        }
+      });
+    });
+    
+    function updateDropdownText(lang) {
+      const langMap = {
+        'uk': '🇺🇦',
+        'en': '🇬🇧',
+        'ru': '🇷🇺'
+      };
+      if (toggleText) {
+        toggleText.textContent = langMap[lang] || '🌐';
+      }
+    }
+  }
+  
+  // Инициализируем кастомный дропдаун
+  initCustomDropdown();
+  
+  // Загружаем план пользователя
+  fetch('/api/user_info')
+    .then(res => res.json())
+    .then(data => {
+      userPlan = data.plan || 'free';
+      
+      // Отключаем элементы для Free плана вместо скрытия
+      document.querySelectorAll('[data-plan]').forEach(el => {
+        const requiredPlan = el.getAttribute('data-plan');
+        if (userPlan === 'free' && requiredPlan !== 'free') {
+          // Вместо скрытия - отключаем элементы
+          if (el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'SELECT') {
+            el.disabled = true;
+            el.classList.add('disabled-free');
+            
+            // Добавляем tooltip для кнопок статистики и анализа
+            if (el.id === 'downloadStats' || el.id === 'loadStrategyAnalysis') {
+              el.title = '🔒 Доступно только в Pro/Pro+';
+              el.setAttribute('data-tooltip', '🔒 Доступно только в Pro/Pro+');
+            }
+          } else {
+            // Для контейнеров отключаем все интерактивные элементы внутри
+            const interactiveElements = el.querySelectorAll('button, input, select, textarea');
+            interactiveElements.forEach(ie => {
+              ie.disabled = true;
+              ie.classList.add('disabled-free');
+              
+              // Добавляем tooltip для кнопок статистики и анализа
+              if (ie.id === 'downloadStats' || ie.id === 'loadStrategyAnalysis') {
+                ie.title = '🔒 Доступно только в Pro/Pro+';
+                ie.setAttribute('data-tooltip', '🔒 Доступно только в Pro/Pro+');
+              }
+            });
+            el.classList.add('disabled-free-container');
+          }
+        } else if (userPlan !== 'free') {
+          // Включаем элементы для Pro/Pro+
+          if (el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'SELECT') {
+            el.disabled = false;
+            el.classList.remove('disabled-free');
+            if (el.id === 'downloadStats' || el.id === 'loadStrategyAnalysis') {
+              el.removeAttribute('title');
+              el.removeAttribute('data-tooltip');
+            }
+          } else {
+            const interactiveElements = el.querySelectorAll('button, input, select, textarea');
+            interactiveElements.forEach(ie => {
+              ie.disabled = false;
+              ie.classList.remove('disabled-free');
+              if (ie.id === 'downloadStats' || ie.id === 'loadStrategyAnalysis') {
+                ie.removeAttribute('title');
+                ie.removeAttribute('data-tooltip');
+              }
+            });
+            el.classList.remove('disabled-free-container');
+          }
+        }
+      });
+      
+      // Продвинутые настройки - не скрываем, но отключаем для Free
+      if (userPlan === 'free') {
+        const advancedSettings = document.getElementById('advancedSettings');
+        const toggleAdvanced = document.getElementById('toggleAdvanced');
+        
+        if (toggleAdvanced) {
+          toggleAdvanced.disabled = true;
+          toggleAdvanced.classList.add('disabled-free');
+          
+          // Создаем тултип через модуль
+          ProTooltipManager.create(toggleAdvanced);
+        }
+        
+        if (advancedSettings) {
+          // Отключаем все интерактивные элементы внутри продвинутых настроек
+          const interactiveElements = advancedSettings.querySelectorAll('button, input, select, textarea');
+          interactiveElements.forEach(ie => {
+            ie.disabled = true;
+            ie.classList.add('disabled-free');
+          });
+          advancedSettings.classList.add('disabled-free-container');
+        }
+      } else {
+        // Включаем для Pro/Pro+
+        const advancedSettings = document.getElementById('advancedSettings');
+        const toggleAdvanced = document.getElementById('toggleAdvanced');
+        
+        if (toggleAdvanced) {
+          toggleAdvanced.disabled = false;
+          toggleAdvanced.classList.remove('disabled-free');
+          
+          // Удаляем тултип через модуль
+          ProTooltipManager.remove(toggleAdvanced);
+        }
+        
+        if (advancedSettings) {
+          const interactiveElements = advancedSettings.querySelectorAll('button, input, select, textarea');
+          interactiveElements.forEach(ie => {
+            ie.disabled = false;
+            ie.classList.remove('disabled-free');
+          });
+          advancedSettings.classList.remove('disabled-free-container');
+        }
+      }
+      
+      // Для кнопок статистики и анализа - используем модуль тултипов
+        const downloadStatsBtn = document.getElementById('downloadStats');
+        const loadStrategyAnalysisBtn = document.getElementById('loadStrategyAnalysis');
+        
+      if (userPlan === 'free') {
+        // Для кнопки статистики - создаем тултип
+        if (downloadStatsBtn) {
+          ProTooltipManager.create(downloadStatsBtn);
+        }
+        
+        // Для кнопки анализа стратегий - создаем тултип
+        if (loadStrategyAnalysisBtn) {
+          ProTooltipManager.create(loadStrategyAnalysisBtn);
+        }
+      } else {
+        // Удаляем тултипы для Pro пользователей
+        if (downloadStatsBtn) {
+          ProTooltipManager.remove(downloadStatsBtn);
+        }
+        if (loadStrategyAnalysisBtn) {
+          ProTooltipManager.remove(loadStrategyAnalysisBtn);
+        }
+      }
+    })
+    .catch(err => {
+      console.error('Ошибка загрузки информации о пользователе:', err);
+      userPlan = 'free'; // По умолчанию Free
+    });
+  
+  // Применяем переводы при загрузке
+  updateTranslations();
+  
+  // Инициализируем рекомендуемый таймфрейм ПОСЛЕ загрузки переводов
+  updateTimeframeInfo();
 
   // === Продвинутые настройки: раскрытие/сворачивание ===
   if (toggleAdvanced && advancedSettings && toggleIcon) {
@@ -107,16 +609,26 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
     
-    // Восстанавливаем состояние из localStorage
-    const savedState = localStorage.getItem("advancedSettingsExpanded");
-    if (savedState === "true") {
-      advancedSettings.classList.remove("hidden");
+    // Восстанавливаем состояние из localStorage (только если не режим новичка)
+    if (!beginnerMode || !beginnerMode.checked) {
+      const savedState = localStorage.getItem("advancedSettingsExpanded");
+      if (savedState === "true") {
+        advancedSettings.classList.remove("hidden");
+      } else {
+        advancedSettings.classList.add("hidden");
+      }
     } else {
+      // В режиме новичка всегда скрываем
       advancedSettings.classList.add("hidden");
     }
     updateToggleIcon();
 
     toggleAdvanced.addEventListener("click", (e) => {
+      // Проверяем, не отключен ли элемент для Free плана
+      if (toggleAdvanced.disabled || toggleAdvanced.classList.contains('disabled-free')) {
+        return;
+      }
+      
       e.preventDefault();
       e.stopPropagation();
       const isHidden = advancedSettings.classList.contains("hidden");
@@ -550,15 +1062,18 @@ document.addEventListener("DOMContentLoaded", () => {
     const timeframe = timeframeSelect && timeframeSelect.value !== "auto" ? timeframeSelect.value : null;
 
     if (!confirmation) {
-      showToast("⚠️ Выберите подтверждение входа", "error");
+      showToast("⚠️ " + t("select_confirmation"), "error");
       return;
     }
 
     startProgress();
     analyzeBtn.disabled = true;
     const originalBtnText = analyzeBtn.textContent;
-    analyzeBtn.textContent = "⏳ Анализ рынка...";
-    document.querySelector("#result h2").textContent = "📄 Отчёт";
+    analyzeBtn.textContent = t("analyzing");
+    const resultH2 = document.querySelector("#result h2");
+    if (resultH2) {
+      resultH2.textContent = t("report_title");
+    }
     downloadBtn.disabled = true;
     downloadStatsBtn.disabled = true;
 
@@ -605,7 +1120,11 @@ document.addEventListener("DOMContentLoaded", () => {
       stopProgress();
 
       if (data.error) {
+        if (data.limit_reached) {
+          showToast("❌ " + t("free_limit_reached"), "error", 10000);
+        } else {
         showToast("❌ " + data.error, "error");
+        }
         analyzeBtn.disabled = false;
         analyzeBtn.textContent = originalBtnText;
         return;
@@ -615,7 +1134,12 @@ document.addEventListener("DOMContentLoaded", () => {
         reportText.innerHTML = renderReport(data.report_text);
 
         result.classList.remove("demo");
-        showToast("✅ Анализ завершён", "success");
+        showToast(t("analysis_complete"), "success");
+        
+        // Показываем сообщение об оставшихся анализах для Free
+        if (data.remaining_analyses !== undefined && data.remaining_analyses !== null) {
+          showToast(t("free_analyses_left", { count: data.remaining_analyses }), "info", 5000);
+        }
 
         // === Real-Time график ===
         // График уже должен быть виден и работать
@@ -636,13 +1160,30 @@ document.addEventListener("DOMContentLoaded", () => {
           });
           
           // Запускаем таймер автоматического скрытия линий
-          scheduleLinesHide(tradingType.value);
+          // Преобразуем значение типа торговли для маппинга
+          const tradingTypeValue = tradingType.value;
+          const mappedValue = tradingTypeMap[tradingTypeValue] || tradingTypeValue;
+          scheduleLinesHide(mappedValue);
           
-          showToast('📊 Линии анализа наложены на график', 'success', 3000);
+          showToast(t("lines_added"), 'success', 3000);
+        }
+
+        // === Визуализация кривой баланса бэктеста ===
+        if (data.backtest && data.backtest.equity_curve && data.backtest.equity_curve.length > 0) {
+          displayBacktestEquityCurve(data.backtest);
+        } else {
+          // Скрываем график, если нет данных
+          const backtestChartContainer = document.getElementById('backtestChartContainer');
+          if (backtestChartContainer) {
+            backtestChartContainer.classList.add('hidden');
+          }
         }
 
         downloadBtn.disabled = false;
+        // Восстанавливаем disabled только если не Free план
+        if (userPlan !== 'free') {
         downloadStatsBtn.disabled = false;
+        }
         
         // Восстанавливаем кнопку после успешного анализа
         analyzeBtn.disabled = false;
@@ -690,6 +1231,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // === Скачать статистику ===
   downloadStatsBtn.addEventListener("click", async (e) => {
+    // Проверяем, не отключена ли кнопка для Free плана
+    if (downloadStatsBtn.disabled || downloadStatsBtn.classList.contains('disabled-free')) {
+      return;
+    }
     e.preventDefault();
     downloadStatsBtn.disabled = true;
 
@@ -758,6 +1303,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // === Загрузка анализа стратегий ===
   if (loadStrategyAnalysisBtn && strategyAnalysisDiv) {
     loadStrategyAnalysisBtn.addEventListener("click", async () => {
+      // Проверяем, не отключена ли кнопка для Free плана
+      if (loadStrategyAnalysisBtn.disabled || loadStrategyAnalysisBtn.classList.contains('disabled-free')) {
+        return;
+      }
       loadStrategyAnalysisBtn.disabled = true;
       loadStrategyAnalysisBtn.textContent = "⏳ Загрузка...";
       
@@ -933,6 +1482,11 @@ document.addEventListener("DOMContentLoaded", () => {
           y: {
             beginAtZero: false,
             ticks: {
+              color: '#e6e6e6', // Яркий цвет для меток
+              font: {
+                size: 12,
+                weight: 'bold' // Жирный шрифт для лучшей видимости
+              },
               callback: function(value) {
                 return '$' + value.toFixed(2);
               }
@@ -943,7 +1497,15 @@ document.addEventListener("DOMContentLoaded", () => {
           },
           x: {
             ticks: {
-              maxTicksLimit: 20 // Показываем максимум 20 меток времени
+              maxTicksLimit: 15, // Уменьшаем для лучшей читаемости
+              autoSkip: true,
+              maxRotation: 45,
+              minRotation: 0,
+              color: '#e6e6e6', // Яркий цвет для меток
+              font: {
+                size: 11,
+                weight: 'bold' // Жирный шрифт для лучшей видимости
+              }
             },
             grid: {
               color: 'rgba(255, 255, 255, 0.1)'
@@ -976,9 +1538,13 @@ document.addEventListener("DOMContentLoaded", () => {
           tooltip: {
             padding: 12,
             displayColors: true,
+            position: 'nearest', // Исправляем позиционирование
+            intersect: false,
             callbacks: {
               title: function(context) {
-                return 'Время: ' + context[0].label;
+                const label = context[0].label;
+                // Для коротких таймфреймов день уже в label
+                return 'Время: ' + label;
               },
               label: function(context) {
                 const datasetLabel = context.dataset.label || '';
@@ -1001,11 +1567,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 
                 // Определяем цвет для каждой линии
                 if (datasetLabel === 'Entry') {
-                  color = 'rgb(34, 211, 153)';
+                  color = 'rgb(63, 169, 245)'; // Яркий синий
                 } else if (datasetLabel === 'Stop Loss') {
-                  color = 'rgb(239, 68, 68)';
+                  color = 'rgb(239, 68, 68)'; // Красный
                 } else if (datasetLabel === 'Take Profit') {
-                  color = 'rgb(59, 130, 246)';
+                  color = 'rgb(34, 211, 153)'; // Яркий зеленый
                 }
                 
                 return {
@@ -1020,16 +1586,73 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Функция форматирования времени с миллисекундами
-  function formatTime(date) {
+  // Функция форматирования времени в зависимости от таймфрейма
+  function formatTime(date, timeframe = '1h') {
+    const shortTimeframes = ['1m', '3m', '5m', '15m', '30m'];
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    // Функция для определения, какой это день
+    const getDayLabel = (date) => {
+      const dateStr = date.toDateString();
+      const todayStr = today.toDateString();
+      const yesterdayStr = yesterday.toDateString();
+      
+      if (dateStr === todayStr) return 'Сегодня';
+      if (dateStr === yesterdayStr) return 'Вчера';
+      
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      return `${day}.${month}`;
+    };
+    
+    if (shortTimeframes.includes(timeframe)) {
+      // Для коротких таймфреймов показываем день и время с секундами
+      const dayLabel = getDayLabel(date);
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const seconds = date.getSeconds().toString().padStart(2, '0');
+      return `${dayLabel} ${hours}:${minutes}:${seconds}`;
+    } else if (timeframe === '1h' || timeframe === '2h') {
+      // Для часовых таймфреймов показываем дату и время
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      return `${day}.${month} ${hours}:${minutes}`;
+    } else if (timeframe === '4h' || timeframe === '6h' || timeframe === '8h' || timeframe === '12h') {
+      // Для 4-12 часов показываем дату и время
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const hours = date.getHours().toString().padStart(2, '0');
+      return `${day}.${month} ${hours}:00`;
+    } else if (timeframe === '1d' || timeframe === '3d') {
+      // Для дневных таймфреймов показываем дату
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}.${month}.${year}`;
+    } else if (timeframe === '1w') {
+      // Для недельных показываем дату начала недели
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}.${month}.${year}`;
+    } else if (timeframe === '1M') {
+      // Для месячных показываем месяц и год
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const year = date.getFullYear();
+      return `${month}.${year}`;
+    }
+    
+    // По умолчанию
     const hours = date.getHours().toString().padStart(2, '0');
     const minutes = date.getMinutes().toString().padStart(2, '0');
-    const seconds = date.getSeconds().toString().padStart(2, '0');
-    const milliseconds = date.getMilliseconds().toString().padStart(3, '0');
-    return `${hours}:${minutes}:${seconds}.${milliseconds}`;
+    return `${hours}:${minutes}`;
   }
 
-  // Подключение к WebSocket
+  // Подключение к WebSocket (как на Binance: история через REST, обновления через WS)
   function connectWebSocket(symbol, timeframe = '1h') {
     // Сохраняем символ и таймфрейм для переподключения
     currentSymbol = symbol;
@@ -1038,218 +1661,225 @@ document.addEventListener("DOMContentLoaded", () => {
     // Преобразуем BTC/USDT в btcusdt
     const wsSymbol = symbol.replace('/', '').toLowerCase();
     
-    // Определяем, какой stream использовать
-    // Для коротких таймфреймов (до 1h) используем ticker для частых обновлений
-    // Для длинных таймфреймов используем kline stream
-    const shortTimeframes = ['1m', '3m', '5m', '15m', '30m'];
-    let wsUrl;
+    // Очищаем старые данные
+    priceHistory = [];
+    timeHistory = [];
     
-    if (shortTimeframes.includes(timeframe)) {
-      // Используем ticker для коротких таймфреймов (частые обновления)
-      wsUrl = `wss://stream.binance.com:9443/ws/${wsSymbol}@ticker`;
-    } else {
-      // Используем kline stream для длинных таймфреймов
-      wsUrl = `wss://stream.binance.com:9443/ws/${wsSymbol}@kline_${timeframe}`;
-    }
-    
-    // Останавливаем старое подключение, если есть
+    // Правильно закрываем старое подключение
     if (wsConnection) {
-      wsManuallyStopped = true; // Временно устанавливаем флаг, чтобы не переподключаться
-      wsConnection.close();
+      wsManuallyStopped = true;
+      wsConnection.onclose = null;
+      wsConnection.onerror = null;
+      wsConnection.onmessage = null;
+      if (wsConnection.readyState === WebSocket.OPEN || wsConnection.readyState === WebSocket.CONNECTING) {
+        wsConnection.close(1000, 'Switching symbol');
+      }
       wsConnection = null;
     }
     
-    // Сбрасываем флаг ручной остановки
-    wsManuallyStopped = false;
-    
-    // Очищаем таймер переподключения, если есть
+    // Очищаем таймер переподключения
     if (wsReconnectTimer) {
       clearTimeout(wsReconnectTimer);
       wsReconnectTimer = null;
     }
     
-    wsConnection = new WebSocket(wsUrl);
-    
-    wsConnection.onopen = () => {
-      console.log('✅ WebSocket подключен для', symbol, 'таймфрейм:', timeframe);
-      showToast('📡 Real-Time котировки подключены', 'success');
-      
-      // Убеждаемся, что график инициализирован
-      if (!realtimeChart) {
-        const ctx = document.getElementById('realtimeChart');
-        if (ctx) {
-          initRealtimeChart();
-        }
+    // Убеждаемся, что график инициализирован
+    if (!realtimeChart) {
+      const ctx = document.getElementById('realtimeChart');
+      if (ctx) {
+        initRealtimeChart();
       }
-      
-      // Синхронизируем данные с графиком
-      if (realtimeChart) {
-        if (priceHistory.length === 0 && realtimeChart.data.labels.length > 0) {
-          realtimeChart.data.labels = [];
-          realtimeChart.data.datasets[0].data = [];
-          realtimeChart.update('none');
-        } else if (priceHistory.length > 0 && realtimeChart.data.labels.length === 0) {
+    }
+    
+    // Определяем количество свечей для загрузки в зависимости от таймфрейма
+    // Для коротких таймфреймов ограничиваем ~1-2 днями (как на Binance)
+    let limit = 500; // По умолчанию
+    if (timeframe === '1M') limit = 100;
+    else if (timeframe === '1w') limit = 200;
+    else if (timeframe === '1d' || timeframe === '3d') limit = 300;
+    else if (timeframe === '12h' || timeframe === '8h' || timeframe === '6h' || timeframe === '4h') limit = 400;
+    else if (timeframe === '2h' || timeframe === '1h') limit = 500;
+    else if (timeframe === '30m') limit = 96; // ~2 дня (30мин * 96 = 2 дня)
+    else if (timeframe === '15m') limit = 192; // ~2 дня (15мин * 192 = 2 дня)
+    else if (timeframe === '5m') limit = 288; // ~1 день (5мин * 288 = 24 часа)
+    else if (timeframe === '3m') limit = 480; // ~1 день (3мин * 480 = 24 часа)
+    else if (timeframe === '1m') limit = 1440; // ~1 день (1мин * 1440 = 24 часа)
+    
+    // ШАГ 1: Загружаем исторические данные через REST API (как на Binance)
+    fetch(`https://api.binance.com/api/v3/klines?symbol=${wsSymbol.toUpperCase()}&interval=${timeframe}&limit=${limit}`)
+      .then(res => {
+        if (!res.ok) throw new Error('Network response was not ok');
+        return res.json();
+      })
+      .then(klines => {
+        // Очищаем график
+        priceHistory = [];
+        timeHistory = [];
+        
+        // Добавляем исторические данные
+        klines.forEach(kline => {
+          const timestamp = new Date(kline[0]);
+          const closePrice = parseFloat(kline[4]); // Цена закрытия
+          const timeStr = formatTime(timestamp, timeframe);
+          
+          priceHistory.push(closePrice);
+          timeHistory.push(timeStr);
+        });
+        
+        // Обновляем график с историей
+        if (realtimeChart) {
           realtimeChart.data.labels = [...timeHistory];
           realtimeChart.data.datasets[0].data = [...priceHistory];
           realtimeChart.update('none');
         }
-      }
-      
-      // Запрашиваем текущую цену через REST API для начальной точки графика
-      fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${wsSymbol.toUpperCase()}`)
-        .then(res => {
-          if (!res.ok) throw new Error('Network response was not ok');
-          return res.json();
-        })
-        .then(data => {
-          const currentPrice = parseFloat(data.price);
-          if (!isNaN(currentPrice) && currentPrice > 0) {
-            const timeStr = formatTime(new Date());
-            // ВСЕГДА добавляем начальную точку, даже если график не пустой
-            // Это гарантирует, что график будет виден сразу
-            updateRealtimeChart(currentPrice, timeStr);
-            updatePriceInfo(currentPrice);
-            lastPrice = currentPrice;
-            console.log('✅ Начальная цена добавлена:', currentPrice);
-          } else {
-            console.error('Неверная цена получена:', data);
-          }
-        })
-        .catch(err => {
-          console.error('Ошибка получения текущей цены:', err);
-          // Повторная попытка через 1 секунду
-          setTimeout(() => {
-            fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${wsSymbol.toUpperCase()}`)
-              .then(res => res.json())
-              .then(data => {
-                const currentPrice = parseFloat(data.price);
-                if (!isNaN(currentPrice) && currentPrice > 0) {
-                  const timeStr = formatTime(new Date());
-                  // ВСЕГДА добавляем начальную точку
-                  updateRealtimeChart(currentPrice, timeStr);
-                  updatePriceInfo(currentPrice);
-                  lastPrice = currentPrice;
-                  console.log('✅ Начальная цена добавлена (повторная попытка):', currentPrice);
+        
+        // Обновляем текущую цену
+        if (priceHistory.length > 0) {
+          const lastPriceValue = priceHistory[priceHistory.length - 1];
+          updatePriceInfo(lastPriceValue);
+          lastPrice = lastPriceValue;
+        }
+        
+        console.log(`✅ Загружено ${klines.length} исторических свечей для ${symbol} (${timeframe})`);
+        showToast('📡 Real-Time котировки подключены', 'success');
+        
+        // ШАГ 2: Подключаемся к WebSocket только для обновления последней свечи в реальном времени
+        const wsUrl = `wss://stream.binance.com:9443/ws/${wsSymbol}@kline_${timeframe}`;
+        
+        setTimeout(() => {
+          wsManuallyStopped = false;
+          wsConnection = new WebSocket(wsUrl);
+          
+          wsConnection.onopen = () => {
+            console.log('✅ WebSocket подключен для обновлений', symbol, 'таймфрейм:', timeframe);
+          };
+          
+          wsConnection.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            
+            if (data.k) {
+              const kline = data.k;
+              const price = parseFloat(kline.c); // Текущая цена закрытия свечи
+              const timestamp = new Date(kline.t);
+              const timeStr = formatTime(timestamp, timeframe);
+              
+              // Находим индекс последней свечи в истории
+              const lastTimeIndex = timeHistory.length - 1;
+              const lastTimeStr = lastTimeIndex >= 0 ? timeHistory[lastTimeIndex] : null;
+              
+              // Если это та же свеча - обновляем, иначе добавляем новую
+              if (lastTimeStr === timeStr && lastTimeIndex >= 0) {
+                // Обновляем последнюю точку
+                priceHistory[lastTimeIndex] = price;
+                timeHistory[lastTimeIndex] = timeStr;
+              } else {
+                // Добавляем новую точку (новая свеча закрылась)
+                priceHistory.push(price);
+                timeHistory.push(timeStr);
+                
+                // Ограничиваем количество точек (удаляем старые)
+                if (priceHistory.length > limit) {
+                  priceHistory.shift();
+                  timeHistory.shift();
                 }
-              })
-              .catch(err2 => console.error('Повторная ошибка получения цены:', err2));
-          }, 1000);
-        });
-    };
-    
-    wsConnection.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      let price, timestamp;
-      
-      // Определяем формат данных в зависимости от типа stream
-      if (data.k) {
-        // Kline stream (для длинных таймфреймов)
-        const kline = data.k;
-        // Используем текущую цену свечи (c), а не только при закрытии
-        price = parseFloat(kline.c); // Текущая цена свечи
-        timestamp = new Date(kline.t);
-        
-        const timeStr = formatTime(timestamp);
-        
-        // ВАЖНО: Обновляем график при каждом сообщении, не только при закрытии
-        // Это обеспечит отображение данных даже для долгосрочных таймфреймов
-        updateRealtimeChart(price, timeStr);
-        updatePriceInfo(price);
-        
-        // Проверяем TP/SL только при закрытии свечи
-        if (kline.x && currentAnalysis) {
-          checkSignalLevels(price);
-        }
-      } else {
-        // Ticker stream (для коротких таймфреймов)
-        price = parseFloat(data.c || data.lastPrice || data.price);
-        if (!price || isNaN(price)) return;
-        
-        timestamp = new Date();
-        const timeStr = formatTime(timestamp);
-        
-        // Добавляем данные для визуализации
-        updateRealtimeChart(price, timeStr);
-        updatePriceInfo(price);
-        
-        // Проверяем TP/SL если есть анализ
-        if (currentAnalysis) {
-          checkSignalLevels(price);
-        }
-      }
-    };
-    
-    wsConnection.onerror = (error) => {
-      console.error('WebSocket ошибка:', error);
-      showToast('⚠️ Ошибка подключения к котировкам', 'error');
-    };
-    
-    wsConnection.onclose = () => {
-      console.log('WebSocket закрыт');
-      // Автоматическое переподключение через 3 секунды (только если не остановлено вручную и есть символ)
-      if (!wsManuallyStopped && currentSymbol && wsConnection && wsConnection.readyState === WebSocket.CLOSED) {
-        wsReconnectTimer = setTimeout(() => {
-          if (!wsManuallyStopped && currentSymbol && wsConnection && wsConnection.readyState === WebSocket.CLOSED) {
-            console.log('🔄 Переподключение к WebSocket...');
-            // При переподключении используем последний использованный таймфрейм или из селекта
-            const chartTimeframeSelect = document.getElementById('chartTimeframe');
-            const lastTimeframe = currentTimeframe || (chartTimeframeSelect ? chartTimeframeSelect.value : '1h') || '1h';
-            connectWebSocket(currentSymbol, lastTimeframe);
-          }
-        }, 3000);
-      }
-    };
+              }
+              
+              // Обновляем график
+              if (realtimeChart) {
+                realtimeChart.data.labels = [...timeHistory];
+                realtimeChart.data.datasets[0].data = [...priceHistory];
+                
+                // Обновляем линии входа/выхода, если они есть
+                if (currentAnalysis && realtimeChart.data.datasets.length > 1) {
+                  for (let i = 1; i < realtimeChart.data.datasets.length; i++) {
+                    const dataset = realtimeChart.data.datasets[i];
+                    if (dataset.label === 'Entry' || dataset.label === 'Stop Loss' || dataset.label === 'Take Profit') {
+                      const lineValue = dataset.data && dataset.data.length > 0 
+                        ? (dataset.data[0] || dataset.data[dataset.data.length - 1])
+                        : null;
+                      if (lineValue !== null) {
+                        dataset.data = priceHistory.map(() => lineValue);
+                      }
+                    }
+                  }
+                }
+                
+                realtimeChart.update('none');
+              }
+              
+              // Обновляем информацию о цене
+              updatePriceInfo(price);
+              lastPrice = price;
+              
+              // Проверяем TP/SL если есть анализ
+              if (currentAnalysis) {
+                checkSignalLevels(price);
+              }
+            }
+          };
+          
+          wsConnection.onerror = (error) => {
+            if (!wsManuallyStopped) {
+              console.error('WebSocket ошибка:', error);
+            }
+          };
+          
+          wsConnection.onclose = (event) => {
+            console.log('WebSocket закрыт', event.code, event.reason);
+            // Переподключаемся только если не было ручной остановки и код не 1000
+            if (!wsManuallyStopped && event.code !== 1000 && currentSymbol) {
+              wsReconnectTimer = setTimeout(() => {
+                if (!wsManuallyStopped && currentSymbol) {
+                  console.log('🔄 Переподключение к WebSocket...');
+                  connectWebSocket(currentSymbol, currentTimeframe);
+                }
+              }, 3000);
+            }
+          };
+        }, 100);
+      })
+      .catch(err => {
+        console.error('Ошибка загрузки исторических данных:', err);
+        showToast('⚠️ Ошибка загрузки исторических данных', 'error');
+      });
   }
 
-  // Обновление графика
+  // Обновление графика (упрощенная версия, так как данные уже в массивах)
   function updateRealtimeChart(price, timeStr) {
+    // Эта функция больше не нужна для добавления точек,
+    // так как мы обновляем массивы напрямую в onmessage
+    // Оставляем только для совместимости, если где-то вызывается
     if (!realtimeChart) {
       console.warn('График не инициализирован при попытке обновления');
       return;
     }
     
-    // Проверяем, что цена валидна
     if (isNaN(price) || price <= 0) {
       console.warn('Невалидная цена для графика:', price);
       return;
     }
     
-    // Добавляем новую точку
-    priceHistory.push(price);
-    timeHistory.push(timeStr);
-    
-    // Ограничиваем количество точек (последние 100)
-    if (priceHistory.length > 100) {
-      priceHistory.shift();
-      timeHistory.shift();
-    }
-    
-    // Обновляем данные графика - создаем новые массивы для Chart.js
-    realtimeChart.data.labels = [...timeHistory];
-    realtimeChart.data.datasets[0].data = [...priceHistory];
-    
-    // Обновляем линии входа/выхода, если они есть (расширяем их на новую длину)
-    if (currentAnalysis && realtimeChart.data.datasets.length > 1) {
-      for (let i = 1; i < realtimeChart.data.datasets.length; i++) {
-        const dataset = realtimeChart.data.datasets[i];
-        if (dataset.label === 'Entry' || dataset.label === 'Stop Loss' || dataset.label === 'Take Profit') {
-          // Сохраняем значение линии и расширяем массив данных
-          const lineValue = dataset.data && dataset.data.length > 0 
-            ? (dataset.data[0] || dataset.data[dataset.data.length - 1])
-            : null;
-          if (lineValue !== null) {
-            dataset.data = priceHistory.map(() => lineValue);
+    // Обновляем график из массивов
+    if (realtimeChart) {
+      realtimeChart.data.labels = [...timeHistory];
+      realtimeChart.data.datasets[0].data = [...priceHistory];
+      
+      // Обновляем линии входа/выхода, если они есть
+      if (currentAnalysis && realtimeChart.data.datasets.length > 1) {
+        for (let i = 1; i < realtimeChart.data.datasets.length; i++) {
+          const dataset = realtimeChart.data.datasets[i];
+          if (dataset.label === 'Entry' || dataset.label === 'Stop Loss' || dataset.label === 'Take Profit') {
+            const lineValue = dataset.data && dataset.data.length > 0 
+              ? (dataset.data[0] || dataset.data[dataset.data.length - 1])
+              : null;
+            if (lineValue !== null) {
+              dataset.data = priceHistory.map(() => lineValue);
+            }
           }
         }
       }
-    }
-    
-    // Обновляем график без анимации
-    realtimeChart.update('none');
-    
-    // Логирование для отладки (можно убрать после исправления)
-    if (priceHistory.length === 1) {
-      console.log('✅ Первая точка добавлена на график:', price, timeStr);
+      
+      realtimeChart.update('none');
     }
   }
 
@@ -1300,14 +1930,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const entryLine = {
       label: 'Entry',
       data: lineData.map(() => analysis.entry_price),
-      borderColor: 'rgb(34, 211, 153)', // Зеленый
-      backgroundColor: 'rgba(34, 211, 153, 0.8)', // Зеленый для легенды
+      borderColor: 'rgb(63, 169, 245)', // Яркий синий/голубой (цвет темы)
+      backgroundColor: 'rgba(63, 169, 245, 0.8)', // Синий для легенды
       borderWidth: 2,
       borderDash: [5, 5],
       pointRadius: 0,
       pointHoverRadius: 6,
-      pointBackgroundColor: 'rgb(34, 211, 153)',
-      pointBorderColor: 'rgb(34, 211, 153)',
+      pointBackgroundColor: 'rgb(63, 169, 245)',
+      pointBorderColor: 'rgb(63, 169, 245)',
       fill: false,
       spanGaps: true
     };
@@ -1330,14 +1960,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const takeProfitLine = {
       label: 'Take Profit',
       data: lineData.map(() => analysis.take_profit),
-      borderColor: 'rgb(59, 130, 246)', // Синий
-      backgroundColor: 'rgba(59, 130, 246, 0.8)', // Синий для легенды
+      borderColor: 'rgb(34, 211, 153)', // Яркий зеленый (более контрастный)
+      backgroundColor: 'rgba(34, 211, 153, 0.8)', // Зеленый для легенды
       borderWidth: 2,
       borderDash: [5, 5],
       pointRadius: 0,
       pointHoverRadius: 6,
-      pointBackgroundColor: 'rgb(59, 130, 246)',
-      pointBorderColor: 'rgb(59, 130, 246)',
+      pointBackgroundColor: 'rgb(34, 211, 153)',
+      pointBorderColor: 'rgb(34, 211, 153)',
       fill: false,
       spanGaps: true
     };
