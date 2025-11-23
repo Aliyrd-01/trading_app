@@ -413,7 +413,16 @@ document.addEventListener("DOMContentLoaded", () => {
   
   // Загружаем план пользователя
   fetch('/api/user_info')
-    .then(res => res.json())
+    .then(res => {
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Ответ не является JSON");
+      }
+      return res.json();
+    })
     .then(data => {
       userPlan = data.plan || 'free';
       

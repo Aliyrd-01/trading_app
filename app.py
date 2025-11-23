@@ -191,6 +191,23 @@ def session_check():
     return jsonify({"logged_in": bool(session.get("user_id"))})
 
 
+# === API: Информация о пользователе ===
+@app.route("/api/user_info")
+def api_user_info():
+    if not session.get("user_id"):
+        return jsonify({"error": "Требуется авторизация"}), 401
+    
+    user = User.query.get(session["user_id"])
+    if not user:
+        return jsonify({"error": "Пользователь не найден"}), 404
+    
+    return jsonify({
+        "id": user.id,
+        "email": user.email,
+        "plan": user.plan or "free"
+    })
+
+
 # === Страницы ===
 @app.route("/login")
 def login_page():
