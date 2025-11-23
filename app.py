@@ -269,9 +269,29 @@ def run_analysis_route():
         def convert_numpy(value):
             if value is None:
                 return None
-            if hasattr(value, 'item'):  # numpy scalar
-                return value.item()
-            return float(value) if isinstance(value, (np.integer, np.floating)) else value
+            try:
+                # Проверяем на numpy nan перед конвертацией
+                if isinstance(value, float) and (np.isnan(value) or value != value):
+                    return None
+                if hasattr(value, 'item'):  # numpy scalar
+                    converted = value.item()
+                    # Проверяем на nan после конвертации
+                    if isinstance(converted, float) and (np.isnan(converted) or converted != converted):
+                        return None
+                    return converted
+                if isinstance(value, (np.integer, np.floating)):
+                    converted = float(value)
+                    # Проверяем на nan
+                    if np.isnan(converted) or converted != converted:
+                        return None
+                    return converted
+                # Дополнительная проверка для обычных float
+                if isinstance(value, float) and (np.isnan(value) or value != value):
+                    return None
+            except (ValueError, TypeError, OverflowError):
+                # Если не удалось конвертировать, возвращаем None
+                return None
+            return value
         
         report = ReportV2(
             user_id=user_id,
@@ -385,14 +405,34 @@ def run_analysis_route():
                 z.writestr("data.xlsx", excel_bytes.getvalue())
         zip_base64 = base64.b64encode(zip_buf.getvalue()).decode()
 
+        # Вспомогательная функция для безопасной конвертации в float для JSON
+        def safe_float(value):
+            if value is None:
+                return None
+            try:
+                # Проверяем на numpy nan
+                if isinstance(value, float) and (np.isnan(value) or value != value):
+                    return None
+                if hasattr(value, 'item'):
+                    converted = value.item()
+                    if isinstance(converted, float) and (np.isnan(converted) or converted != converted):
+                        return None
+                    return converted
+                converted = float(value)
+                if np.isnan(converted) or converted != converted:
+                    return None
+                return converted
+            except (ValueError, TypeError, OverflowError):
+                return None
+
         return jsonify({
             "report_text": report_text,
             "chart_base64": chart_base64,
             "zip_base64": zip_base64,
             "symbol": symbol,
-            "entry_price": float(entry_price) if entry_price is not None else None,
-            "stop_loss": float(stop_loss) if stop_loss is not None else None,
-            "take_profit": float(take_profit) if take_profit is not None else None,
+            "entry_price": safe_float(entry_price),
+            "stop_loss": safe_float(stop_loss),
+            "take_profit": safe_float(take_profit),
             "direction": direction
         })
     except Exception as e:

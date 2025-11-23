@@ -343,7 +343,12 @@ def smart_combine_indicators(symbol, trading_type="Дейтрейдинг", time
         df["BB_lower"] = df["BB_middle"] - 2 * df["BB_std"]
         df["ADX"] = compute_adx(df).fillna(0)
         
-        latest = df.dropna(subset=["Close"]).iloc[-1]
+        # Отбираем строки с валидными Close и ATR_14
+        df_valid = df.dropna(subset=["Close", "ATR_14"])
+        if df_valid.empty:
+            return ["EMA", "RSI"], "Недостаточно данных для расчёта ATR (требуется минимум 14 строк)"
+        
+        latest = df_valid.iloc[-1]
         adx = latest.get("ADX", 0)
         trend = latest.get("Trend", "Uptrend")
         rsi = latest.get("RSI_14", 50)
@@ -850,7 +855,12 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
         df["BB_lower"] = df["BB_middle"] - 2 * df["BB_std"]
         df["ADX"] = compute_adx(df).fillna(0)
 
-        latest = df.dropna(subset=["Close"]).iloc[-1]
+        # Отбираем строки с валидными Close и ATR_14 (ATR требует минимум 14 строк данных)
+        df_valid = df.dropna(subset=["Close", "ATR_14"])
+        if df_valid.empty:
+            raise ValueError(f"Недостаточно данных для расчёта ATR. Требуется минимум 14 строк исторических данных. Получено: {len(df)} строк.")
+        
+        latest = df_valid.iloc[-1]
         strat = STRATEGIES.get(strategy, STRATEGIES["Сбалансированная"])
         atr = latest.get("ATR_14", np.nan)
         ema20, ema50, ema200 = latest["EMA_20"], latest["EMA_50"], latest["EMA_200"]
