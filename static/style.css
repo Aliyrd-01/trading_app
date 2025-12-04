@@ -28,6 +28,10 @@
   background: #2d8cd6;
 }
 
+#settingsBtn:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
 #languageToggle {
   background: transparent !important;
   border: none !important;
@@ -597,6 +601,10 @@ img {
 }
 #downloadStats:hover:not(:disabled) { background-color: #15803d; }
 
+#exportTradingView {
+  margin-top: 15px;
+}
+
 #loadStrategyAnalysis {
   margin-top: 15px;
 }
@@ -912,7 +920,7 @@ button:focus { outline: none; }
   border-left: 4px solid #3fa9f5;
   color: #e8e8e8;
   line-height: 1.8;
-  font-size: 16px;
+  font-size: 16px; /* ✅ Унифицированный размер шрифта */
   white-space: pre-wrap; /* Сохраняем переносы строк */
   word-wrap: break-word; /* Переносим длинные слова */
   max-width: 100%;
@@ -924,6 +932,8 @@ button:focus { outline: none; }
   word-wrap: break-word;
   line-height: 1.8;
   margin: 10px 0;
+  font-size: 16px; /* ✅ Унифицированный размер шрифта */
+  color: #e8e8e8;
 }
 
 /* Разделители для лучшей читаемости */
@@ -1176,7 +1186,7 @@ button:focus { outline: none; }
 }
 
 .section-title {
-  font-size: 16px;
+  font-size: 18px; /* ✅ Увеличен шрифт */
   font-weight: 700;
   margin-bottom: 12px;
   color: #dbe7ff;
@@ -1196,7 +1206,7 @@ button:focus { outline: none; }
 }
 
 .card-title {
-  font-size: 14px;
+  font-size: 16px; /* ✅ Увеличен шрифт */
   font-weight: 700;
   margin-bottom: 8px;
   color: #cbd5e1;
@@ -1215,16 +1225,43 @@ button:focus { outline: none; }
   border-bottom: 1px solid #1f2537;
   border-right: 1px solid #1f2537;
   padding: 12px 15px;
-  font-size: 14px;
+  font-size: 16px; /* ✅ Увеличен шрифт */
   text-align: left;
+  word-wrap: break-word; /* Перенос длинных слов */
+  vertical-align: middle; /* ✅ Выравнивание по вертикали */
+}
+
+/* Минимальная ширина для первой колонки, чтобы она не была слишком узкой */
+.report-table th:first-child,
+.report-table td:first-child {
+  min-width: 150px;
+}
+
+/* Выравнивание для конкретных таблиц */
+.report-table-aligned {
+  table-layout: fixed;
+}
+
+.report-table-aligned th:first-child,
+.report-table-aligned td:first-child {
+  width: 40%;
+}
+
+.report-table-aligned th:last-child,
+.report-table-aligned td:last-child {
+  width: 60%;
 }
 .report-table th {
   background: #0f1525;
   color: #a8c1ff;
   font-weight: 600;
+  font-size: 16px; /* ✅ Унифицированный размер шрифта */
+  vertical-align: middle; /* ✅ Выравнивание по вертикали */
 }
 .report-table td {
   color: #e8e8e8;
+  font-size: 16px; /* ✅ Унифицированный размер шрифта */
+  vertical-align: middle; /* ✅ Выравнивание по вертикали */
 }
 .report-table tr:hover {
   background: rgba(63, 169, 245, 0.05);
@@ -1236,9 +1273,11 @@ button:focus { outline: none; }
   margin: 0;
   padding-left: 18px;
   color: #e8e8e8;
+  font-size: 16px; /* ✅ Унифицированный размер шрифта */
 }
 .report-list li {
   margin: 6px 0;
+  font-size: 16px; /* ✅ Унифицированный размер шрифта */
 }
 
 /* === Real-Time график === */
@@ -1337,4 +1376,34 @@ button:focus { outline: none; }
 .toast.info {
   background: #3fa9f5;
   color: white;
+}
+
+/* === Стили для экрана настроек === */
+#settingsScreen #closeSettingsBtn {
+  padding: 4px 8px !important;
+  font-size: 10px !important;
+  margin-left: 20px !important;
+}
+
+#settingsScreen > div > div:first-child {
+  gap: 20px !important;
+}
+
+#settingsScreen label {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 10px !important;
+  margin-bottom: 15px !important;
+  font-size: 14px !important;
+  font-weight: normal !important;
+}
+
+#settingsScreen label input[type="checkbox"] {
+  width: 18px !important;
+  height: 18px !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  margin: 0 !important;
 }

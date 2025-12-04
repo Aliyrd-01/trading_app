@@ -9,10 +9,12 @@
 # Получите токен у @BotFather в Telegram
 TELEGRAM_BOT_TOKEN = "8559314895:AAFI0pwIcJgy7iZqtiSitIZM7DMHnrV5dbw"
 
-# === Email настройки (SMTP) ===
-# Для Gmail используйте пароль приложения (не обычный пароль!)
-# Инструкция: https://support.google.com/accounts/answer/185833
+# === Email настройки (Resend API) ===
+# Получите API ключ на https://resend.com/api-keys
+RESEND_API_KEY = "re_aJY2AAvt_KrbfPNiGWEcJLibcsgUJ7tnK"
+RESEND_FROM_EMAIL = "tirion2025@gmail.com"  # Email отправителя (должен быть верифицирован в Resend)
 
+# === Старые SMTP настройки (оставлены для обратной совместимости, но не используются) ===
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
 SMTP_USER = ""  # Ваш email (например: your.email@gmail.com)
@@ -37,6 +39,18 @@ SMTP_PASSWORD = ""  # Пароль приложения (16 символов, б
 # SMTP_PORT = 587
 # SMTP_USER = "apikey"
 # SMTP_PASSWORD = "ваш_api_ключ_sendgrid"
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

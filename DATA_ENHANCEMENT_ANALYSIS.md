@@ -265,3 +265,24 @@ prob_up_2pct = 1 - norm.cdf(0.02, 0, volatility)
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -20,6 +20,21 @@ class User(db.Model):
     enable_telegram_notifications = db.Column(db.Boolean, default=False)
     enable_email_notifications = db.Column(db.Boolean, default=False)
     alert_min_reliability = db.Column(db.Float, default=60.0)
+    # Настройки торговли
+    exchange_spread = db.Column(db.Float, default=0.0)  # Спред биржи в процентах (например, 0.1 = 0.1%)
+    # Настройки автоматических сигналов
+    auto_signals_enabled = db.Column(db.Boolean, default=False)
+    auto_signal_symbol = db.Column(db.String(20), nullable=True)
+    auto_signal_capital = db.Column(db.Float, nullable=True)
+    auto_signal_trading_type = db.Column(db.String(50), nullable=True)
+    auto_signal_strategy = db.Column(db.String(50), nullable=True)
+    auto_signal_risk = db.Column(db.Float, nullable=True)
+    auto_signal_confirmation = db.Column(db.String(100), nullable=True)
+    auto_signal_min_reliability = db.Column(db.Float, default=60.0)
+    auto_signal_check_interval = db.Column(db.Integer, default=60)
+    auto_signal_last_check = db.Column(db.DateTime, nullable=True)
+    auto_signal_last_signal_price = db.Column(db.Float, nullable=True)
+    auto_signal_last_signal_direction = db.Column(db.String(10), nullable=True)
 
 class ReportV2(db.Model):
     __tablename__ = "report_v2"

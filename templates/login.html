@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Crypto Analyzer — Login</title>
+  <title data-i18n="login_title">Crypto Analyzer — Login</title>
   <link rel="stylesheet" href="/static/style.css">
   <script src="{{ url_for('static', filename='translations.js') }}"></script>
 
@@ -40,7 +40,7 @@
   </div>
   
   <div class="login-card">
-    <h1>Crypto Analyzer</h1>
+    <h1 data-i18n="app_title">Crypto Analyzer</h1>
     <div class="login-form">
       <label>
         <span id="emailLabel">Email:</span>
@@ -225,7 +225,8 @@
 	  const password = passwordInput.value.trim();
 
 	  if (!email || !password) {
-		errorMsg.textContent = "Email и пароль обязательны";
+		const t = translations[currentLanguage] || translations['ru'] || {};
+		errorMsg.textContent = t.login_error_required || "Email и пароль обязательны";
 		isSubmitting = false;
 		loginBtn.disabled = false;
 		return;
@@ -257,12 +258,14 @@
 
 		  window.location.href = "/";
 		} else {
-		  errorMsg.textContent = data.error || "Ошибка авторизации";
+		  const t = translations[currentLanguage] || translations['ru'] || {};
+		  errorMsg.textContent = data.error || t.login_error_auth || "Ошибка авторизации";
 		  isSubmitting = false;
 		  loginBtn.disabled = false;
 		}
 	  } catch (e) {
-		errorMsg.textContent = "Ошибка соединения с сервером";
+		const t = translations[currentLanguage] || translations['ru'] || {};
+		errorMsg.textContent = t.login_error_connection || "Ошибка соединения с сервером";
 		isSubmitting = false;
 		loginBtn.disabled = false;
 	  }

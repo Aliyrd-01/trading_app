@@ -10,3 +10,24 @@ ADD COLUMN `alert_min_reliability` FLOAT DEFAULT 60.0 AFTER `enable_email_notifi
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
