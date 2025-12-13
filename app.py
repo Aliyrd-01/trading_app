@@ -119,8 +119,15 @@ except Exception as e:
     SMTP_USER = os.getenv("SMTP_USER", "")
     SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 
-# === MySQL ===
-app.config['SQLALCHEMY_DATABASE_URI'] = "mysql+pymysql://u543957720_crypto:AgUbbkD1h!@auth-db936.hstgr.io/u543957720_cryptoprice"
+# === Database Configuration ===
+# Use environment variable if available, otherwise fallback to SQLite for local development
+DATABASE_URL = os.getenv('DATABASE_URL')
+if DATABASE_URL:
+    app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+else:
+    # Fallback to SQLite for local development
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(basedir, 'instance', 'crypto_analyzer.db')}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"pool_recycle": 280, "pool_pre_ping": True}
 
@@ -2378,10 +2385,11 @@ if hasattr(signal, 'SIGBREAK'):
 
 # === Запуск ===
 if __name__ == "__main__":
-    port = 5051  # Изменён с 5050 на 5051 из-за конфликта портов
-    print(f"🖥️ Flask сервер запущен на http://127.0.0.1:{port}")
+    port = int(os.getenv('PORT', 5000))
+    host = os.getenv('HOST', '0.0.0.0')
+    print(f"🖥️ Flask сервер запущен на http://{host}:{port}")
     try:
-        app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False, threaded=True)
+        app.run(host=host, port=port, debug=False, use_reloader=False, threaded=True)
     except KeyboardInterrupt:
         print("\n🛑 Получен сигнал прерывания (Ctrl+C)")
         cleanup_connections()

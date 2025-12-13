@@ -3141,3 +3141,24 @@ WHERE report_v2.user_id = %(user_id_1)s ORDER BY report_v2.timestamp DESC]
 2025-12-03 15:38:59,362 - app - INFO - ✅ Telegram уведомление успешно отправлено на 7420361749
 2025-12-03 15:38:59,367 - app - INFO - ✅ Telegram уведомление отправлено на 7420361749
 2025-12-03 15:38:59,614 - werkzeug - INFO - 127.0.0.1 - - [03/Dec/2025 15:38:59] "POST /api/analyze HTTP/1.1" 200 -
+2025-12-13 07:46:21,016 - __main__ - INFO - ✅ База данных инициализирована
+2025-12-13 07:46:21,050 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://172.31.99.34:5000
+2025-12-13 07:46:21,051 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-12-13 07:46:26,277 - werkzeug - INFO - 172.31.99.34 - - [13/Dec/2025 07:46:26] "[32mGET / HTTP/1.1[0m" 302 -
+2025-12-13 07:46:26,639 - werkzeug - INFO - 172.31.99.34 - - [13/Dec/2025 07:46:26] "GET /login HTTP/1.1" 200 -
+2025-12-13 07:46:27,484 - werkzeug - INFO - 172.31.99.34 - - [13/Dec/2025 07:46:27] "GET /static/style.css HTTP/1.1" 200 -
+2025-12-13 07:46:27,787 - werkzeug - INFO - 172.31.99.34 - - [13/Dec/2025 07:46:27] "GET /static/translations.js HTTP/1.1" 200 -
+2025-12-13 07:46:29,506 - werkzeug - INFO - 127.0.0.1 - - [13/Dec/2025 07:46:29] "[32mGET / HTTP/1.1[0m" 302 -
+2025-12-13 07:46:29,509 - werkzeug - INFO - 127.0.0.1 - - [13/Dec/2025 07:46:29] "GET /login HTTP/1.1" 200 -
+2025-12-13 07:46:29,584 - werkzeug - INFO - 127.0.0.1 - - [13/Dec/2025 07:46:29] "GET /static/translations.js HTTP/1.1" 200 -
+2025-12-13 07:46:29,585 - werkzeug - INFO - 127.0.0.1 - - [13/Dec/2025 07:46:29] "GET /static/style.css HTTP/1.1" 200 -
+2025-12-13 07:46:29,715 - werkzeug - INFO - 127.0.0.1 - - [13/Dec/2025 07:46:29] "GET /session_check HTTP/1.1" 200 -
+2025-12-13 07:46:29,783 - werkzeug - INFO - 127.0.0.1 - - [13/Dec/2025 07:46:29] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2025-12-13 07:46:29,808 - werkzeug - INFO - 172.31.99.34 - - [13/Dec/2025 07:46:29] "GET /session_check HTTP/1.1" 200 -
+2025-12-13 07:46:47,485 - werkzeug - INFO - 127.0.0.1 - - [13/Dec/2025 07:46:47] "GET /login HTTP/1.1" 200 -
+2025-12-13 07:46:47,502 - werkzeug - INFO - 127.0.0.1 - - [13/Dec/2025 07:46:47] "[36mGET /static/style.css HTTP/1.1[0m" 304 -
+2025-12-13 07:46:47,502 - werkzeug - INFO - 127.0.0.1 - - [13/Dec/2025 07:46:47] "[36mGET /static/translations.js HTTP/1.1[0m" 304 -
+2025-12-13 07:46:47,609 - werkzeug - INFO - 127.0.0.1 - - [13/Dec/2025 07:46:47] "GET /session_check HTTP/1.1" 200 -
