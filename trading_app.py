@@ -2723,17 +2723,19 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
             short_tp_base = short_entry - min_distance
         
         # Применяем трейлинг-логику, если включена
+        # ВАЖНО: Трейлинг-стоп активируется только когда цена движется в нашу сторону
+        # В момент открытия позиции используем базовый SL
         if enable_trailing:
-            # Для лонга: стоп движется вверх на trailing_percent от прибыли
-            # Например, если цена выросла на 2%, а trailing_percent = 50%, стоп будет на 1% от входа
-            long_profit_potential = long_tp_base - long_entry
-            long_trailing_sl = long_entry + (long_profit_potential * trailing_percent)
-            long_sl = max(long_sl_base, long_trailing_sl)  # Стоп не может быть ниже базового
+            # Для лонга: начальный SL = базовый, трейлинг активируется при росте цены
+            # trailing_percent определяет насколько близко SL следует за ценой
+            # Например, trailing_percent=0.5 означает SL на 50% расстояния от входа до текущей цены
+            long_sl = long_sl_base  # Начинаем с базового SL (ниже входа)
             
-            # Для шорта: стоп движется вниз на trailing_percent от прибыли
-            short_profit_potential = short_entry - short_tp_base
-            short_trailing_sl = short_entry - (short_profit_potential * trailing_percent)
-            short_sl = min(short_sl_base, short_trailing_sl)  # Стоп не может быть выше базового
+            # Для шорта: начальный SL = базовый, трейлинг активируется при падении цены
+            short_sl = short_sl_base  # Начинаем с базового SL (выше входа)
+            
+            # Примечание: активация трейлинг-стопа происходит в реальном времени
+            # когда цена движется в нужном направлении
         else:
             long_sl = long_sl_base
             short_sl = short_sl_base
@@ -2962,9 +2964,9 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
 | **{{indicator_adx}}** | {safe_fmt(latest.get('ADX', np.nan))} | {adx:.2f} |
 | **{{user_confirmations}}** | {user_confirmation_str} | {{result}} {user_confirmation_result} |
 | **{{reliability_rating}}** | {reliability_rating:.1f}% ({passed_count}/{total_count}) | {'⭐⭐⭐⭐⭐' if reliability_rating >= 80 else '⭐⭐⭐⭐' if reliability_rating >= 60 else '⭐⭐⭐' if reliability_rating >= 40 else '⭐⭐' if reliability_rating >= 20 else '⭐'} |
-| **{{confidence_index}}** | {confidence_index:.1f}% | {{confidence_text_key}} |
-| **😨 Fear & Greed Index** | {fear_greed_value if fear_greed_value is not None else 'N/A'} ({fear_greed_classification}) | {{fear_greed_text_key}} |
-| **📈 {{historical_volatility}}** | {safe_fmt(historical_volatility)}% | {{volatility_text_key}} |
+| **{{confidence_index}}** | {confidence_index:.1f}% | {t_key(confidence_text_key)} |
+| **😨 Fear & Greed Index** | {fear_greed_value if fear_greed_value is not None else 'N/A'} ({fear_greed_classification}) | {t_key(fear_greed_text_key)} |
+| **📈 {{historical_volatility}}** | {safe_fmt(historical_volatility)}% | {t_key(volatility_text_key)} |
 
 ### {{strategy_title}}
 - {{trading_type_label}} {get_report_translation("trading_type_" + TRADING_TYPE_MAP.get(trading_type, trading_type.lower().replace(' ', '_')), language, default=trading_type)}
