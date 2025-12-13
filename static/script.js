@@ -461,6 +461,8 @@ let timeHistory = []; // История времени
 let ohlcData = []; // ✅ НОВОЕ: OHLC данные для свечей [open, high, low, close]
 let lastPrice = null; // Последняя цена для расчета изменения
 let wsReconnectTimer = null; // Таймер для переподключения
+let wsReconnectAttempts = 0; // Счетчик попыток переподключения
+const MAX_WS_RECONNECT_ATTEMPTS = 3; // Максимум 3 попытки, потом только fallback
 let wsManuallyStopped = false; // Флаг ручной остановки
 let currentSymbol = null; // Текущий символ для WebSocket
 let currentTimeframe = null; // Текущий таймфрейм для WebSocket
@@ -941,6 +943,10 @@ function connectWebSocket(symbol, timeframe = '1h') {
     clearTimeout(wsReconnectTimer);
     wsReconnectTimer = null;
   }
+  // Сбрасываем счетчик только при смене символа (не при авто-переподключении)
+  if (previousSymbol !== symbol) {
+    wsReconnectAttempts = 0;
+  }
   
   // ✅ ИСПРАВЛЕНО: Останавливаем старый fallback перед запуском нового
   if (window.stopPriceUpdateFallback) {
@@ -1273,12 +1279,18 @@ function connectWebSocket(symbol, timeframe = '1h') {
                 clearTimeout(wsReconnectTimer);
               }
               
-              wsReconnectTimer = setTimeout(() => {
-                if (!wsManuallyStopped && currentSymbol && currentTimeframe) {
-                  console.log('🔄 Переподключение к WebSocket...');
-                  connectWebSocket(currentSymbol, currentTimeframe);
-                }
-              }, 3000);
+              // Ограничиваем количество попыток переподключения
+              if (wsReconnectAttempts < MAX_WS_RECONNECT_ATTEMPTS) {
+                wsReconnectAttempts++;
+                wsReconnectTimer = setTimeout(() => {
+                  if (!wsManuallyStopped && currentSymbol && currentTimeframe) {
+                    console.log(`🔄 Переподключение к WebSocket (попытка ${wsReconnectAttempts}/${MAX_WS_RECONNECT_ATTEMPTS})...`);
+                    connectWebSocket(currentSymbol, currentTimeframe);
+                  }
+                }, 3000);
+              } else {
+                console.log('ℹ️ WebSocket недоступен, используется fallback через REST API');
+              }
             }
           };
         } catch (e) {

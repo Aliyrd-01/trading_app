@@ -2723,19 +2723,24 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
             short_tp_base = short_entry - min_distance
         
         # Применяем трейлинг-логику, если включена
-        # ВАЖНО: Трейлинг-стоп активируется только когда цена движется в нашу сторону
-        # В момент открытия позиции используем базовый SL
+        # ВАЖНО: Trailing stop показывает ПОТЕНЦИАЛЬНУЮ позицию стопа после достижения TP
+        # При входе в позицию стоп остается на базовом уровне (long_sl_base/short_sl_base)
+        # Стоп подтягивается только когда цена движется в нашу сторону
         if enable_trailing:
-            # Для лонга: начальный SL = базовый, трейлинг активируется при росте цены
-            # trailing_percent определяет насколько близко SL следует за ценой
-            # Например, trailing_percent=0.5 означает SL на 50% расстояния от входа до текущей цены
-            long_sl = long_sl_base  # Начинаем с базового SL (ниже входа)
+            # Для лонга: trailing показывает уровень стопа при достижении TP
+            # Это уровень, до которого стоп подтянется, если цена дойдет до TP
+            long_profit_distance = long_tp_base - long_entry
+            # Trailing SL при достижении TP будет на уровне: вход + (прибыль * trailing_percent)
+            # Но при входе стоп остается на базовом уровне (ниже входа!)
+            long_trailing_sl_at_tp = long_entry + (long_profit_distance * trailing_percent)
+            # Используем базовый стоп для входа (ниже цены входа)
+            long_sl = long_sl_base
             
-            # Для шорта: начальный SL = базовый, трейлинг активируется при падении цены
-            short_sl = short_sl_base  # Начинаем с базового SL (выше входа)
-            
-            # Примечание: активация трейлинг-стопа происходит в реальном времени
-            # когда цена движется в нужном направлении
+            # Для шорта: аналогично, стоп подтягивается вниз при движении цены вниз
+            short_profit_distance = short_entry - short_tp_base
+            short_trailing_sl_at_tp = short_entry - (short_profit_distance * trailing_percent)
+            # Используем базовый стоп для входа (выше цены входа)
+            short_sl = short_sl_base
         else:
             long_sl = long_sl_base
             short_sl = short_sl_base
@@ -2934,10 +2939,15 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
         # --- Markdown отчёт ---
         # ✅ Функция перевода t уже определена выше
         
-        # Определяем ключи для переводов (вместо переведенных текстов)
+        # Определяем ключи для переводов и сразу переводим их
         confidence_text_key = "very_high_confidence" if confidence_index >= 80 else "high_confidence" if confidence_index >= 60 else "medium_confidence" if confidence_index >= 40 else "low_confidence"
-        fear_greed_text_key = "extreme_fear" if fear_greed_value and fear_greed_value <= 25 else "fear" if fear_greed_value and fear_greed_value <= 45 else "neutral" if fear_greed_value and fear_greed_value <= 55 else "greed" if fear_greed_value and fear_greed_value <= 75 else "extreme_greed" if fear_greed_value else 'N/A'
-        volatility_text_key = "high" if not pd.isna(historical_volatility) and historical_volatility > 50 else "medium" if not pd.isna(historical_volatility) and historical_volatility > 30 else "low" if not pd.isna(historical_volatility) else 'N/A'
+        confidence_text = t(confidence_text_key)
+        
+        fear_greed_text_key = "extreme_fear" if fear_greed_value and fear_greed_value <= 25 else "fear" if fear_greed_value and fear_greed_value <= 45 else "neutral" if fear_greed_value and fear_greed_value <= 55 else "greed" if fear_greed_value and fear_greed_value <= 75 else "extreme_greed" if fear_greed_value else None
+        fear_greed_text = t(fear_greed_text_key) if fear_greed_text_key else 'N/A'
+        
+        volatility_text_key = "high" if not pd.isna(historical_volatility) and historical_volatility > 50 else "medium" if not pd.isna(historical_volatility) and historical_volatility > 30 else "low" if not pd.isna(historical_volatility) else None
+        volatility_text = t(volatility_text_key) if volatility_text_key else 'N/A'
         trend_text_key = "bull_market" if trend == 'Uptrend' else "bear_market"
         rsi_text_key = "oversold" if rsi < 30 else "overbought" if rsi > 70 else "neutral_zone"
         range_text_key = "within_bounds" if latest['Close'] > latest.get('BB_lower',0) and latest['Close'] < latest.get('BB_upper',0) else "out_of_bounds"
@@ -2964,9 +2974,9 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
 | **{{indicator_adx}}** | {safe_fmt(latest.get('ADX', np.nan))} | {adx:.2f} |
 | **{{user_confirmations}}** | {user_confirmation_str} | {{result}} {user_confirmation_result} |
 | **{{reliability_rating}}** | {reliability_rating:.1f}% ({passed_count}/{total_count}) | {'⭐⭐⭐⭐⭐' if reliability_rating >= 80 else '⭐⭐⭐⭐' if reliability_rating >= 60 else '⭐⭐⭐' if reliability_rating >= 40 else '⭐⭐' if reliability_rating >= 20 else '⭐'} |
-| **{{confidence_index}}** | {confidence_index:.1f}% | {t_key(confidence_text_key)} |
-| **😨 Fear & Greed Index** | {fear_greed_value if fear_greed_value is not None else 'N/A'} ({fear_greed_classification}) | {t_key(fear_greed_text_key)} |
-| **📈 {{historical_volatility}}** | {safe_fmt(historical_volatility)}% | {t_key(volatility_text_key)} |
+| **{{confidence_index}}** | {confidence_index:.1f}% | {confidence_text} |
+| **😨 Fear & Greed Index** | {fear_greed_value if fear_greed_value is not None else 'N/A'} ({fear_greed_classification}) | {fear_greed_text} |
+| **📈 {{historical_volatility}}** | {safe_fmt(historical_volatility)}% | {volatility_text} |
 
 ### {{strategy_title}}
 - {{trading_type_label}} {get_report_translation("trading_type_" + TRADING_TYPE_MAP.get(trading_type, trading_type.lower().replace(' ', '_')), language, default=trading_type)}
