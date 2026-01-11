@@ -1,0 +1,163 @@
+<!-- 
+  ============================================
+  КОД ДЛЯ ЛЕНДИНГА - Demo режим
+  ============================================
+  
+  Скопируйте этот код на ваш лендинг для реализации
+  модального окна с iframe и кнопки "Полный экран"
+  
+  ============================================
+-->
+
+<!-- Кнопка для открытия demo -->
+<button id="demoBtn" onclick="openDemoModal()" 
+        style="padding: 15px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4); transition: transform 0.2s, box-shadow 0.2s;"
+        onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(102, 126, 234, 0.6)';"
+        onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(102, 126, 234, 0.4)';">
+  🚀 Попробовать Demo
+</button>
+
+<!-- Модальное окно с iframe -->
+<div id="demoModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 10000; overflow: hidden; animation: fadeIn 0.3s ease-in;">
+  <div style="position: relative; width: 95%; height: 95%; margin: 2.5% auto; background: #0f1320; border-radius: 10px; box-shadow: 0 0 50px rgba(0,0,0,0.5); animation: slideUp 0.3s ease-out;">
+    <!-- Кнопка закрытия -->
+    <button onclick="closeDemoModal()" 
+            style="position: absolute; top: 15px; right: 15px; z-index: 10001; background: #ef4444; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; transition: background 0.2s; box-shadow: 0 2px 10px rgba(239, 68, 68, 0.3);"
+            onmouseover="this.style.background='#dc2626'; this.style.boxShadow='0 4px 15px rgba(239, 68, 68, 0.5)';" 
+            onmouseout="this.style.background='#ef4444'; this.style.boxShadow='0 2px 10px rgba(239, 68, 68, 0.3)';">
+      ✕ Закрыть
+    </button>
+    
+    <!-- Кнопка "Открыть в полном экране" -->
+    <a href="https://cryptoanalyz.net/demo" 
+       target="_blank"
+       style="position: absolute; top: 15px; right: 120px; z-index: 10001; background: #3fa9f5; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold; text-decoration: none; transition: background 0.2s; box-shadow: 0 2px 10px rgba(63, 169, 245, 0.3); display: inline-block;"
+       onmouseover="this.style.background='#2d8cd6'; this.style.boxShadow='0 4px 15px rgba(63, 169, 245, 0.5)';" 
+       onmouseout="this.style.background='#3fa9f5'; this.style.boxShadow='0 2px 10px rgba(63, 169, 245, 0.3)';">
+      🔲 Полный экран
+    </a>
+    
+    <!-- iframe с приложением -->
+    <iframe 
+      id="demoIframe"
+      src="https://cryptoanalyz.net/demo" 
+      style="width: 100%; height: 100%; border: none; border-radius: 10px;"
+      allow="fullscreen"
+      allowfullscreen
+      sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox">
+    </iframe>
+  </div>
+</div>
+
+<!-- CSS анимации (добавьте в ваш CSS файл или в <style> тег) -->
+<style>
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      transform: translateY(20px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  #demoModal {
+    animation: fadeIn 0.3s ease-in;
+  }
+
+  #demoModal > div {
+    animation: slideUp 0.3s ease-out;
+  }
+</style>
+
+<!-- JavaScript функции -->
+<script>
+function openDemoModal() {
+  const modal = document.getElementById('demoModal');
+  if (modal) {
+    modal.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    
+    // Фокус на iframe для лучшего UX
+    setTimeout(() => {
+      const iframe = document.getElementById('demoIframe');
+      if (iframe) {
+        iframe.focus();
+      }
+    }, 100);
+  }
+}
+
+function closeDemoModal() {
+  const modal = document.getElementById('demoModal');
+  if (modal) {
+    modal.style.display = 'none';
+    document.body.style.overflow = 'auto';
+  }
+}
+
+// Закрытие по ESC
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    closeDemoModal();
+  }
+});
+
+// Закрытие при клике вне модального окна
+document.addEventListener('DOMContentLoaded', function() {
+  const modal = document.getElementById('demoModal');
+  if (modal) {
+    modal.addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeDemoModal();
+      }
+    });
+  }
+});
+</script>
+
+<!-- 
+  ============================================
+  ИНСТРУКЦИЯ ПО ИСПОЛЬЗОВАНИЮ:
+  ============================================
+  
+  1. Скопируйте весь код выше на ваш лендинг
+  
+  2. Замените URL в iframe:
+     - Текущий: https://cryptoanalyz.net/demo
+     - На ваш: https://ваш-домен.com/demo
+  
+  3. Замените URL в кнопке "Полный экран":
+     - Текущий: https://cryptoanalyz.net/demo
+     - На ваш: https://ваш-домен.com/demo
+  
+  ⚠️ ВАЖНО: Если вы видите ошибку "Did you forget to add the page to the router?":
+     - Это ошибка Next.js/React Router, но ваше приложение - Flask
+     - Убедитесь, что роут /demo добавлен в app.py (уже добавлен)
+     - Проверьте, что сервер запущен и доступен по указанному URL
+     - Откройте https://ваш-домен.com/demo напрямую в браузере (не в iframe) для проверки
+     - Проверьте консоль браузера (F12) на наличие других ошибок
+     - Убедитесь, что нет конфликтов с другими скриптами или расширениями браузера
+  
+  4. Настройте стили кнопки "Попробовать Demo" под дизайн вашего лендинга
+  
+  5. Протестируйте:
+     - Открытие модального окна
+     - Закрытие по кнопке "Закрыть"
+     - Закрытие по ESC
+     - Закрытие при клике вне модального окна
+     - Кнопка "Полный экран" открывает в новой вкладке
+  
+  ============================================
+-->
+

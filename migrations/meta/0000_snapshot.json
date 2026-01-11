@@ -1,0 +1,574 @@
+{
+  "id": "00000000-0000-0000-0000-000000000000",
+  "prevId": "",
+  "version": "5",
+  "dialect": "mysql",
+  "tables": {
+    "report": {
+      "name": "report",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int(11)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "user_id",
+          "type": "int(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "symbol": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "symbol",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "strategy": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "strategy",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "trading_type": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "trading_type",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "capital": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "capital",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "risk": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "risk",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "confirmation": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "confirmation",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "result_summary": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "result_summary",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "report_text": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "report_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rr_long": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "rr_long",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rr_short": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "rr_short",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "trend": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "trend",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "timestamp": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "timestamp",
+          "type": "datetime",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "compositePrimaryKeys": {},
+      "indexes": {
+        "user_id": {
+          "name": "user_id",
+          "columns": [
+            "user_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "report_ibfk_1": {
+          "name": "report_ibfk_1",
+          "tableFrom": "report",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "report_old": {
+      "name": "report_old",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int(11)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "user_id",
+          "type": "int(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "symbol": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "symbol",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "strategy": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "strategy",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "trading_type": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "trading_type",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "capital": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "capital",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "risk": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "risk",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "confirmation": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "confirmation",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "result_summary": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "result_summary",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "report_text": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "report_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rr_long": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "rr_long",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rr_short": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "rr_short",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "trend": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "trend",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "timestamp": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "timestamp",
+          "type": "datetime",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "compositePrimaryKeys": {},
+      "indexes": {
+        "user_id": {
+          "name": "user_id",
+          "columns": [
+            "user_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "report_old_ibfk_1": {
+          "name": "report_old_ibfk_1",
+          "tableFrom": "report_old",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "report_v2": {
+      "name": "report_v2",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int(11)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "user_id",
+          "type": "int(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "symbol": {
+          "autoincrement": false,
+          "name": "symbol",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "strategy": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "strategy",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "trading_type": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "trading_type",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "capital": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "capital",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "risk": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "risk",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "confirmation": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "confirmation",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "report_text": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "report_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "result_summary": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "result_summary",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rr_long": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "rr_long",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rr_short": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "rr_short",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "entry_price": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "entry_price",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exit_price": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "exit_price",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "direction": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "direction",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "trend": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "trend",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "timestamp": {
+          "default": "'current_timestamp()'",
+          "autoincrement": false,
+          "name": "timestamp",
+          "type": "datetime",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "profit_loss": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "profit_loss",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "profit_loss_percent": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "profit_loss_percent",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "success": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "success",
+          "type": "tinyint(1)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stop_loss": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "stop_loss",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "take_profit": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "take_profit",
+          "type": "float",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "compositePrimaryKeys": {},
+      "indexes": {},
+      "foreignKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "sessions": {
+      "name": "sessions",
+      "columns": {
+        "session_id": {
+          "autoincrement": false,
+          "name": "session_id",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires": {
+          "autoincrement": false,
+          "name": "expires",
+          "type": "int(11) unsigned",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "data": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "data",
+          "type": "mediumtext",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "compositePrimaryKeys": {},
+      "indexes": {},
+      "foreignKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "user": {
+      "name": "user",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int(11)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "autoincrement": false,
+          "name": "email",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "password_hash": {
+          "autoincrement": false,
+          "name": "password_hash",
+          "type": "varchar(256)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "created_at",
+          "type": "datetime",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "plan": {
+          "default": "'NULL'",
+          "autoincrement": false,
+          "name": "plan",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "compositePrimaryKeys": {},
+      "indexes": {},
+      "foreignKeys": {},
+      "uniqueConstraints": {
+        "email": {
+          "name": "email",
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    }
+  },
+  "views": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "tables": {},
+    "indexes": {}
+  }
+}

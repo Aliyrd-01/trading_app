@@ -1,0 +1,17 @@
+flask>=2.0
+gunicorn
+pandas
+numpy
+matplotlib
+openpyxl
+ccxt
+requests
+flask-sqlalchemy
+cryptography
+scipy
+bcrypt
+python-dotenv
+sqlalchemy
+urllib3
+werkzeug
+psycopg2-binary

@@ -1,0 +1,15 @@
+node_modules
+dist
+.DS_Store
+server/public
+vite.config.ts.*
+*.tar.gz
+.git
+build/
+installer/
+release_artifacts/
+*.exe
+*.pkg
+*.msi
+*.dmg
+*.zip

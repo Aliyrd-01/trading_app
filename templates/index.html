@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>📊 Crypto Trading Analyzer</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ app_version|default('dev') }}">
+  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+  <!-- Chart.js для real-time графика -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- Translations -->
+  <script src="{{ url_for('static', filename='translations.js') }}"></script>
+</head>
+<body data-demo-mode="{{ 'true' if demo_mode else 'false' }}">
+  <div class="container">
+    <!-- ✅ Demo режим баннер -->
+    {% if demo_mode %}
+    <div id="demoBanner" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; text-align: center; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);">
+      <strong>🎮 Demo режим</strong> - Вы используете демонстрационную версию приложения.
+      {% if not demo_logged_in %}
+      <a href="/login" style="color: white; text-decoration: underline; margin-left: 10px; font-weight: bold;">Войти для полного доступа</a>
+      {% endif %}
+    </div>
+    {% endif %}
+    
+    <div id="logoutContainer" style="display: flex !important; align-items: center !important; justify-content: flex-end !important; gap: 32px !important; margin-top: 10px; margin-bottom: 20px;">
+      {% if not demo_mode %}
+      <button id="settingsBtn" type="button" style="background: transparent; border: none; color: #fff; font-size: 22px; cursor: pointer; padding: 8px; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 5px; transition: background 0.2s; margin-right: 32px;" data-i18n-title="settings_tooltip" title="Настройки">⚙️</button>
+      {% endif %}
+      <div class="custom-dropdown" id="languageDropdown">
+        <button class="custom-dropdown-toggle" id="languageToggleBtn" type="button">
+          <span id="languageToggleText">🌐</span>
+        </button>
+        <ul class="custom-dropdown-menu" id="languageDropdownMenu">
+          <li data-value="uk">Українська</li>
+          <li data-value="en">English</li>
+          <li data-value="ru" class="selected">Русский</li>
+        </ul>
+      </div>
+      {% if not demo_mode %}
+      <a href="#" id="logoutBtn" data-i18n="logout" style="margin-left: 32px;">Выйти</a>
+      {% endif %}
+    </div>
+
+    <!-- Экран настроек -->
+    <div id="settingsScreen" class="hidden" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #0f1320; z-index: 1000; overflow-y: auto; padding: 20px;">
+      <div style="max-width: 800px; margin: 0 auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 24px;">⚙️</span>
+            <h2 style="color: #fff; margin: 0;" data-i18n="settings">Настройки</h2>
+          </div>
+          <button id="closeSettingsBtn" type="button" data-i18n="close_settings" style="background: #3fa9f5 !important; color: #fff !important; border: none !important; padding: 4px 8px !important; border-radius: 5px !important; cursor: pointer !important; font-size: 10px !important; margin-left: 20px !important;">Закрыть</button>
+        </div>
+
+        <!-- Настройки уведомлений -->
+        <div style="background: #1a1f35; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2c3350;">
+          <h3 style="color: #fff; margin-top: 0; margin-bottom: 20px;" data-i18n="notification_settings">📬 Настройка уведомлений</h3>
+          
+          <label style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 15px; color: #fff;">
+            <span style="margin-right: 10px;">📧 <span data-i18n="enable_email_notifications">Email уведомления</span></span>
+            <input type="checkbox" id="enableEmailNotifications" style="width: 18px; height: 18px; cursor: pointer; flex-shrink: 0;">
+          </label>
+          
+          <label style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 15px; color: #fff;">
+            <span style="margin-right: 10px;">📱 <span data-i18n="enable_telegram_notifications">Telegram уведомления</span></span>
+            <input type="checkbox" id="enableTelegramNotifications" style="width: 18px; height: 18px; cursor: pointer; flex-shrink: 0;">
+          </label>
+          
+          <div style="margin-top: 15px;">
+            <label style="display: block; color: #fff; margin-bottom: 8px;" data-i18n="telegram_chat_id_label">Telegram Username или Chat ID:</label>
+            <input type="text" id="telegramChatId" data-i18n-placeholder="telegram_chat_id_placeholder" placeholder="@username или 123456789" style="width: 100%; padding: 10px; background: #0f1320; border: 1px solid #2c3350; border-radius: 5px; color: #fff; font-size: 14px; box-sizing: border-box;">
+            <p style="color: #8ea0bf; font-size: 12px; margin-top: 5px; margin-bottom: 15px;" data-i18n="telegram_chat_id_hint">💡 Инструкция: Введите ваш Telegram username (например: @username) или Chat ID (число). Для работы с username сначала отправьте /start боту CryptoTradingAnalizer в Telegram.</p>
+          </div>
+          
+          <!-- Рейтинг надежности - закомментировано
+          <div style="margin-top: 15px;">
+            <label style="display: block; color: #fff; margin-bottom: 8px;" data-i18n="alert_min_reliability_label">Минимальный рейтинг надежности для уведомлений:</label>
+            <input type="number" id="alertMinReliability" min="0" max="100" value="60" style="width: 100px; padding: 10px; background: #0f1320; border: 1px solid #2c3350; border-radius: 5px; color: #fff; font-size: 14px;">
+          </div>
+          -->
+          
+          <button id="saveNotificationSettingsBtn" type="button" data-i18n="save_notification_settings" style="margin-top: 15px; background: #3fa9f5; color: #fff; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 14px;">Сохранить настройки уведомлений</button>
+        </div>
+
+        <!-- Настройки торговли -->
+        <div style="background: #1a1f35; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2c3350;">
+          <h3 style="color: #fff; margin-top: 0; margin-bottom: 20px;" data-i18n="trading_settings">⚙️ Настройки торговли</h3>
+          
+          <div style="margin-top: 15px;">
+            <label style="display: block; color: #fff; margin-bottom: 8px;" data-i18n="exchange_spread_label">Спред биржи (%):</label>
+            <input type="number" id="exchangeSpread" min="0" max="1" step="0.01" value="0" style="width: 100%; padding: 10px; background: #0f1320; border: 1px solid #2c3350; border-radius: 5px; color: #fff; font-size: 14px; box-sizing: border-box;">
+            <p style="color: #8ea0bf; font-size: 12px; margin-top: 5px; margin-bottom: 0;" data-i18n="exchange_spread_hint">Спред биржи учитывается при расчете прибыли. Обычно 0.05-0.1% для Binance.</p>
+          </div>
+          
+          <button id="saveTradingSettingsBtn" type="button" data-i18n="save_trading_settings" style="margin-top: 15px; background: #3fa9f5; color: #fff; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 14px;">Сохранить настройки торговли</button>
+        </div>
+
+        <!-- Настройки автоматических сигналов -->
+        <div style="background: #1a1f35; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2c3350;">
+          <h3 style="color: #fff; margin-top: 0; margin-bottom: 20px;" data-i18n="auto_signals_settings">🤖 Автоматические сигналы</h3>
+          
+          <label style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 20px; color: #fff;">
+            <span style="margin-right: 10px;"><span data-i18n="enable_auto_signals">Получать сигналы автоматически</span></span>
+            <input type="checkbox" id="enableAutoSignals" style="width: 18px; height: 18px; cursor: pointer; flex-shrink: 0;">
+          </label>
+          
+          <div id="autoSignalsConfig" style="display: none;">
+            <div style="margin-bottom: 15px;">
+              <label style="display: block; color: #fff; margin-bottom: 8px;" data-i18n="auto_signal_symbol_label">Валюта:</label>
+              <select id="autoSignalSymbol" style="width: 100%; padding: 10px; background: #0f1320; border: 1px solid #2c3350; border-radius: 5px; color: #fff; font-size: 14px; box-sizing: border-box;">
+                <option value="BTC/USDT">BTC/USDT</option>
+                <option value="ETH/USDT">ETH/USDT</option>
+                <option value="BNB/USDT">BNB/USDT</option>
+                <option value="XRP/USDT">XRP/USDT</option>
+                <option value="SOL/USDT">SOL/USDT</option>
+                <option value="TRX/USDT">TRX/USDT</option>
+                <option value="DOGE/USDT">DOGE/USDT</option>
+                <option value="ADA/USDT">ADA/USDT</option>
+                <option value="LINK/USDT">LINK/USDT</option>
+                <option value="ZEC/USDT">ZEC/USDT</option>
+              </select>
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+              <label style="display: block; color: #fff; margin-bottom: 8px;" data-i18n="auto_signal_capital_label">Капитал ($):</label>
+              <input type="number" id="autoSignalCapital" min="0" step="0.01" placeholder="10000" style="width: 100%; padding: 10px; background: #0f1320; border: 1px solid #2c3350; border-radius: 5px; color: #fff; font-size: 14px; box-sizing: border-box;">
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+              <label style="display: block; color: #fff; margin-bottom: 8px;" data-i18n="auto_signal_trading_type_label">Тип торговли:</label>
+              <select id="autoSignalTradingType" style="width: 100%; padding: 10px; background: #0f1320; border: 1px solid #2c3350; border-radius: 5px; color: #fff; font-size: 14px; box-sizing: border-box;">
+                <option value="Скальпинг" data-i18n="scalping">Скальпинг</option>
+                <option value="Дейтрейдинг" data-i18n="daytrading">Дейтрейдинг</option>
+                <option value="Свинг" data-i18n="swing">Свинг</option>
+                <option value="Среднесрочная" data-i18n="medium_term">Среднесрочная</option>
+                <option value="Долгосрочная" data-i18n="long_term">Долгосрочная</option>
+              </select>
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+              <label style="display: block; color: #fff; margin-bottom: 8px;" data-i18n="auto_signal_strategy_label">Стратегия:</label>
+              <select id="autoSignalStrategy" style="width: 100%; padding: 10px; background: #0f1320; border: 1px solid #2c3350; border-radius: 5px; color: #fff; font-size: 14px; box-sizing: border-box;">
+                <option value="Консервативная" data-i18n="conservative">Консервативная</option>
+                <option value="Сбалансированная" data-i18n="balanced">Сбалансированная</option>
+                <option value="Агрессивная" data-i18n="aggressive">Агрессивная</option>
+              </select>
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+              <label style="display: block; color: #fff; margin-bottom: 8px;" data-i18n="auto_signal_risk_label">Риск (%):</label>
+              <input type="number" id="autoSignalRisk" min="0" max="100" step="0.01" placeholder="1.0" style="width: 100%; padding: 10px; background: #0f1320; border: 1px solid #2c3350; border-radius: 5px; color: #fff; font-size: 14px; box-sizing: border-box;">
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+              <label style="display: block; color: #fff; margin-bottom: 8px;" data-i18n="auto_signal_confirmation_label">Подтверждения:</label>
+              <select id="autoSignalConfirmation" style="width: 100%; padding: 10px; background: #0f1320; border: 1px solid #2c3350; border-radius: 5px; color: #fff; font-size: 14px; box-sizing: border-box;">
+                <option value="NONE" data-i18n="confirmation_none">Без фильтров</option>
+                <option value="RSI" data-i18n="confirmation_rsi">RSI</option>
+                <option value="MACD" data-i18n="confirmation_macd">MACD</option>
+                <option value="EMA" data-i18n="confirmation_ema">EMA</option>
+                <option value="VWMA" data-i18n="confirmation_vwma">VWMA</option>
+                <option value="ADX" data-i18n="confirmation_adx">ADX</option>
+                <option value="BB" data-i18n="confirmation_bb">Bollinger Bands</option>
+                <option value="RSI+MACD" data-i18n="confirmation_rsi_macd">RSI + MACD</option>
+                <option value="EMA+ADX+VWMA" data-i18n="confirmation_ema_adx_vwma">EMA + ADX + VWMA</option>
+                <option value="ALL" data-i18n="confirmation_all">Все фильтры подтверждены</option>
+              </select>
+              <p style="color: #8ea0bf; font-size: 12px; margin-top: 5px; margin-bottom: 0;" data-i18n="auto_signal_confirmation_hint">Выберите тип подтверждения из списка</p>
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+              <label style="display: block; color: #fff; margin-bottom: 8px;" data-i18n="auto_signal_min_reliability_label">Минимальная надежность (%):</label>
+              <input type="number" id="autoSignalMinReliability" min="0" max="100" step="0.1" value="60" style="width: 100%; padding: 10px; background: #0f1320; border: 1px solid #2c3350; border-radius: 5px; color: #fff; font-size: 14px; box-sizing: border-box;">
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+              <label style="display: block; color: #fff; margin-bottom: 8px;" data-i18n="auto_signal_check_interval_label">Интервал проверки (минуты):</label>
+              <input type="number" id="autoSignalCheckInterval" min="5" step="1" value="60" style="width: 100%; padding: 10px; background: #0f1320; border: 1px solid #2c3350; border-radius: 5px; color: #fff; font-size: 14px; box-sizing: border-box;">
+              <p style="color: #8ea0bf; font-size: 12px; margin-top: 5px; margin-bottom: 0;" data-i18n="auto_signal_check_interval_hint">Рекомендуется: Скальпинг - 5-15 мин, Дейтрейдинг - 30-60 мин, Свинг - 240 мин (4 часа)</p>
+            </div>
+            
+            <button id="testAutoSignalsBtn" type="button" data-i18n="test_auto_signals" style="margin-top: 10px; margin-right: 10px; background: #ff9800; color: #fff; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 14px;">Тестовая проверка</button>
+          </div>
+          
+          <button id="saveAutoSignalsSettingsBtn" type="button" data-i18n="save_auto_signals_settings" style="margin-top: 15px; background: #3fa9f5; color: #fff; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 14px;">Сохранить настройки</button>
+        </div>
+
+        <!-- Отправить сообщение о проблеме -->
+        <div style="background: #1a1f35; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2c3350;">
+          <h3 style="color: #fff; margin-top: 0; margin-bottom: 20px;" data-i18n="send_problem_message">💬 Отправить сообщение о проблеме</h3>
+          
+          <textarea id="problemMessage" data-i18n-placeholder="problem_message_placeholder" placeholder="Опишите проблему или оставьте отзыв..." style="width: 100%; min-height: 150px; padding: 10px; background: #0f1320; border: 1px solid #2c3350; border-radius: 5px; color: #fff; font-size: 14px; font-family: inherit; resize: vertical; box-sizing: border-box;"></textarea>
+          
+          <button id="sendProblemMessageBtn" type="button" data-i18n="send_message" style="margin-top: 15px; background: #3fa9f5; color: #fff; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 14px;">Отправить</button>
+        </div>
+
+        <!-- Версия приложения -->
+        <div style="background: #1a1f35; padding: 20px; border-radius: 8px; border: 1px solid #2c3350;">
+          <h3 style="color: #fff; margin-top: 0; margin-bottom: 10px;" data-i18n="information">ℹ️ Информация</h3>
+          <p style="color: #8ea0bf; margin: 0;"><span data-i18n="app_version">Версия приложения:</span> <strong style="color: #fff;">1.0.1</strong></p>
+        </div>
+      </div>
+    </div>
+
+    <h1 data-i18n="app_title">📊 Crypto Trading Analyzer</h1>
+
+    <!-- Кнопка переключения режима под заголовком -->
+    <div style="text-align: center; margin: 15px 0 25px 0;">
+      <button id="modeToggleBtn" type="button" data-i18n="beginner_mode" style="padding: 8px 20px; background: #3fa9f5; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-size: 14px;">🌱 Режим новичка</button>
+    </div>
+
+    <script>
+      // ✅ Проверка demo режима
+      const isDemoMode = document.body && document.body.dataset && document.body.dataset.demoMode === 'true';
+      
+      // В demo режиме скрываем некоторые элементы через JavaScript
+      if (isDemoMode) {
+        document.addEventListener('DOMContentLoaded', () => {
+          // Скрываем кнопку настроек (если она все еще видна)
+          const settingsBtn = document.getElementById('settingsBtn');
+          if (settingsBtn) {
+            settingsBtn.style.display = 'none';
+          }
+          
+          // Скрываем кнопку выхода (если она все еще видна)
+          const logoutBtn = document.getElementById('logoutBtn');
+          if (logoutBtn) {
+            logoutBtn.style.display = 'none';
+          }
+          
+          // Скрываем экран настроек (если пользователь попытается открыть)
+          const settingsScreen = document.getElementById('settingsScreen');
+          if (settingsScreen) {
+            settingsScreen.style.display = 'none';
+          }
+        });
+      }
+    </script>
+    <script src="{{ url_for('static', filename='script.js') }}?v={{ app_version|default('dev') }}"></script>
+
+    <!-- Режим новичка - упрощенная форма -->
+    <div id="beginnerForm" class="form-grid" style="display: none;">
+      <label>
+        <span data-i18n="beginner_investment">💰 Сколько хотите инвестировать?</span>
+        <input type="number" id="beginnerCapital" value="10000" min="100" step="100">
+      </label>
+      <label>
+        <span data-i18n="beginner_currency_pair">Выберите валютную пару:</span>
+        <select id="beginnerSymbol">
+          <option>BTC/USDT</option>
+          <option>ETH/USDT</option>
+          <option>BNB/USDT</option>
+          <option>SOL/USDT</option>
+          <option>DOGE/USDT</option>
+          <option>LINK/USDT</option>
+          <option>ZEC/USDT</option>
+        </select>
+      </label>
+      <button id="beginnerAnalyzeBtn" data-i18n="beginner_analyze" style="grid-column: 1 / -1; padding: 15px; background: #3fa9f5; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: 500;">🚀 Проанализировать</button>
+      <div id="progressBarBeginner" class="hidden" style="grid-column: 1 / -1; text-align: center; margin-top: 30px;">
+        <div class="bar"></div>
+        <p data-i18n="beginner_analyzing" style="margin-top: 15px; font-size: 18px; color: #e8e8e8;">⏳ Анализ выполняется, подождите...</p>
+      </div>
+    </div>
+
+    <div class="form-grid" id="advancedForm">
+      <!-- Настройки анализа -->
+      <label>
+        <span data-i18n="currency_pair">Валютная пара:</span>
+        <select id="symbol">
+          <option>BTC/USDT</option>
+          <option>ETH/USDT</option>
+          <option>BNB/USDT</option>
+          <option>XRP/USDT</option>
+          <option>SOL/USDT</option>
+          <option>TRX/USDT</option>
+          <option>DOGE/USDT</option>
+          <option>ADA/USDT</option>
+          <option>LINK/USDT</option>
+          <option>ZEC/USDT</option>
+        </select>
+      </label>
+
+      <label class="with-info">
+        <div class="label-row">
+          <span data-i18n="trading_type">Тип торговли:</span>
+          <span class="info" data-tip-key="tooltip_trading_type">ℹ️</span>
+        </div>
+        <select id="trading_type" onchange="updateTimeframeInfo()">
+          <option value="scalping" data-i18n="scalping">Скальпинг</option>
+          <option value="daytrading" data-i18n="daytrading">Дейтрейдинг</option>
+          <option value="swing" data-i18n="swing">Свинг</option>
+          <option value="medium_term" data-i18n="medium_term">Среднесрочная</option>
+          <option value="long_term" data-i18n="long_term">Долгосрочная</option>
+        </select>
+      </label>
+
+      <label>
+        <span data-i18n="strategy">Стратегия:</span>
+        <select id="strategy">
+          <option value="conservative" data-i18n="conservative">Консервативная</option>
+          <option value="balanced" data-i18n="balanced">Сбалансированная</option>
+          <option value="aggressive" data-i18n="aggressive">Агрессивная</option>
+        </select>
+      </label>
+
+      <label>
+        <span data-i18n="capital">💰 Капитал (USDT):</span>
+        <input type="number" id="capital" value="10000" min="1" max="10000000" step="1">
+      </label>
+
+      <label class="with-info">
+        <div class="label-row">
+          <span data-i18n="risk">⚖️ Риск (%):</span>
+          <span class="info" data-tip-key="tooltip_risk">ℹ️</span>
+        </div>
+        <input type="number" id="risk" value="1" step="0.1" min="0.1" max="100">
+      </label>
+
+      <label class="with-info">
+        <div class="label-row">
+          <span data-i18n="confirmation">Тип подтверждения входа:</span>
+          <span class="info" data-tip-key="tooltip_confirmation">ℹ️</span>
+        </div>
+        <select id="confirmation">
+          <option value="EMA" data-i18n="confirmation_ema">EMA</option>
+          <option value="RSI" data-i18n="confirmation_rsi">RSI</option>
+          <option value="MACD" data-i18n="confirmation_macd">MACD</option>
+          <option value="VWMA" data-i18n="confirmation_vwma">VWMA</option>
+          <option value="ADX" data-i18n="confirmation_adx">ADX</option>
+          <option value="BB" data-i18n="confirmation_bb">Bollinger Bands (возврат внутрь)</option>
+          <option value="RSI+MACD" data-i18n="confirmation_rsi_macd">RSI + MACD</option>
+          <option value="EMA+ADX+VWMA" data-i18n="confirmation_ema_adx_vwma">EMA + ADX + VWMA</option>
+          <option value="ALL" data-i18n="confirmation_all">Все фильтры подтверждены</option>
+          <option value="NONE" data-i18n="confirmation_none">Без фильтров</option>
+        </select>
+      </label>
+
+      <label class="with-info">
+        <div class="label-row">
+          <span data-i18n="timeframe">📊 Таймфрейм:</span>
+          <span class="info" data-tip-key="tooltip_timeframe">ℹ️</span>
+        </div>
+        <select id="timeframe">
+          <option value="auto" data-i18n="auto">Автоматически (рекомендуемый)</option>
+          <option value="1m" data-i18n="1m">1 минута</option>
+          <option value="3m" data-i18n="3m">3 минуты</option>
+          <option value="5m" data-i18n="5m">5 минут</option>
+          <option value="15m" data-i18n="15m">15 минут</option>
+          <option value="30m" data-i18n="30m">30 минут</option>
+          <option value="1h" data-i18n="1h">1 час</option>
+          <option value="2h" data-i18n="2h">2 часа</option>
+          <option value="4h" data-i18n="4h">4 часа</option>
+          <option value="6h" data-i18n="6h">6 часов</option>
+          <option value="8h" data-i18n="8h">8 часов</option>
+          <option value="12h" data-i18n="12h">12 часов</option>
+          <option value="1d" data-i18n="1d">1 день</option>
+          <option value="3d" data-i18n="3d">3 дня</option>
+          <option value="1w" data-i18n="1w">1 неделя</option>
+          <option value="1M" data-i18n="1M">1 месяц</option>
+        </select>
+      </label>
+
+      <label class="with-info">
+        <div class="label-row">
+          <span data-i18n="chart_timeframe">📈 Таймфрейм графика:</span>
+          <span class="info" data-tip-key="tooltip_chart_timeframe">ℹ️</span>
+        </div>
+        <select id="chartTimeframe">
+          <option value="1m" data-i18n="1m">1 минута</option>
+          <option value="3m" data-i18n="3m">3 минуты</option>
+          <option value="5m" data-i18n="5m">5 минут</option>
+          <option value="15m" data-i18n="15m">15 минут</option>
+          <option value="30m" data-i18n="30m">30 минут</option>
+          <option value="1h" selected data-i18n="1h">1 час</option>
+          <option value="2h" data-i18n="2h">2 часа</option>
+          <option value="4h" data-i18n="4h">4 часа</option>
+          <option value="6h" data-i18n="6h">6 часов</option>
+          <option value="8h" data-i18n="8h">8 часов</option>
+          <option value="12h" data-i18n="12h">12 часов</option>
+          <option value="1d" data-i18n="1d">1 день</option>
+          <option value="3d" data-i18n="3d">3 дня</option>
+          <option value="1w" data-i18n="1w">1 неделя</option>
+          <option value="1M" data-i18n="1M">1 месяц</option>
+        </select>
+      </label>
+
+      <p id="tfInfo" class="info-text" data-i18n="recommended">Рекомендуемый таймфрейм: 5m</p>
+
+      <!-- ⚙️ Продвинутые настройки -->
+      <div class="advanced-toggle-container" data-plan="pro">
+        <button type="button" id="toggleAdvanced" class="toggle-advanced-btn">
+          <span data-i18n="advanced_settings">⚙️ Продвинутые настройки</span>
+          <span id="toggleIcon">🔽</span>
+        </button>
+      </div>
+
+      <div id="advancedSettings" class="advanced-settings hidden" data-plan="pro">
+        <div class="advanced-option">
+          <div class="option-label" data-i18n="min_reliability">🎯 Минимальный рейтинг сигнала (%):</div>
+          <div class="option-info">
+            <span class="info" data-tip-key="tooltip_min_reliability">ℹ️</span>
+          </div>
+          <input type="number" id="minReliability" value="50" min="0" max="100" step="5">
+        </div>
+
+        <div class="advanced-option checkbox-option">
+          <div class="option-label" data-i18n="enable_forecast">📊 Показывать прогноз на основе истории</div>
+          <div class="option-info">
+            <span class="info" data-tip-key="tooltip_forecast">ℹ️</span>
+          </div>
+          <input type="checkbox" id="enableForecast">
+        </div>
+
+        <div class="advanced-option checkbox-option">
+          <div class="option-label" data-i18n="enable_backtest">📈 Включить бэктестинг стратегии</div>
+          <div class="option-info">
+            <span class="info" data-tip-key="tooltip_backtest">ℹ️</span>
+          </div>
+          <input type="checkbox" id="enableBacktest">
+        </div>
+
+        <div id="backtestPeriod" class="advanced-option hidden">
+          <div class="option-label" data-i18n="backtest_period">Период бэктеста (дней):</div>
+          <div class="option-info">
+            <span class="info" data-tip-key="tooltip_backtest_period">ℹ️</span>
+          </div>
+          <select id="backtestDays">
+            <option value="auto" data-i18n="backtest_auto">Автоматически (x2 от периода анализа)</option>
+            <option value="30" data-i18n="backtest_30_days">30 дней</option>
+            <option value="60" data-i18n="backtest_60_days">60 дней</option>
+            <option value="90" data-i18n="backtest_90_days">90 дней</option>
+            <option value="180" data-i18n="backtest_180_days">180 дней</option>
+          </select>
+        </div>
+
+        <div class="advanced-option checkbox-option">
+          <div class="option-label" data-i18n="enable_ml">🤖 Использовать ML-прогноз вероятности успеха</div>
+          <div class="option-info">
+            <span class="info" data-tip-key="tooltip_ml">ℹ️</span>
+          </div>
+          <input type="checkbox" id="enableML">
+        </div>
+
+        <!-- Трейлинг-логика -->
+        <div class="advanced-option checkbox-option">
+          <div class="option-label" data-i18n="enable_trailing">📈 Включить трейлинг-стоп</div>
+          <div class="option-info">
+            <span class="info" data-tip-key="tooltip_trailing">ℹ️</span>
+          </div>
+          <input type="checkbox" id="enableTrailing">
+        </div>
+
+        <div id="trailingSettings" class="advanced-option hidden">
+          <div class="option-label" data-i18n="trailing_percent">Процент трейлинга (%):</div>
+          <div class="option-info">
+            <span class="info" data-tip-key="tooltip_trailing_percent">ℹ️</span>
+          </div>
+          <input type="number" id="trailingPercent" value="50" min="5" max="90" step="5">
+        </div>
+
+        <div class="smart-combine-container">
+          <button type="button" id="smartCombineBtn" class="smart-combine-btn" data-i18n="smart_combine">
+            🎯 Автоподбор индикаторов
+          </button>
+          <p class="smart-combine-hint" data-i18n="tooltip_smart_combine">Автоматически выберет оптимальные индикаторы под текущий режим рынка</p>
+          <div id="smartCombineResult" class="smart-combine-result"></div>
+        </div>
+
+        <!-- Alert-система (закомментировано - будет полезно при добавлении автоматического мониторинга) -->
+        <!--
+        <div class="advanced-option checkbox-option">
+          <div class="option-label">📧 Email уведомления (опционально)</div>
+          <div class="option-info">
+            <span class="info" data-tip="Отправлять уведомления на email после анализа.&#10;&#10;⚠️ Примечание: При ручном запуске анализа результаты сразу видны на экране, поэтому уведомления не обязательны.&#10;&#10;Могут быть полезны в будущем при добавлении автоматического мониторинга рынка.">ℹ️</span>
+          </div>
+          <input type="checkbox" id="enableEmail">
+        </div>
+
+        <div class="advanced-option">
+          <div class="option-label">Минимальный рейтинг для уведомления (%):</div>
+          <div class="option-info">
+            <span class="info" data-tip="Отправлять уведомления только если рейтинг сигнала выше указанного">ℹ️</span>
+          </div>
+          <input type="number" id="alertMinReliability" value="60" min="0" max="100" step="5">
+        </div>
+        -->
+      </div>
+
+      <button id="analyzeBtn" data-i18n="analyze">🚀 Запустить анализ</button>
+
+      <div id="progressBar" class="hidden" style="grid-column: 1 / -1; text-align: center; margin-top: 30px;">
+        <div class="bar"></div>
+        <p data-i18n="progress_analyzing" style="margin-top: 15px; font-size: 18px; color: #e8e8e8;">⏳ Анализ выполняется, подождите...</p>
+      </div>
+    </div>
+
+    <!-- Упрощенный результат для новичка -->
+    <div id="beginnerResult" style="display: none; background: #2a2d3a; border-radius: 10px; padding: 30px; margin-top: 20px; text-align: center;">
+    </div>
+
+    <!-- 📄 Демонстрационный отчёт -->
+    <div id="result" class="demo">
+      <h2 style="margin:0;">📄 Отчёт (демо)</h2>
+      <div id="reportText"></div>
+      
+      <!--
+      График кривой баланса бэктеста
+      <div id="backtestChartContainer" class="hidden" style="margin-top: 30px;">
+        <h3 style="color: #3fa9f5; margin-bottom: 15px;">📈 Кривая баланса бэктеста</h3>
+        <canvas id="backtestChart" style="max-height: 400px;"></canvas>
+      </div>
+      
+      <span data-i18n="run_comparative_backtest">Сравнительный бэктест всех стратегий</span>
+      <div id="compareBacktestContainer" class="hidden" style="margin-top: 30px;">
+        <h3 style="color: #3fa9f5; margin-bottom: 15px;" data-i18n="strategy_comparison">📊 Сравнение стратегий</h3>
+        <button id="runCompareBacktestBtn" style="margin-bottom: 20px; padding: 10px 20px; background: #3fa9f5; color: white; border: none; border-radius: 5px; cursor: pointer;" data-i18n="run_comparative_backtest">
+          🔄 Запустить сравнительный бэктест всех стратегий
+        </button>
+        <div id="compareBacktestResults" style="display: none;">
+          <canvas id="compareBacktestChart" style="max-height: 400px; margin-bottom: 20px;"></canvas>
+          <div id="compareBacktestTable"></div>
+        </div>
+      </div>
+      -->
+      <script id="demoReport" type="text/plain">=== Аналитический отчёт по BTC/USDT ===  
+Сгенерировано: 2025-10-31 17:42:18 (Europe/Kyiv)  
+Текущий рынок (bias):  Бычий
+
+### 📈 Краткое резюме
+| Показатель | Значение | Интерпретация |
+|------------|-----------|----------------|
+| **Close** | 67,245.00 | Текущая цена |
+| **EMA20 / EMA50 / EMA200** | 66,900 / 66,500 / 61,200 | Направление скользящих |
+| **RSI(14)** | 58.2 | Нейтральная зона |
+| **ATR(14)** | 230.5 | Средняя волатильность рынка |
+| **Trend** | Uptrend | Бычий рынок |
+| **VWMA(20)** | 67,050 | Цена выше VWMA — восходящий импульс |
+| **BB Upper/Lower** | 68,000 / 65,000 | В пределах диапазона |
+| **ADX** | 27.3 | Сильный тренд |
+| **Выбранные подтверждения (пользователь)** | EMA+ADX+VWMA | Результат: Все подтверждения ✅ |
+
+### ⚙️ Стратегия
+- Тип торговли: Дейтрейдинг  
+- Стратегия: Сбалансированная  
+- Капитал: $10,000.00  
+- Динамический риск: 0.90% (базовый 1.00%)  
+- Тип подтверждения: EMA+ADX+VWMA
+
+### 🎯 Уровни
+**Лонг**
+| Параметр | Значение | Комментарий |
+|-----------|-----------|-------------|
+| Триггер (buy-stop) | 67,000 | По стратегии |
+| Стоп-лосс | 66,500 | триггер − 1.0 × ATR |
+| Take-profit | 67,800 | триггер + 1.3 × ATR |
+| Размер позиции | 17.24 units ≈ $1,156.9 | Риск: 0.90% |
+
+**Шорт**
+| Параметр | Значение | Комментарий |
+|-----------|-----------|-------------|
+| Триггер (sell-stop) | 66,700 | По стратегии |
+| Стоп-лосс | 67,200 | вход + 1.0 × ATR |
+| Take-profit | 65,900 | вход − 1.3 × ATR |
+| Размер позиции | 18.00 units ≈ $1,200.0 | Риск: 0.90% |
+
+### 📊 Соотношение риск/прибыль
+| Направление | R:R |
+|--------------|------|
+| Лонг | 1.6 |
+| Шорт | 1.3 |
+
+### 💰 Перспектива
+- Более перспективно: Лонг 🚀  
+- Тренд: Бычий рынок  
+- RSI: Нейтральная зона  
+- Диапазон: В пределах границ  
+- VWMA: Восходящий импульс  
+- ADX: Сильный тренд  
+
+### 💡 Дополнительные рекомендации
+- Рынок во флете — лучше воздержаться от входов до появления четкого тренда
+- RSI < 30 — перепроданность, возможен отскок вверх, рассмотрите лонг-позиции
+
+=== Конец отчёта ===</script>
+
+      <!-- Real-Time график -->
+      <div id="realtimeChartContainer">
+        <h3 style="margin-top: 0; margin-bottom: 20px; padding: 0 10px;" data-i18n="realtime_chart">📈 Real-Time график</h3>
+        <div id="priceInfo">
+          <div class="price-item">
+            <span id="currentSymbol" style="font-size: 14px; color: #8ea0bf; margin-right: 8px;">BTC/USDT</span>
+            <strong data-i18n="current_price">Текущая цена:</strong> 
+            <span id="currentPrice">--</span>
+          </div>
+          <div class="price-item">
+            <strong data-i18n="change">Изменение:</strong> 
+            <span id="priceChange">--</span>
+          </div>
+          <div class="price-item">
+            <button id="stopRealtimeBtn" type="button" style="padding: 5px 15px; background: #ef4444; color: white; border: none; border-radius: 5px; cursor: pointer;" data-i18n="stop">⏹ Остановить</button>
+          </div>
+        </div>
+        <canvas id="realtimeChart"></canvas>
+      </div>
+
+      <!-- Кнопки скачивания -->
+      <div id="downloadButtons" class="mt-4 flex justify-between items-center w-full max-w-4xl mx-auto px-4" style="margin-top: 20px;">
+        <button id="downloadZip" disabled data-i18n="download_zip">📦 Скачать ZIP</button>
+        <button id="exportTradingView" disabled data-i18n="export_tradingview">📤 Экспорт в TradingView</button>
+        <button id="downloadStats" disabled data-plan="pro" data-i18n="download_stats">📊 Скачать статистику</button>
+        <button id="loadStrategyAnalysis" type="button" data-plan="pro" data-i18n="strategy_analysis">📈 Анализ стратегий</button>
+      </div>
+    </div>
+
+    <!-- 📊 Анализ стратегий -->
+    <div id="strategyAnalysis" class="strategy-analysis hidden">
+      <h2 data-i18n="strategy_analysis_title">📊 Анализ стратегий</h2>
+      
+      <div id="autoSummary" class="auto-summary">
+        <h3 data-i18n="auto_report">🤖 Автоматический отчёт</h3>
+        <div id="autoSummaryText" class="summary-text"></div>
+      </div>
+
+      <div id="strategyStats" class="strategy-stats">
+        <h3 data-i18n="strategy_comparison">📈 Сравнение стратегий</h3>
+        <div id="strategyStatsTable" class="stats-table"></div>
+      </div>
+
+      <div id="benchmarkComparison" class="benchmark-comparison">
+        <h3 data-i18n="benchmark_title">⚖️ Benchmark: Стратегия vs "Купить и держать"</h3>
+        <div id="benchmarkContent" class="benchmark-content"></div>
+      </div>
+
+      <div id="heatmapSection" class="heatmap-section">
+        <h3 data-i18n="heatmap_title">🔥 Heatmap: Прибыльность по времени и инструментам</h3>
+        <div id="heatmapContent" class="heatmap-content">
+          <div id="heatmapImageContainer" class="heatmap-image-container"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button id="scrollTopBtn" type="button" aria-label="Наверх">↑</button>
+
+  <div id="toastContainer"></div>
+
+  <script>
+    // Инициализация Qt WebChannel, чтобы window.pyjs был доступен в JS
+    try {
+      if (window.QWebChannel && window.qt && window.qt.webChannelTransport) {
+        new QWebChannel(window.qt.webChannelTransport, function (channel) {
+          window.pyjs = channel.objects.pyjs;
+        });
+      }
+    } catch (e) {
+      console.warn("WebChannel init failed or not in Qt:", e);
+    }
+
+    // ✅ ИСПРАВЛЕНО: Проверка demo режима перед проверкой сессии
+    // 🔒 Проверка сессии при загрузке страницы (только если не demo режим)
+    // ✅ isDemoMode уже объявлена выше, не объявляем повторно
+    async function checkSession() {
+      // ✅ Пропускаем проверку в demo режиме
+      if (isDemoMode) {
+        console.log("🎮 Demo режим: пропускаем проверку сессии");
+        return;
+      }
+      
+      try {
+        const res = await fetch("/session_check");
+        const data = await res.json();
+        if (!data.logged_in) {
+          // если сессия неактивна, уходим на логин
+          window.location.href = "/login";
+        }
+      } catch (err) {
+        console.error("Ошибка проверки сессии:", err);
+        // ✅ В demo режиме не перенаправляем на логин при ошибке
+        if (!isDemoMode) {
+          window.location.href = "/login";
+        }
+      }
+    }
+    
+    // ✅ Вызываем проверку только если не demo режим
+    if (!isDemoMode) {
+      checkSession();
+    }
+
+    // 🚪 Обработчик выхода (только если не demo режим)
+    const logoutBtn = document.getElementById("logoutBtn");
+    if (logoutBtn && !isDemoMode) {
+      logoutBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+          await fetch("/api/logout", { method: "POST", headers: { "Content-Type": "application/json" } });
+        } catch (err) {
+          console.error("Ошибка logout:", err);
+        }
+        window.location.href = "/login";
+      });
+    }
+  </script>
+</body>
+</html>
