@@ -133,7 +133,8 @@ def run_analysis_for_user(user):
         
         # Выполняем анализ
         (
-            report_text,
+            reports_by_language,
+            report_markdown_raw,
             chart_bytes,
             excel_bytes,
             symbol,
@@ -147,7 +148,13 @@ def run_analysis_for_user(user):
             take_profit,
             reliability_rating,
             rsi_value,
-            _  # Игнорируем report_markdown_raw, не нужен для уведомлений
+            user_confirmation_result,
+            passed_count,
+            total_count,
+            user_confirmation_str,
+            actual_timeframe,
+            actual_trading_type,
+            higher_timeframes,
         ) = run_analysis(
             user.auto_signal_symbol,
             timeframe=None,  # Автоматический таймфрейм
@@ -168,6 +175,8 @@ def run_analysis_for_user(user):
             spread=getattr(user, 'exchange_spread', 0.0),
             language="ru"
         )
+
+        report_text = reports_by_language.get("ru") if isinstance(reports_by_language, dict) else reports_by_language
         
         # Проверяем, есть ли сигнал
         min_reliability = user.auto_signal_min_reliability or 60.0
@@ -198,7 +207,14 @@ def run_analysis_for_user(user):
             "reliability_rating": reliability_rating,
             "trend": trend,
             "strategy": strategy,
-            "report_text": report_text
+            "report_text": report_text,
+            "user_confirmation_result": user_confirmation_result,
+            "passed_count": passed_count,
+            "total_count": total_count,
+            "user_confirmation_str": user_confirmation_str,
+            "actual_timeframe": actual_timeframe,
+            "actual_trading_type": actual_trading_type,
+            "higher_timeframes": higher_timeframes,
         }
         
     except Exception as e:
@@ -219,13 +235,20 @@ def send_signal_notifications(user, result):
             result["reliability_rating"],
             result["strategy"],
             result["trend"],
-            language="ru"
+            language="ru",
+            confirmation_result=result.get("user_confirmation_result"),
+            confirmations_selected=result.get("user_confirmation_str"),
+            confirmations_passed=result.get("passed_count"),
+            confirmations_total=result.get("total_count"),
+            timeframe=result.get("actual_timeframe"),
+            trading_type=result.get("actual_trading_type"),
+            higher_timeframes=result.get("higher_timeframes"),
         )
         
         # Email уведомления
         if user.enable_email_notifications and user.email:
             email_subject = f"🚨 Автоматический сигнал: {result['symbol']} {result['direction'].upper()}"
-            email_message = alert_message.replace("<b>", "").replace("</b>", "").replace("🚨", "🚨").replace("📊", "📊")
+            email_message = alert_message.replace("\n", "<br>")
             if send_email_notification(user.email, email_subject, email_message):
                 logger.info(f"✅ Email уведомление отправлено пользователю {user.id} ({user.email})")
             else:
@@ -233,8 +256,8 @@ def send_signal_notifications(user, result):
         
         # Telegram уведомления
         if user.enable_telegram_notifications and user.telegram_chat_id:
-            telegram_message = alert_message.replace("<b>", "*").replace("</b>", "*")
-            if send_telegram_notification(user.telegram_chat_id, telegram_message):
+            telegram_message = alert_message
+            if send_telegram_notification(user.telegram_chat_id, telegram_message, parse_mode=None):
                 logger.info(f"✅ Telegram уведомление отправлено пользователю {user.id} ({user.telegram_chat_id})")
             else:
                 logger.warning(f"⚠️ Не удалось отправить Telegram уведомление пользователю {user.id}")

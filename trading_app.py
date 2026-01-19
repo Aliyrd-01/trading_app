@@ -16,6 +16,22 @@ from scipy.stats import norm
 LOCAL_TZ = ZoneInfo("Europe/Kyiv")
 exchange = ccxt.binance({"enableRateLimit": True, "timeout": 20000})
 
+
+def _sanitize_exchange_urls(obj):
+    if isinstance(obj, str):
+        return obj.replace('httpss://', 'https://')
+    if isinstance(obj, dict):
+        return {k: _sanitize_exchange_urls(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return type(obj)(_sanitize_exchange_urls(v) for v in obj)
+    return obj
+
+
+try:
+    exchange.urls = _sanitize_exchange_urls(getattr(exchange, 'urls', {}))
+except Exception:
+    pass
+
 # --- Конфигурация ---
 STRATEGIES = {
     "Консервативная": {"entry_type": "ema50", "atr_sl": 1.5, "atr_tp": 1.8, "ema_buffer": 0.001, "rsi_filter": 55},
@@ -67,7 +83,7 @@ REPORT_TRANSLATIONS = {
     "ru": {
         "report_title": "Аналитический отчёт по",
         "generated": "Сгенерировано:",
-        "current_market": "Текущий рынок (bias):",
+        "current_market": "Текущий рынок (уклон):",
         "bullish": "Бычий",
         "bearish": "Медвежий",
         "summary_title": "📈 Краткое резюме",
@@ -108,7 +124,7 @@ REPORT_TRANSLATIONS = {
         "trigger_buy": "Триггер (buy-stop)",
         "trigger_sell": "Триггер (sell-stop)",
         "stop_loss": "Стоп-лосс",
-        "take_profit": "Take-profit",
+        "take_profit": "Тейк-профит",
         "position_size": "Размер позиции",
         "psychological_levels_title": "🎯 Психологические уровни",
         "psychological_levels_desc": "Ближайшие психологические уровни (круглые числа) могут служить дополнительными уровнями поддержки/сопротивления:",
@@ -137,6 +153,15 @@ REPORT_TRANSLATIONS = {
         "candlestick_interpretation_text": "Свечной анализ основан на паттернах японских свечей. Каждый паттерн показывает настроение рынка: бычьи паттерны (зеленые) указывают на возможный рост, медвежьи (красные) — на возможное падение. Сила сигнала зависит от контекста и подтверждения другими индикаторами.",
         "btc_comparison_title": "📈 Сравнение с BTC/USDT",
         "additional_metrics_title": "📊 Дополнительные метрики",
+        "btc_return": "Доходность BTC/USDT (Buy & Hold)",
+        "strategy_return": "Потенциальная доходность стратегии",
+        "alpha": "Альфа (превышение)",
+        "btc_result": "Результат",
+        "btc_price": "Цена BTC",
+        "strategy_better": "Стратегия лучше",
+        "btc_better": "BTC/USDT лучше",
+        "equal": "Равны",
+        "btc_unavailable": "Сравнение с BTC/USDT недоступно (недостаточно данных)",
         "price_movement_probabilities": "Вероятности движения цены:",
         "probability_up_1": "Вероятность роста на 1%:",
         "probability_up_2": "Вероятность роста на 2%:",
@@ -219,6 +244,8 @@ REPORT_TRANSLATIONS = {
         "error_message_empty": "Сообщение не может быть пустым",
         "error_message_sent": "Сообщение отправлено",
         "error_message_failed": "Не удалось отправить сообщение",
+        "error_email_not_configured": "Email отправка не настроена. Заполните RESEND_API_KEY и RESEND_FROM_EMAIL.",
+        "message_saved_locally": "✅ Сообщение сохранено локально (Email не настроен).",
         "error_unknown": "Неизвестная ошибка",
         "error_insufficient_data": "Недостаточно данных",
         "error_insufficient_data_atr": "Недостаточно данных для расчёта ATR (требуется минимум 14 строк)",
@@ -233,12 +260,17 @@ REPORT_TRANSLATIONS = {
         "notification_direction": "Направление:",
         "notification_trend": "Тренд:",
         "notification_strategy": "Стратегия:",
+        "notification_confirmations": "Подтверждения",
+        "notification_higher_timeframes": "Старшие ТФ:",
         "notification_levels": "Уровни:",
         "notification_entry": "Вход:",
         "notification_stop_loss": "Стоп-лосс:",
-        "notification_take_profit": "Take Profit:",
+        "notification_take_profit": "Тейк-профит:",
         "notification_rr": "R:R:",
+        "notification_rr_full": "R:R (Риск/прибыль):",
         "notification_reliability": "Надёжность:",
+        "trend_up": "Восходящий",
+        "trend_down": "Нисходящий",
         # Статистика
         "stats_successful": "Успешные",
         "stats_unsuccessful": "Неуспешные",
@@ -302,8 +334,9 @@ REPORT_TRANSLATIONS = {
         "notification_levels": "Уровни:",
         "notification_entry": "Вход:",
         "notification_stop_loss": "Стоп-лосс:",
-        "notification_take_profit": "Take Profit:",
+        "notification_take_profit": "Тейк-профит:",
         "notification_rr": "R:R:",
+        "notification_rr_full": "R:R (Риск/прибыль):",
         "notification_reliability": "Надёжность:",
         "notification_time": "Время:",
         # Индикаторы для таблицы
@@ -315,9 +348,9 @@ REPORT_TRANSLATIONS = {
         "indicator_vwma": "VWMA(20)",
         "indicator_adx": "ADX",
         # R:R переводы
-        "risk_reward_ratio_title": "📊 Соотношение Ризик:Прибыль (R:R)",
-        "risk_reward_long": "Long:",
-        "risk_reward_short": "Short:",
+        "risk_reward_ratio_title": " Risk:Reward Ratio (R:R)",
+        "risk_reward_long": "Лонг:",
+        "risk_reward_short": "Шорт:",
         # Статистика
         "stats_successful": "Успешные",
         "stats_unsuccessful": "Неуспешные",
@@ -344,7 +377,7 @@ REPORT_TRANSLATIONS = {
         "current_market": "Current Market (bias):",
         "bullish": "Bullish",
         "bearish": "Bearish",
-        "summary_title": "📈 Summary",
+        "summary_title": " Summary",
         "indicator": "Indicator",
         "value": "Value",
         "interpretation": "Interpretation",
@@ -353,8 +386,8 @@ REPORT_TRANSLATIONS = {
         "avg_volatility": "Average market volatility",
         "user_confirmations": "Selected confirmations (user)",
         "result": "Result:",
-        "reliability_rating": "🎯 Signal Reliability Rating",
-        "confidence_index": "📊 Confidence Index",
+        "reliability_rating": " Signal Reliability Rating",
+        "confidence_index": " Confidence Index",
         "very_high_confidence": "Very high confidence",
         "high_confidence": "High confidence",
         "medium_confidence": "Medium confidence",
@@ -367,14 +400,14 @@ REPORT_TRANSLATIONS = {
         "high": "High",
         "medium": "Medium",
         "low": "Low",
-        "strategy_title": "⚙️ Strategy",
+        "strategy_title": " Strategy",
         "trading_type_label": "Trading type:",
         "strategy_label": "Strategy:",
         "capital_label": "Capital:",
         "dynamic_risk": "Dynamic risk:",
         "base_risk": "base",
         "confirmation_type": "Confirmation type:",
-        "levels_title": "🎯 Levels",
+        "levels_title": " Levels",
         "long": "Long",
         "short": "Short",
         "parameter": "Parameter",
@@ -384,11 +417,11 @@ REPORT_TRANSLATIONS = {
         "stop_loss": "Stop Loss",
         "take_profit": "Take Profit",
         "position_size": "Position size",
-        "psychological_levels_title": "🎯 Psychological Levels",
+        "psychological_levels_title": " Psychological Levels",
         "psychological_levels_desc": "Nearest psychological levels (round numbers) can serve as additional support/resistance levels:",
         "psychological_levels_not_found": "Psychological levels not found",
         "price": "Price",
-        "perspective_title": "💰 Perspective",
+        "perspective_title": " Perspective",
         "more_perspective": "More promising:",
         "trend": "Trend:",
         "bull_market": "Bull market",
@@ -403,26 +436,35 @@ REPORT_TRANSLATIONS = {
         "strong_trend": "Strong trend",
         "weak_trend": "Weak trend",
         "medium_trend": "Medium trend",
-        "recommendations_title": "💡 Additional Recommendations",
-        "candlestick_title": "🕯️ Candlestick Analysis",
+        "recommendations_title": " Additional Recommendations",
+        "candlestick_title": " Candlestick Analysis",
         "candlestick_desc": "Recognized candlestick patterns in recent candles:",
         "candlestick_not_found": "Candlestick patterns not detected in recent candles",
         "candlestick_interpretation_title": "How to interpret:",
         "candlestick_interpretation_text": "Candlestick analysis is based on Japanese candlestick patterns. Each pattern shows market sentiment: bullish patterns (green) indicate possible growth, bearish (red) — possible decline. Signal strength depends on context and confirmation by other indicators.",
-        "btc_comparison_title": "📈 Comparison with BTC/USDT",
-        "additional_metrics_title": "📊 Additional Metrics",
+        "btc_comparison_title": " Comparison with BTC/USDT",
+        "additional_metrics_title": " Additional Metrics",
+        "btc_return": "BTC/USDT Return (Buy & Hold)",
+        "strategy_return": "Potential Strategy Return",
+        "alpha": "Alpha (excess)",
+        "btc_result": "Result",
+        "btc_price": "BTC price",
+        "strategy_better": "Strategy better",
+        "btc_better": "BTC/USDT better",
+        "equal": "Equal",
+        "btc_unavailable": "Comparison with BTC/USDT unavailable (insufficient data)",
         "price_movement_probabilities": "Price movement probabilities:",
         "probability_up_1": "Probability of 1% growth:",
         "probability_up_2": "Probability of 2% growth:",
         "probability_up_5": "Probability of 5% growth:",
-        "confidence_interpretation": "Confidence Index interpretation ({confidence}%):",
-        "very_high_confidence_desc": "✅ Very high confidence in signal — all components point in one direction",
-        "high_confidence_desc": "✅ High confidence — most factors confirm the signal",
-        "medium_confidence_desc": "⚠️ Medium confidence — signal partially confirmed, caution required",
-        "low_confidence_desc": "❌ Low confidence — weak signal, recommended to refrain from entry",
+        "confidence_interpretation": "Interpretation of confidence index ({confidence}%):",
+        "very_high_confidence_desc": " Very high confidence in signal — all components point in one direction",
+        "high_confidence_desc": " High confidence — most factors confirm the signal",
+        "medium_confidence_desc": " Medium confidence — signal partially confirmed, caution required",
+        "low_confidence_desc": " Low confidence — weak signal, recommended to refrain from entry",
         "pattern": "Pattern",
         "description": "Description",
-        "reliability_warning": "⚠️ **WARNING:** Signal reliability rating ({rating}%) is below the minimum threshold ({min}%). It is recommended to refrain from entry.",
+        "reliability_warning": " **WARNING:** Signal reliability rating ({rating}%) is below the minimum threshold ({min}%). It is recommended to refrain from entry.",
         "no_confirmations": "No confirmations selected",
         # Trading type translations
         "trading_type_scalping": "Scalping",
@@ -450,20 +492,20 @@ REPORT_TRANSLATIONS = {
         "pattern_bullish_engulfing": "Bullish Engulfing - possible reversal up",
         "pattern_bearish_engulfing": "Bearish Engulfing - possible reversal down",
         # Forecast translations
-        "forecast_title": "📊 Forecast based on history",
+        "forecast_title": " Forecast based on history",
         "forecast_analysis": "Analysis of {cases} similar situations in history:",
-        "forecast_success_prob": "🎯 Success probability:",
-        "forecast_expected_profit": "💰 Expected profit:",
-        "forecast_range": "📊 Range of possible results: from {min}% to {max}%",
+        "forecast_success_prob": " Probability of success:",
+        "forecast_expected_profit": " Expected profit:",
+        "forecast_range": " Range of possible results: from {min}% to {max}%",
         "forecast_note": "*Note: the range shows the minimum and maximum result from similar situations in history*",
         # Additional translations for ML forecast
-        "ml_forecast_title": "🤖 ML-forecast probability of success",
+        "ml_forecast_title": " ML-forecast probability of success",
         "ml_forecast_analysis": "Analysis based on similar indicator patterns:",
-        "ml_forecast_success_prob": "🎯 Probability of success:",
-        "ml_forecast_similar_cases": "📊 Similar cases in history:",
-        "ml_forecast_confidence": "⚡ Confidence level:",
+        "ml_forecast_success_prob": " Probability of success:",
+        "ml_forecast_similar_cases": " Similar cases in history:",
+        "ml_forecast_confidence": " Confidence level:",
         # Translations for R:R
-        "risk_reward_ratio_title": "📊 Risk:Reward Ratio (R:R)",
+        "risk_reward_ratio_title": " Risk:Reward Ratio (R:R)",
         "risk_reward_long": "Long:",
         "risk_reward_short": "Short:",
         # Position management translations
@@ -503,6 +545,8 @@ REPORT_TRANSLATIONS = {
         "error_message_empty": "Message cannot be empty",
         "error_message_sent": "Message sent",
         "error_message_failed": "Failed to send message",
+        "error_email_not_configured": "Email sending is not configured. Please set RESEND_API_KEY and RESEND_FROM_EMAIL.",
+        "message_saved_locally": "✅ Message saved locally (Email is not configured).",
         "error_unknown": "Unknown error",
         "error_insufficient_data": "Insufficient data",
         "error_insufficient_data_atr": "Insufficient data to calculate ATR (minimum 14 rows required)",
@@ -517,19 +561,24 @@ REPORT_TRANSLATIONS = {
         "notification_direction": "Direction:",
         "notification_trend": "Trend:",
         "notification_strategy": "Strategy:",
+        "notification_confirmations": "Confirmations",
+        "notification_higher_timeframes": "Higher TF:",
         "notification_levels": "Levels:",
         "notification_entry": "Entry:",
         "notification_stop_loss": "Stop Loss:",
         "notification_take_profit": "Take Profit:",
         "notification_rr": "R:R:",
+        "notification_rr_full": "R:R (Risk/Reward):",
         "notification_reliability": "Reliability:",
+        "trend_up": "Uptrend",
+        "trend_down": "Downtrend",
         # Statistics
         "stats_successful": "Successful",
         "stats_unsuccessful": "Unsuccessful",
         "stats_distribution_result": "Trade distribution by result",
         "stats_distribution_instruments": "Trade distribution by instruments",
-        "long_direction": "Long 🚀",
-        "short_direction": "Short 📉",
+        "long_direction": "Long ",
+        "short_direction": "Short ",
         "rsi_label": "RSI:",
         "range_label": "Range:",
         "vwma_label": "VWMA:",
@@ -546,23 +595,23 @@ REPORT_TRANSLATIONS = {
         "indicator_vwma": "VWMA(20)",
         "indicator_adx": "ADX",
         "rr_label": "R:R",
-        "ml_forecast_title": "🤖 ML-forecast probability of success",
+        "ml_forecast_title": " ML-forecast probability of success",
         "ml_forecast_analysis": "Analysis based on similar indicator patterns:",
-        "ml_forecast_success_prob": "🎯 Probability of success:",
-        "ml_forecast_similar_cases": "📊 Similar cases in history:",
-        "ml_forecast_confidence": "⚡ Confidence level:",
+        "ml_forecast_success_prob": " Probability of success:",
+        "ml_forecast_similar_cases": " Similar cases in history:",
+        "ml_forecast_confidence": " Confidence level:",
         # Translations for R:R
-        "risk_reward_ratio_title": "📊 Risk:Reward Ratio (R:R)",
+        "risk_reward_ratio_title": " Risk:Reward Ratio (R:R)",
         "risk_reward_long": "Long:",
         "risk_reward_short": "Short:",
         "confidence_high": "High",
         "confidence_medium": "Medium",
         "confidence_low": "Low",
-        "perspective_flat": "Market in flat ⚖️",
-        "perspective_uncertain": "Trend unclear — forming movement ⚖️",
-        "perspective_bullish": "Clear bullish trend 🚀",
-        "perspective_bearish": "Clear bearish trend 📉",
-        "perspective_mixed": "Trend expressed, but confirmations unclear 🔄",
+        "perspective_flat": "Market in flat ",
+        "perspective_uncertain": "Trend unclear — forming movement ",
+        "perspective_bullish": "Clear bullish trend ",
+        "perspective_bearish": "Clear bearish trend ",
+        "perspective_mixed": "Trend expressed, but confirmations unclear ",
         # Errors and messages
         "error_user_not_found": "User not found",
         "error_invalid_password": "Invalid password",
@@ -599,6 +648,7 @@ REPORT_TRANSLATIONS = {
         "notification_stop_loss": "Stop Loss:",
         "notification_take_profit": "Take Profit:",
         "notification_rr": "R:R:",
+        "notification_rr_full": "R:R (Risk/Reward):",
         "notification_reliability": "Reliability:",
         "notification_time": "Time:",
         # Индикаторы для таблицы
@@ -636,7 +686,7 @@ REPORT_TRANSLATIONS = {
     "uk": {
         "report_title": "Аналітичний звіт по",
         "generated": "Згенеровано:",
-        "current_market": "Поточний ринок (bias):",
+        "current_market": "Поточний ринок (ухил):",
         "bullish": "Бичий",
         "bearish": "Ведмежий",
         "summary_title": "📈 Коротке резюме",
@@ -677,7 +727,7 @@ REPORT_TRANSLATIONS = {
         "trigger_buy": "Тригер (buy-stop)",
         "trigger_sell": "Тригер (sell-stop)",
         "stop_loss": "Стоп-лосс",
-        "take_profit": "Take-profit",
+        "take_profit": "Тейк-профіт",
         "position_size": "Розмір позиції",
         "psychological_levels_title": "🎯 Психологічні рівні",
         "psychological_levels_desc": "Найближчі психологічні рівні (круглі числа) можуть служити додатковими рівнями підтримки/опору:",
@@ -686,7 +736,7 @@ REPORT_TRANSLATIONS = {
         "perspective_title": "💰 Перспектива",
         "more_perspective": "Більш перспективно:",
         "trend": "Тренд:",
-        "bull_market": "Бичий ринок",
+        "bull_market": "Бичачий ринок",
         "bear_market": "Ведмежий ринок",
         "oversold": "Перепроданість",
         "overbought": "Перекупленість",
@@ -706,6 +756,15 @@ REPORT_TRANSLATIONS = {
         "candlestick_interpretation_text": "Свічковий аналіз базується на паттернах японських свічок. Кожен паттерн показує настрій ринку: бичі паттерни (зелені) вказують на можливе зростання, ведмежі (червоні) — на можливе падіння. Сила сигналу залежить від контексту та підтвердження іншими індикаторами.",
         "btc_comparison_title": "📈 Порівняння з BTC/USDT",
         "additional_metrics_title": "📊 Додаткові метрики",
+        "btc_return": "Доходність BTC/USDT (Buy & Hold)",
+        "strategy_return": "Потенційна доходність стратегії",
+        "alpha": "Альфа (перевищення)",
+        "btc_result": "Результат",
+        "btc_price": "Ціна BTC",
+        "strategy_better": "Стратегія краще",
+        "btc_better": "BTC/USDT краще",
+        "equal": "Рівні",
+        "btc_unavailable": "Порівняння з BTC/USDT недоступне (недостатньо даних)",
         "price_movement_probabilities": "Ймовірності руху ціни:",
         "probability_up_1": "Ймовірність зростання на 1%:",
         "probability_up_2": "Ймовірність зростання на 2%:",
@@ -794,6 +853,8 @@ REPORT_TRANSLATIONS = {
         "error_message_empty": "Повідомлення не може бути порожнім",
         "error_message_sent": "Повідомлення відправлено",
         "error_message_failed": "Не вдалося відправити повідомлення",
+        "error_email_not_configured": "Email відправка не налаштована. Заповніть RESEND_API_KEY та RESEND_FROM_EMAIL.",
+        "message_saved_locally": "✅ Повідомлення збережено локально (Email не налаштовано).",
         "error_unknown": "Невідома помилка",
         "error_insufficient_data": "Недостатньо даних",
         "error_insufficient_atr_data": "Недостатньо даних для розрахунку ATR (потрібно мінімум 14 рядків)",
@@ -801,14 +862,15 @@ REPORT_TRANSLATIONS = {
         # Сповіщення
         "notification_new_signal": "Новий торговий сигнал!",
         "notification_instrument": "Інструмент:",
-        "notification_direction": "Напрямок:",
+        "notification_direction": "Напрям:",
         "notification_trend": "Тренд:",
         "notification_strategy": "Стратегія:",
         "notification_levels": "Рівні:",
         "notification_entry_price": "Вхід:",
-        "notification_stop_loss_price": "Stop Loss:",
-        "notification_take_profit_price": "Take Profit:",
+        "notification_stop_loss_price": "Стоп-лосс:",
+        "notification_take_profit_price": "Тейк-профіт:",
         "notification_rr_ratio": "R:R:",
+        "notification_rr_full": "R:R (Ризик/прибуток):",
         "notification_reliability_rating": "Надійність:",
         # Графіки
         "chart_successful_trades": "Успішні",
@@ -853,8 +915,8 @@ REPORT_TRANSLATIONS = {
         "perspective_mixed": "Тренд виражений, але підтвердження неоднозначні 🔄",
         # Переклади для R:R
         "risk_reward_ratio_title": "📊 Співвідношення Ризик:Прибуток (R:R)",
-        "risk_reward_long": "Long:",
-        "risk_reward_short": "Short:",
+        "risk_reward_long": "Лонг:",
+        "risk_reward_short": "Шорт:",
         # Помилки та повідомлення
         "error_user_not_found": "Користувача не знайдено",
         "error_invalid_password": "Невірний пароль",
@@ -883,16 +945,21 @@ REPORT_TRANSLATIONS = {
         # Сповіщення
         "notification_new_signal": "Новий торговий сигнал!",
         "notification_instrument": "Інструмент:",
-        "notification_direction": "Напрямок:",
+        "notification_direction": "Напрям:",
         "notification_trend": "Тренд:",
         "notification_strategy": "Стратегія:",
+        "notification_confirmations": "Підтвердження",
+        "notification_higher_timeframes": "Старші ТФ:",
         "notification_levels": "Рівні:",
         "notification_entry": "Вхід:",
         "notification_stop_loss": "Стоп-лосс:",
-        "notification_take_profit": "Take Profit:",
+        "notification_take_profit": "Тейк-профіт:",
         "notification_rr": "R:R:",
+        "notification_rr_full": "R:R (Ризик/прибуток):",
         "notification_reliability": "Надійність:",
         "notification_time": "Час:",
+        "trend_up": "Висхідний",
+        "trend_down": "Низхідний",
         # Індикатори для таблиці
         "indicator_close": "Close",
         "indicator_ema": "EMA20 / EMA50 / EMA200",
@@ -1529,6 +1596,162 @@ def add_indicators(df):
     df["ATR_14"] = tr.rolling(14).mean()
 
     df["Trend"] = np.where(df["EMA_50"] > df["EMA_200"], "Uptrend", "Downtrend")
+
+    try:
+        typical_price = (df["High"] + df["Low"] + df["Close"]) / 3.0
+        vol = df["Volume"].replace(0, np.nan)
+        df["VWAP"] = (typical_price.mul(vol)).cumsum() / vol.cumsum()
+    except Exception:
+        df["VWAP"] = np.nan
+
+    try:
+        n = 2
+        pivot_low = (
+            (df["Low"] < df["Low"].shift(1)) &
+            (df["Low"] < df["Low"].shift(2)) &
+            (df["Low"] < df["Low"].shift(-1)) &
+            (df["Low"] < df["Low"].shift(-2))
+        )
+        pivot_high = (
+            (df["High"] > df["High"].shift(1)) &
+            (df["High"] > df["High"].shift(2)) &
+            (df["High"] > df["High"].shift(-1)) &
+            (df["High"] > df["High"].shift(-2))
+        )
+
+        trend_last = df["Trend"].iloc[-1] if len(df) else "Uptrend"
+        if trend_last == "Uptrend":
+            pivots = np.where(pivot_low.fillna(False).values)[0]
+        else:
+            pivots = np.where(pivot_high.fillna(False).values)[0]
+
+        anchor_pos = int(pivots[-1]) if len(pivots) else 0
+        avwap = pd.Series(index=df.index, dtype=float)
+        if len(df) and anchor_pos < len(df):
+            tpv = (typical_price.iloc[anchor_pos:] * df["Volume"].iloc[anchor_pos:]).cumsum()
+            cv = df["Volume"].iloc[anchor_pos:].cumsum().replace(0, np.nan)
+            avwap.iloc[:anchor_pos] = np.nan
+            avwap.iloc[anchor_pos:] = tpv / cv
+        df["AVWAP"] = avwap
+    except Exception:
+        df["AVWAP"] = np.nan
+
+    try:
+        direction = np.sign(df["Close"].diff()).fillna(0.0)
+        obv = (direction * df["Volume"]).cumsum()
+        df["OBV"] = obv
+        df["OBV_EMA_20"] = obv.ewm(span=20, adjust=False).mean()
+    except Exception:
+        df["OBV"] = np.nan
+        df["OBV_EMA_20"] = np.nan
+
+    try:
+        rsi = df["RSI_14"]
+        rsi_min = rsi.rolling(14).min()
+        rsi_max = rsi.rolling(14).max()
+        stoch_rsi = (rsi - rsi_min) / (rsi_max - rsi_min)
+        stoch_rsi = stoch_rsi.replace([np.inf, -np.inf], np.nan).clip(0, 1)
+        k = stoch_rsi.rolling(3).mean() * 100.0
+        d = k.rolling(3).mean()
+        df["STOCHRSI_K"] = k
+        df["STOCHRSI_D"] = d
+    except Exception:
+        df["STOCHRSI_K"] = np.nan
+        df["STOCHRSI_D"] = np.nan
+
+    try:
+        st_period = 10
+        st_mult = 3.0
+        atr_st = tr.rolling(st_period).mean()
+        hl2 = (df["High"] + df["Low"]) / 2.0
+        upperband = hl2 + st_mult * atr_st
+        lowerband = hl2 - st_mult * atr_st
+
+        final_upper = upperband.copy()
+        final_lower = lowerband.copy()
+        close = df["Close"].values
+
+        for i in range(1, len(df)):
+            if np.isnan(final_upper.iat[i - 1]):
+                final_upper.iat[i - 1] = upperband.iat[i - 1]
+            if np.isnan(final_lower.iat[i - 1]):
+                final_lower.iat[i - 1] = lowerband.iat[i - 1]
+
+            if upperband.iat[i] < final_upper.iat[i - 1] or close[i - 1] > final_upper.iat[i - 1]:
+                final_upper.iat[i] = upperband.iat[i]
+            else:
+                final_upper.iat[i] = final_upper.iat[i - 1]
+
+            if lowerband.iat[i] > final_lower.iat[i - 1] or close[i - 1] < final_lower.iat[i - 1]:
+                final_lower.iat[i] = lowerband.iat[i]
+            else:
+                final_lower.iat[i] = final_lower.iat[i - 1]
+
+        supertrend = pd.Series(index=df.index, dtype=float)
+        supertrend_dir = pd.Series(index=df.index, dtype=float)
+        if len(df):
+            supertrend.iat[0] = final_upper.iat[0]
+            supertrend_dir.iat[0] = -1.0
+        for i in range(1, len(df)):
+            prev_st = supertrend.iat[i - 1]
+            if prev_st == final_upper.iat[i - 1]:
+                if close[i] <= final_upper.iat[i]:
+                    supertrend.iat[i] = final_upper.iat[i]
+                    supertrend_dir.iat[i] = -1.0
+                else:
+                    supertrend.iat[i] = final_lower.iat[i]
+                    supertrend_dir.iat[i] = 1.0
+            else:
+                if close[i] >= final_lower.iat[i]:
+                    supertrend.iat[i] = final_lower.iat[i]
+                    supertrend_dir.iat[i] = 1.0
+                else:
+                    supertrend.iat[i] = final_upper.iat[i]
+                    supertrend_dir.iat[i] = -1.0
+
+        df["SUPERTREND"] = supertrend
+        df["SUPERTREND_DIR"] = supertrend_dir
+    except Exception:
+        df["SUPERTREND"] = np.nan
+        df["SUPERTREND_DIR"] = np.nan
+
+    try:
+        pivot_low = (
+            (df["Low"] < df["Low"].shift(1)) &
+            (df["Low"] < df["Low"].shift(2)) &
+            (df["Low"] < df["Low"].shift(-1)) &
+            (df["Low"] < df["Low"].shift(-2))
+        ).fillna(False).values
+        pivot_high = (
+            (df["High"] > df["High"].shift(1)) &
+            (df["High"] > df["High"].shift(2)) &
+            (df["High"] > df["High"].shift(-1)) &
+            (df["High"] > df["High"].shift(-2))
+        ).fillna(False).values
+
+        last_ph = None
+        prev_ph = None
+        last_pl = None
+        prev_pl = None
+        mstruct = np.zeros(len(df), dtype=bool)
+        for i in range(len(df)):
+            if pivot_high[i]:
+                prev_ph = last_ph
+                last_ph = float(df["High"].iat[i])
+            if pivot_low[i]:
+                prev_pl = last_pl
+                last_pl = float(df["Low"].iat[i])
+
+            trend_i = df["Trend"].iat[i]
+            if prev_ph is None or prev_pl is None or last_ph is None or last_pl is None:
+                mstruct[i] = False
+            elif trend_i == "Uptrend":
+                mstruct[i] = (last_ph > prev_ph) and (last_pl > prev_pl)
+            else:
+                mstruct[i] = (last_ph < prev_ph) and (last_pl < prev_pl)
+        df["MSTRUCT"] = mstruct
+    except Exception:
+        df["MSTRUCT"] = False
     
     # === Расширение волатильности (Фаза 1) ===
     # Историческая волатильность (стандартное отклонение доходности)
@@ -1738,6 +1961,12 @@ def check_confirmations(row, selected, prev_row=None, language="ru"):
         "MACD": row["MACD"] > row["Signal_Line"],
         "ADX": row["ADX"] > 25,
         "VWMA": row["Close"] > row.get("VWMA_20", 0),
+        "VWAP": row["Close"] > row.get("VWAP", 0),
+        "AVWAP": row["Close"] > row.get("AVWAP", 0),
+        "SUPERTREND": row["Close"] > row.get("SUPERTREND", 0),
+        "STOCHRSI": row.get("STOCHRSI_K", 0) > 50,
+        "OBV": row.get("OBV", 0) > row.get("OBV_EMA_20", 0),
+        "MSTRUCT": bool(row.get("MSTRUCT", False)),
         # BB: консервативный «возврат внутрь полос»
         "BB": (
             (
@@ -1784,6 +2013,14 @@ def check_confirmations(row, selected, prev_row=None, language="ru"):
     reliability_rating = (len(passed) / total * 100) if total > 0 else 0
 
     if not passed:
+        if failed:
+            return (
+                f"{t('partially_confirmed')} (0/{total}): "
+                + ", ".join([f"{i} ❌" for i in failed]),
+                0,
+                total,
+                reliability_rating,
+            )
         return f"{t('no_confirmations')} ❌", 0, total, reliability_rating
     elif len(passed) == total:
         return f"{t('all_confirmations')} ✅", len(passed), total, reliability_rating
@@ -1935,12 +2172,15 @@ def backtest_strategy(df, strategy, trading_type, confirmation, capital=10000, r
     try:
         if df.empty or len(df) < 100:
             return None
-        
+
         strat = STRATEGIES.get(strategy, STRATEGIES["Сбалансированная"])
         current_capital = capital
         max_capital = capital
         equity_curve = [capital]
         trades = []
+
+        if "Trend" not in df.columns and "EMA_50" in df.columns and "EMA_200" in df.columns:
+            df["Trend"] = np.where(df["EMA_50"] > df["EMA_200"], "Uptrend", "Downtrend")
         
         # ✅ Добавляем VWMA и BB для использования в гибридном подходе
         df["VWMA_20"] = (df["Close"] * df["Volume"]).rolling(20).sum() / df["Volume"].rolling(20).sum()
@@ -1971,7 +2211,8 @@ def backtest_strategy(df, strategy, trading_type, confirmation, capital=10000, r
         trades_skipped_no_entry = 0
         
         # Проходим по истории и ищем сигналы
-        for i in range(100, len(df) - 1):  # Пропускаем первые 100 свечей для индикаторов
+        i = 100
+        while i < (len(df) - 1):  # Пропускаем первые 100 свечей для индикаторов
             row = df.iloc[i]
             prev_row = df.iloc[i-1] if i > 0 else None
             
@@ -1981,6 +2222,7 @@ def backtest_strategy(df, strategy, trading_type, confirmation, capital=10000, r
             # Если подтверждения не пройдены, пропускаем
             if not user_selected or passed_count == 0:
                 trades_skipped_no_conf += 1
+                i += 1
                 continue
             
             # Определяем направление
@@ -2102,6 +2344,7 @@ def backtest_strategy(df, strategy, trading_type, confirmation, capital=10000, r
             # Пропускаем сделку, если вход не был бы исполнен
             if not entry_touched:
                 trades_skipped_no_entry += 1
+                i += 1
                 continue
             
             trades_found += 1
@@ -2131,6 +2374,7 @@ def backtest_strategy(df, strategy, trading_type, confirmation, capital=10000, r
             risk_usd = current_capital * risk_adj
             sl_dist = abs(entry - stop_loss_price)
             if sl_dist <= 1e-9:
+                i += 1
                 continue
             
             units = risk_usd / sl_dist
@@ -2273,10 +2517,21 @@ def backtest_strategy(df, strategy, trading_type, confirmation, capital=10000, r
             })
             
             equity_curve.append(current_capital)
+
+            # Не допускаем наложения сделок: следующую сделку начинаем только после закрытия текущей
+            if exit_bar is not None and exit_bar > i:
+                i = exit_bar
+            else:
+                i += 1
+
+            if len(trades) >= 200:
+                break
             
             # ✅ ИСПРАВЛЕНО: Логирование первых 5 сделок для отладки
             if len(trades) <= 5:
                 print(f"📊 Бэктест сделка {len(trades)}: entry={entry:.2f}, exit={exit_price:.2f}, profit_usd={profit_usd:.2f}, capital={current_capital:.2f}, success={success}")
+        
+        
         
         # ✅ ИСПРАВЛЕНО: Улучшенная обработка случая без сделок
         if not trades:
@@ -2767,6 +3022,41 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
         # Формируем строку подтверждений для отчета
         t_conf = lambda key: get_report_translation(key, language)
         user_confirmation_str = t_conf("no_confirmations") if not user_selected else "+".join(user_selected)
+
+        higher_timeframes = []
+        try:
+            higher_map = {
+                "1m": ["5m", "15m"],
+                "3m": ["15m", "1h"],
+                "5m": ["15m", "1h"],
+                "15m": ["1h", "4h"],
+                "30m": ["1h", "4h"],
+                "1h": ["4h", "1d"],
+                "2h": ["4h", "1d"],
+                "4h": ["1d", "1w"],
+                "6h": ["1d", "1w"],
+                "8h": ["1d", "1w"],
+                "12h": ["1d", "1w"],
+                "1d": ["1w", "1M"],
+                "1w": ["1M"],
+            }
+            htfs = higher_map.get(timeframe, [])
+            for tf in htfs:
+                try:
+                    df_htf = fetch_ohlcv(symbol, tf, history_days=max(int(range_days or 30), 60))
+                    if df_htf is None or df_htf.empty or "Close" not in df_htf.columns:
+                        continue
+                    close = df_htf["Close"].astype(float)
+                    ema50_htf = close.ewm(span=50, adjust=False).mean()
+                    ema200_htf = close.ewm(span=200, adjust=False).mean()
+                    if len(ema200_htf) == 0:
+                        continue
+                    htf_trend = "Uptrend" if float(ema50_htf.iloc[-1]) > float(ema200_htf.iloc[-1]) else "Downtrend"
+                    higher_timeframes.append({"timeframe": tf, "trend": htf_trend})
+                except Exception:
+                    continue
+        except Exception:
+            higher_timeframes = []
         
         # === Фаза 1: Получение дополнительных метрик ===
         # Fear & Greed Index
@@ -2944,11 +3234,19 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
         confidence_desc_key = "very_high_confidence_desc" if confidence_index >= 80 else "high_confidence_desc" if confidence_index >= 60 else "medium_confidence_desc" if confidence_index >= 40 else "low_confidence_desc"
         market_direction_key = 'bullish' if ema50 > ema200 else 'bearish'
         direction_key_value = 'long_direction' if trend == 'Uptrend' else 'short_direction'
-        # Вычисляем ключ направления рынка для markdown
+
         market_direction_key_value = 'bullish' if ema50 > ema200 else 'bearish'
+        market_direction_text = get_report_translation(market_direction_key_value, language, default=market_direction_key_value)
+
+        trend_text = get_report_translation(trend_text_key, language, default=trend_text_key)
+        confidence_text = get_report_translation(confidence_text_key, language, default=confidence_text_key)
+        fear_greed_text = get_report_translation(fear_greed_text_key, language, default=fear_greed_text_key)
+        volatility_text = get_report_translation(volatility_text_key, language, default=volatility_text_key)
+        confidence_desc_text = get_report_translation(confidence_desc_key, language, default=confidence_desc_key)
+
         report_md = f"""=== {{report_title}} {symbol} ===  
 {{generated}} {now.strftime('%Y-%m-%d %H:%M:%S (%Z)')}  
-{{current_market}} {{{{market_direction_key_value}}}}
+{{current_market}} {market_direction_text}
 
 ### {{summary_title}}
 | {{indicator}} | {{value}} | {{interpretation}} |
@@ -2957,14 +3255,14 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
 | **{{indicator_ema}}** | {safe_fmt(ema20)} / {safe_fmt(ema50)} / {safe_fmt(ema200)} | {{moving_direction}} |
 | **{{indicator_rsi}}** | {safe_fmt(latest['RSI_14'])} | {latest['RSI_14']:.2f} |
 | **{{indicator_atr}}** | {safe_fmt(atr)} | {{avg_volatility}} |
-| **{{indicator_trend}}** | {latest['Trend']} | {{trend_text_key}} |
+| **{{indicator_trend}}** | {latest['Trend']} | {trend_text} |
 | **{{indicator_vwma}}** | {safe_fmt(latest.get('VWMA_20', np.nan))} | {latest.get('VWMA_20', np.nan):.2f} |
 | **{{indicator_adx}}** | {safe_fmt(latest.get('ADX', np.nan))} | {adx:.2f} |
 | **{{user_confirmations}}** | {user_confirmation_str} | {{result}} {user_confirmation_result} |
 | **{{reliability_rating}}** | {reliability_rating:.1f}% ({passed_count}/{total_count}) | {'⭐⭐⭐⭐⭐' if reliability_rating >= 80 else '⭐⭐⭐⭐' if reliability_rating >= 60 else '⭐⭐⭐' if reliability_rating >= 40 else '⭐⭐' if reliability_rating >= 20 else '⭐'} |
-| **{{confidence_index}}** | {confidence_index:.1f}% | {{confidence_text_key}} |
-| **😨 Fear & Greed Index** | {fear_greed_value if fear_greed_value is not None else 'N/A'} ({fear_greed_classification}) | {{fear_greed_text_key}} |
-| **📈 {{historical_volatility}}** | {safe_fmt(historical_volatility)}% | {{volatility_text_key}} |
+| **{{confidence_index}}** | {confidence_index:.1f}% | {confidence_text} |
+| **😨 Fear & Greed Index** | {fear_greed_value if fear_greed_value is not None else 'N/A'} ({fear_greed_classification}) | {fear_greed_text} |
+| **📈 {{historical_volatility}}** | {safe_fmt(historical_volatility)}% | {volatility_text} |
 
 ### {{strategy_title}}
 - {{trading_type_label}} {get_report_translation("trading_type_" + TRADING_TYPE_MAP.get(trading_type, trading_type.lower().replace(' ', '_')), language, default=trading_type)}
@@ -3021,7 +3319,7 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
 - {{probability_up_5}} {vol_probs.get(0.05, 0):.1f}%
 
 **{{confidence_interpretation}} ({confidence_index:.1f}%):**
-{{confidence_desc_key}}
+{confidence_desc_text}
 
 """
 
@@ -3245,7 +3543,14 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
             stop_loss,
             take_profit,
             reliability_rating,
-            rsi_value  # ✅ Добавлен RSI
+            rsi_value,  # ✅ Добавлен RSI
+            user_confirmation_result,
+            passed_count,
+            total_count,
+            user_confirmation_str,
+            timeframe,
+            trading_type,
+            higher_timeframes,
         )
 
 

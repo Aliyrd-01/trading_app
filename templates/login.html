@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title data-i18n="login_title">Crypto Analyzer — Login</title>
-  <link rel="stylesheet" href="/static/style.css">
-  <script src="{{ url_for('static', filename='translations.js') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v=static_version) }}">
+  <script src="{{ url_for('static', filename='translations.js', v=static_version) }}"></script>
 
   <style>
     /* === Только для чекбокса "Запомнить меня" === */
@@ -44,11 +44,11 @@
     <div class="login-form">
       <label>
         <span id="emailLabel">Email:</span>
-        <input type="text" id="email" placeholder="Введите email">
+        <input type="text" id="email" placeholder="Введите email" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none">
       </label>
       <label>
         <span id="passwordLabel">Пароль:</span>
-        <input type="password" id="password" placeholder="Введите пароль">
+        <input type="password" id="password" placeholder="Введите пароль" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none">
       </label>
 
       <div id="remember-container" style="display: flex; align-items: center; font-size: 14px; margin-top: 10px; color: #e8e8e8;">
@@ -188,23 +188,9 @@
 	// Автологин при наличии localStorage
 	window.addEventListener("load", async () => {
 	  try {
-		const stored = localStorage.getItem("rememberedUser");
-		if (stored) {
-		  const data = JSON.parse(stored);
-		  const res = await fetch("/api/login", {
-			method: "POST",
-			headers: {"Content-Type": "application/json; charset=utf-8"},
-			body: JSON.stringify({ email: data.email, password: data.password })
-		  });
-		  const result = await res.json();
-		  if (res.ok && result.ok) {
-			window.location.href = "/";
-		  }
-		} else {
-		  const res = await fetch("/session_check");
+		  const res = await fetch("/session_check", { credentials: "include" });
 		  const data = await res.json();
 		  if (data.logged_in) window.location.href = "/";
-		}
 	  } catch (e) {
 		console.error("Session check failed:", e);
 	  }
@@ -239,24 +225,14 @@
 		  headers: {
 			"Content-Type": "application/json; charset=utf-8"
 		  },
-		  body: JSON.stringify({email, password})
+		  credentials: "include",
+		  body: JSON.stringify({email, password, remember: !!rememberMe && rememberMe.checked, language: currentLanguage})
 		});
 
 		const data = await response.json();
 
 		if (response.ok && data.ok) {
-		  if (rememberMe.checked) {
-			// Безопасное сохранение в localStorage с обработкой кириллицы
-			try {
-			  localStorage.setItem("rememberedUser", JSON.stringify({email, password}));
-			} catch (e) {
-			  console.warn("Не удалось сохранить в localStorage:", e);
-			}
-		  } else {
-			localStorage.removeItem("rememberedUser");
-		  }
-
-		  window.location.href = "/";
+		  window.location.href = `/?v=${Date.now()}`;
 		} else {
 		  const t = translations[currentLanguage] || translations['ru'] || {};
 		  errorMsg.textContent = data.error || t.login_error_auth || "Ошибка авторизации";

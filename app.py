@@ -1,4 +1,5 @@
 import os
+import sys
 import base64
 import io
 import zipfile
@@ -21,6 +22,20 @@ import atexit
 import signal
 import urllib3
 
+try:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    if not hasattr(sys.stdout, "reconfigure"):
+        import io
+        if getattr(sys.stdout, "encoding", "").lower() != "utf-8" and hasattr(sys.stdout, "buffer"):
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace", line_buffering=True)
+        if getattr(sys.stderr, "encoding", "").lower() != "utf-8" and hasattr(sys.stderr, "buffer"):
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace", line_buffering=True)
+except Exception:
+    pass
+
 # === Настройка логирования ===
 logging.basicConfig(
     level=logging.INFO,
@@ -35,11 +50,15 @@ logger = logging.getLogger(__name__)
 # Загрузка переменных окружения из .env файла (если есть)
 try:
     from dotenv import load_dotenv
-    load_dotenv()
+    _here = os.path.abspath(os.path.dirname(__file__))
+    load_dotenv(os.path.join(_here, ".env"), override=False)
+    _parent = os.path.abspath(os.path.join(_here, os.pardir))
+    load_dotenv(os.path.join(_parent, ".env"), override=False)
+    load_dotenv(override=False)
     # logger будет определен позже, используем print здесь
-    print("✅ Загружены переменные окружения из .env файла")
+    print("Загружены переменные окружения из .env файла")
 except ImportError:
-    print("⚠️ python-dotenv не установлен. Для использования .env файла установите: pip install python-dotenv")
+    print("python-dotenv не установлен. Для использования .env файла установите: pip install python-dotenv")
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -56,19 +75,48 @@ except ImportError:
 app = Flask(__name__)
 # ✅ ИСПРАВЛЕНО: Фиксированный secret_key из переменной окружения
 # Если не задан, генерируем один раз и сохраняем в файл для постоянства
-SECRET_KEY_FILE = '.secret_key'
+_app_dir = os.path.abspath(os.path.dirname(__file__))
+SECRET_KEY_FILE = os.path.join(_app_dir, '.secret_key')
 if os.path.exists(SECRET_KEY_FILE):
     with open(SECRET_KEY_FILE, 'r') as f:
         app.secret_key = f.read().strip()
 else:
-    app.secret_key = os.getenv('FLASK_SECRET_KEY', os.urandom(24).hex())
+    app.secret_key = os.getenv('FLASK_SECRET_KEY') or os.getenv('SESSION_SECRET') or os.urandom(24).hex()
     # Сохраняем для будущих запусков
     try:
         with open(SECRET_KEY_FILE, 'w') as f:
             f.write(app.secret_key)
-        logger.info("✅ Создан новый secret_key и сохранен в файл")
+        logger.info("Создан новый secret_key и сохранен в файл")
     except Exception as e:
-        logger.warning(f"⚠️ Не удалось сохранить secret_key в файл: {e}")
+        logger.warning(f"Не удалось сохранить secret_key в файл: {e}")
+
+
+def _static_version():
+    try:
+        static_dir = os.path.join(app.root_path, 'static')
+        candidates = ['script.js', 'style.css', 'translations.js']
+        mtimes = []
+        for fn in candidates:
+            p = os.path.join(static_dir, fn)
+            if os.path.exists(p):
+                mtimes.append(os.path.getmtime(p))
+        if not mtimes:
+            return 'dev'
+        return str(int(max(mtimes)))
+    except Exception:
+        return 'dev'
+
+
+@app.after_request
+def _disable_static_cache(resp):
+    try:
+        if request.path.startswith('/static/'):
+            resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+            resp.headers['Pragma'] = 'no-cache'
+            resp.headers['Expires'] = '0'
+    except Exception:
+        pass
+    return resp
 
 # === Настройки сессий для работы через прокси ===
 app.config['SESSION_COOKIE_SECURE'] = False  # True если используете HTTPS
@@ -92,35 +140,52 @@ try:
     )
     # Используем настройки из config_notifications.py, если они заполнены
     TELEGRAM_BOT_TOKEN = CONFIG_TELEGRAM_TOKEN if CONFIG_TELEGRAM_TOKEN else os.getenv("TELEGRAM_BOT_TOKEN", "")
-    RESEND_API_KEY = CONFIG_RESEND_API_KEY if CONFIG_RESEND_API_KEY else os.getenv("RESEND_API_KEY", "")
-    RESEND_FROM_EMAIL = CONFIG_RESEND_FROM_EMAIL if CONFIG_RESEND_FROM_EMAIL else os.getenv("RESEND_FROM_EMAIL", "")
+    RESEND_API_KEY = CONFIG_RESEND_API_KEY if CONFIG_RESEND_API_KEY else (os.getenv("RESEND_API_KEY", "") or os.getenv("SMTP_PASS", ""))
+    RESEND_FROM_EMAIL = CONFIG_RESEND_FROM_EMAIL if CONFIG_RESEND_FROM_EMAIL else (os.getenv("RESEND_FROM_EMAIL", "") or os.getenv("SMTP_FROM", ""))
     # Старые SMTP настройки (для обратной совместимости)
     SMTP_HOST = CONFIG_SMTP_HOST if CONFIG_SMTP_HOST else os.getenv("SMTP_HOST", "smtp.gmail.com")
     SMTP_PORT = int(CONFIG_SMTP_PORT) if CONFIG_SMTP_PORT else int(os.getenv("SMTP_PORT", "587"))
     SMTP_USER = CONFIG_SMTP_USER if CONFIG_SMTP_USER else os.getenv("SMTP_USER", "")
-    SMTP_PASSWORD = CONFIG_SMTP_PASSWORD if CONFIG_SMTP_PASSWORD else os.getenv("SMTP_PASSWORD", "")
+    SMTP_PASSWORD = CONFIG_SMTP_PASSWORD if CONFIG_SMTP_PASSWORD else (os.getenv("SMTP_PASSWORD", "") or os.getenv("SMTP_PASS", ""))
 except ImportError:
     # Если config_notifications.py не существует, используем переменные окружения
     TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-    RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
-    RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "")
+    RESEND_API_KEY = os.getenv("RESEND_API_KEY", "") or os.getenv("SMTP_PASS", "")
+    RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "") or os.getenv("SMTP_FROM", "")
     SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
     SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
     SMTP_USER = os.getenv("SMTP_USER", "")
-    SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-    print("ℹ️ Файл config_notifications.py не найден. Используются переменные окружения.")
+    SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "") or os.getenv("SMTP_PASS", "")
+    print("Файл config_notifications.py не найден. Используются переменные окружения.")
 except Exception as e:
-    print(f"⚠️ Ошибка загрузки config_notifications.py: {e}. Используются переменные окружения.")
+    print(f"Ошибка загрузки config_notifications.py: {e}. Используются переменные окружения.")
     TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-    RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
-    RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "")
+    RESEND_API_KEY = os.getenv("RESEND_API_KEY", "") or os.getenv("SMTP_PASS", "")
+    RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "") or os.getenv("SMTP_FROM", "")
     SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
     SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
     SMTP_USER = os.getenv("SMTP_USER", "")
-    SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+    SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "") or os.getenv("SMTP_PASS", "")
 
-# === MySQL ===
-app.config['SQLALCHEMY_DATABASE_URI'] = "mysql+pymysql://u543957720_crypto:AgUbbkD1h!@auth-db936.hstgr.io/u543957720_cryptoprice"
+# === TradingView webhook ===
+TRADINGVIEW_WEBHOOK_SECRET = os.getenv("TRADINGVIEW_WEBHOOK_SECRET", "")
+
+def _normalize_sqlalchemy_db_url(url: str) -> str:
+    raw = (url or "").strip().strip('"').strip("'")
+    if not raw:
+        return raw
+    if raw.startswith("mysql://"):
+        return "mysql+pymysql://" + raw[len("mysql://"):]
+    if raw.startswith("postgres://"):
+        return "postgresql+psycopg2://" + raw[len("postgres://"):]
+    return raw
+
+DATABASE_URL = _normalize_sqlalchemy_db_url(os.getenv('DATABASE_URL'))
+if DATABASE_URL:
+    app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+    logger.info("DB configured")
+else:
+    raise RuntimeError("DATABASE_URL is not set. MySQL connection string is required.")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"pool_recycle": 280, "pool_pre_ping": True}
 
@@ -152,7 +217,7 @@ class User(db.Model):
     auto_signal_trading_type = db.Column(db.String(50), nullable=True)
     auto_signal_strategy = db.Column(db.String(50), nullable=True)
     auto_signal_risk = db.Column(db.Float, nullable=True)
-    auto_signal_confirmation = db.Column(db.String(100), nullable=True)
+    auto_signal_confirmation = db.Column(db.String(255), nullable=True)
     auto_signal_min_reliability = db.Column(db.Float, default=60.0)
     auto_signal_check_interval = db.Column(db.Integer, default=60)
     auto_signal_last_check = db.Column(db.DateTime, nullable=True)
@@ -192,9 +257,9 @@ class ReportV2(db.Model):
 with app.app_context():
     try:
         db.create_all()
-        logger.info("✅ База данных инициализирована")
+        logger.info("База данных инициализирована")
     except Exception as db_init_error:
-        logger.error(f"❌ Ошибка инициализации БД: {db_init_error}")
+        logger.error(f"Ошибка инициализации БД: {db_init_error}")
         # Продолжаем работу, если БД недоступна (graceful degradation)
     
     # Проверяем и добавляем колонку exchange_spread, если её нет
@@ -203,25 +268,16 @@ with app.app_context():
         inspector = inspect(db.engine)
         columns = [col['name'] for col in inspector.get_columns('users')]
         if 'exchange_spread' not in columns:
-            logger.warning("⚠️ Колонка exchange_spread не найдена в таблице users. Добавляю...")
+            logger.warning("Колонка exchange_spread не найдена в таблице users. Добавляю...")
             db.session.execute(text("ALTER TABLE users ADD COLUMN exchange_spread FLOAT DEFAULT 0.0"))
             db.session.commit()
-            logger.info("✅ Колонка exchange_spread успешно добавлена в таблицу users")
+            logger.info("Колонка exchange_spread успешно добавлена в таблицу users")
     except Exception as e:
-        logger.error(f"⚠️ Не удалось проверить/добавить колонку exchange_spread: {e}")
+        logger.error(f"Не удалось проверить/добавить колонку exchange_spread: {e}")
         try:
             db.session.rollback()
         except:
             pass  # Игнорируем ошибки rollback, если БД недоступна
-
-# === Функция получения переводов ===
-def get_translation(key, language=None, **params):
-    """Получает перевод для ключа с учетом языка из сессии или запроса"""
-    if language is None:
-        language = request.args.get('language') or session.get('language', 'ru')
-    if language not in ['ru', 'en', 'uk']:
-        language = 'ru'
-    return get_report_translation(key, language, **params)
 
 # === Проверка пароля ===
 def verify_password(plain_password: str, stored_hash: str) -> bool:
@@ -247,9 +303,9 @@ def verify_password(plain_password: str, stored_hash: str) -> bool:
     # ✅ ИСПРАВЛЕНО: Убран небезопасный fallback сравнения паролей
     # Если пароль не в формате хеша, логируем предупреждение и возвращаем False
     if len(stored_hash) < 20:  # Хеши обычно длиннее
-        logger.warning(f"⚠️ Обнаружен пароль без хеша для пользователя. Требуется миграция паролей.")
+        logger.warning("Обнаружен пароль без хеша для пользователя. Требуется миграция паролей.")
         return False
-    logger.error(f"❌ КРИТИЧЕСКАЯ ОШИБКА: Попытка сравнения пароля без хеша! Это небезопасно!")
+    logger.error("КРИТИЧЕСКАЯ ОШИБКА: Попытка сравнения пароля без хеша! Это небезопасно!")
     return False
 
 
@@ -273,6 +329,7 @@ def api_login():
     data = request.json or {}
     email = (data.get("email") or "").strip().lower()
     password = (data.get("password") or "").strip()
+    remember = bool(data.get("remember"))
 
     if not email or not password:
         return jsonify({"error": "Email и пароль обязательны"}), 400
@@ -286,6 +343,8 @@ def api_login():
         language = request.json.get('language', 'ru') if request.json else 'ru'
         return jsonify({"error": get_translation("error_invalid_password", language)}), 401
 
+    # ВАЖНО: persistence сессии для "Запомнить меня". НЕ ТРОГАТЬ проверку пользователя/пароля.
+    session.permanent = remember
     session["user_id"] = user.id
     session["email"] = user.email
 
@@ -414,7 +473,7 @@ def api_klines():
         
         return jsonify(klines)
     except Exception as e:
-        print(f"⚠️ Ошибка получения klines: {e}")
+        print(f"Ошибка получения klines: {e}")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
@@ -422,13 +481,13 @@ def api_klines():
 # === Страницы ===
 @app.route("/login")
 def login_page():
-    return render_template("login.html")
+    return render_template("login.html", static_version=_static_version())
 
 @app.route("/")
 def index_page():
     if not session.get("user_id"):
         return redirect(url_for("login_page"))
-    return render_template("index.html")
+    return render_template("index.html", static_version=_static_version())
 
 
 @app.route("/demo", methods=["GET", "POST"])
@@ -436,10 +495,10 @@ def index_page():
 def demo_page():
     """Demo режим - приложение без авторизации"""
     try:
-        logger.info(f"🎮 Запрос на /demo от {request.remote_addr}")
-        logger.info(f"🎮 User-Agent: {request.headers.get('User-Agent', 'Unknown')}")
-        logger.info(f"🎮 Referer: {request.headers.get('Referer', 'Direct')}")
-        logger.info(f"🎮 Session до: demo_mode={session.get('demo_mode')}, user_id={session.get('user_id')}")
+        logger.info(f"Запрос на /demo от {request.remote_addr}")
+        logger.info(f"User-Agent: {request.headers.get('User-Agent', 'Unknown')}")
+        logger.info(f"Referer: {request.headers.get('Referer', 'Direct')}")
+        logger.info(f"Session до: demo_mode={session.get('demo_mode')}, user_id={session.get('user_id')}")
         
         # Устанавливаем флаг demo режима в сессии
         session['demo_mode'] = True
@@ -449,24 +508,24 @@ def demo_page():
         if 'user_id' in session:
             session.pop('user_id', None)
         
-        logger.info(f"🎮 Session после: demo_mode={session.get('demo_mode')}, user_id={session.get('user_id')}")
-        logger.info("✅ Demo режим активирован, рендерим index.html")
+        logger.info(f"Session после: demo_mode={session.get('demo_mode')}, user_id={session.get('user_id')}")
+        logger.info("Demo режим активирован, рендерим index.html")
         
         # ✅ Создаем response с явной установкой cookie
-        response = make_response(render_template("index.html", demo_mode=True))
+        response = make_response(render_template("index.html", demo_mode=True, static_version=_static_version()))
         # ✅ Устанавливаем cookie явно для надежности
         response.set_cookie('demo_mode', 'true', max_age=3600, path='/', httponly=False, samesite='Lax')
         return response
     except Exception as e:
-        logger.error(f"❌ Ошибка в demo_page: {e}")
-        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        logger.error(f"Ошибка в demo_page: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         # Fallback: возвращаем страницу даже при ошибке
         try:
-            response = make_response(render_template("index.html", demo_mode=True))
+            response = make_response(render_template("index.html", demo_mode=True, static_version=_static_version()))
             response.set_cookie('demo_mode', 'true', max_age=3600, path='/', httponly=False, samesite='Lax')
             return response
         except Exception as e2:
-            logger.error(f"❌ Критическая ошибка рендеринга: {e2}")
+            logger.error(f"Критическая ошибка рендеринга: {e2}")
             return f"<html><body><h1>Demo Mode Error</h1><p>Error: {str(e)}</p><p>Details: {str(e2)}</p></body></html>", 500
 
 
@@ -544,7 +603,14 @@ def run_analysis_route():
             stop_loss,
             take_profit,
             reliability_rating,
-            rsi_value  # ✅ ФАЗА 2: Получаем реальный RSI из run_analysis
+            rsi_value,  # ✅ ФАЗА 2: Получаем реальный RSI из run_analysis
+            user_confirmation_result,
+            passed_count,
+            total_count,
+            user_confirmation_str,
+            actual_timeframe,
+            actual_trading_type,
+            higher_timeframes,
         ) = run_analysis(
             data.get("symbol"),
             timeframe,  # Передаем выбранный таймфрейм (None для автоматического)
@@ -808,13 +874,25 @@ def run_analysis_route():
                 logger.info(f"✅ Условие для отправки уведомлений выполнено (reliability_rating >= alert_min_reliability)")
                 alert_message = format_alert_message(
                     symbol, direction, entry_price, stop_loss, take_profit,
-                    reliability_rating, data.get("strategy"), trend, language=language
+                    reliability_rating, strategy, trend, language=language,
+                    confirmation_result=user_confirmation_result,
+                    confirmations_selected=user_confirmation_str,
+                    confirmations_passed=passed_count,
+                    confirmations_total=total_count,
+                    timeframe=actual_timeframe,
+                    trading_type=actual_trading_type,
+                    higher_timeframes=higher_timeframes,
                 )
                 
                 # Email уведомления (если включено)
                 if user.enable_email_notifications and user.email:
                     email_subject = f"🚨 Новый торговый сигнал: {symbol} {direction.upper()}"
-                    email_message = alert_message.replace("<b>", "").replace("</b>", "").replace("🚨", "🚨").replace("📊", "📊")
+                    email_body = alert_message.replace("\n", "<br>")
+                    email_message = (
+                        "<div style=\"font-family: Segoe UI, Arial, sans-serif; font-size: 14px; line-height: 1.5;\">"
+                        + email_body
+                        + "</div>"
+                    )
                     logger.info(f"📧 Попытка отправить Email уведомление на {user.email}")
                     if send_email_notification(user.email, email_subject, email_message):
                         logger.info(f"✅ Email уведомление отправлено на {user.email}")
@@ -825,9 +903,9 @@ def run_analysis_route():
                 
                 # Telegram уведомления (если включено)
                 if user.enable_telegram_notifications and user.telegram_chat_id:
-                    telegram_message = alert_message.replace("<b>", "*").replace("</b>", "*").replace("🚨", "🚨").replace("📊", "📊")
+                    telegram_message = alert_message
                     logger.info(f"📱 Попытка отправить Telegram уведомление на {user.telegram_chat_id}")
-                    if send_telegram_notification(user.telegram_chat_id, telegram_message):
+                    if send_telegram_notification(user.telegram_chat_id, telegram_message, parse_mode=None):
                         logger.info(f"✅ Telegram уведомление отправлено на {user.telegram_chat_id}")
                     else:
                         logger.warning(f"⚠️ Не удалось отправить Telegram уведомление на {user.telegram_chat_id}")
@@ -1315,7 +1393,7 @@ def get_telegram_chat_id_from_username(username, bot_token=None):
         logger.error(f"⚠️ Ошибка при получении Chat ID: {e}")
         return None
 
-def send_telegram_notification(username_or_chat_id, message, bot_token=None):
+def send_telegram_notification(username_or_chat_id, message, bot_token=None, parse_mode="HTML"):
     """
     Отправляет уведомление в Telegram.
     
@@ -1364,11 +1442,14 @@ def send_telegram_notification(username_or_chat_id, message, bot_token=None):
         
         logger.info(f"📱 Отправка Telegram сообщения на {chat_identifier} (тип: {'username' if is_username else 'Chat ID'})")
         url = f"https://api.telegram.org/bot{token}/sendMessage"
-        response = requests.post(url, json={
+        payload = {
             "chat_id": chat_identifier,
             "text": message,
-            "parse_mode": "HTML"
-        }, timeout=10)
+        }
+        if parse_mode:
+            payload["parse_mode"] = parse_mode
+
+        response = requests.post(url, json=payload, timeout=10)
         
         if response.status_code == 200:
             logger.info(f"✅ Telegram уведомление успешно отправлено на {chat_identifier}")
@@ -1386,11 +1467,14 @@ def send_telegram_notification(username_or_chat_id, message, bot_token=None):
                 if chat_id:
                     logger.info(f"✅ Найден Chat ID: {chat_id}, повторная попытка отправки...")
                     # Пытаемся отправить на Chat ID
-                    response = requests.post(url, json={
+                    payload = {
                         "chat_id": chat_id,
                         "text": message,
-                        "parse_mode": "HTML"
-                    }, timeout=10)
+                    }
+                    if parse_mode:
+                        payload["parse_mode"] = parse_mode
+
+                    response = requests.post(url, json=payload, timeout=10)
                     
                     if response.status_code == 200:
                         logger.info(f"✅ Telegram уведомление успешно отправлено на Chat ID {chat_id}")
@@ -1540,36 +1624,140 @@ def send_email_notification(email, subject, message):
         traceback.print_exc()
         return False
 
-def format_alert_message(symbol, direction, entry_price, stop_loss, take_profit, reliability_rating, strategy, trend, language="ru"):
+def format_alert_message(
+    symbol,
+    direction,
+    entry_price,
+    stop_loss,
+    take_profit,
+    reliability_rating,
+    strategy,
+    trend,
+    language="ru",
+    confirmation_result=None,
+    confirmations_selected=None,
+    confirmations_passed=None,
+    confirmations_total=None,
+    timeframe=None,
+    trading_type=None,
+    higher_timeframes=None,
+):
     """
     Форматирует сообщение для уведомления с учетом языка.
     """
-    # Получаем переводы
     t = lambda key, **params: get_translation(key, language, **params)
+
     direction_emoji = "🟢" if direction == "long" else "🔴"
     direction_text = t("long_direction") if direction == "long" else t("short_direction")
     trend_text = t("bull_market") if trend == "Uptrend" else t("bear_market")
-    rr = ((take_profit - entry_price) / (entry_price - stop_loss) if direction == "long" else (entry_price - take_profit) / (stop_loss - entry_price))
-    
-    message = f"""
-🚨 <b>{t('notification_new_signal')}</b>
 
-📊 <b>{t('notification_instrument')}</b> {symbol}
-{direction_emoji} <b>{t('notification_direction')}</b> {direction_text}
-📈 <b>{t('notification_trend')}</b> {trend_text}
-🎯 <b>{t('notification_strategy')}</b> {strategy}
+    strategy_key_map = {
+        "Консервативная": "strategy_conservative",
+        "Сбалансированная": "strategy_balanced",
+        "Агрессивная": "strategy_aggressive",
+        "conservative": "strategy_conservative",
+        "balanced": "strategy_balanced",
+        "aggressive": "strategy_aggressive",
+    }
+    if strategy in strategy_key_map:
+        strategy_text = t(strategy_key_map[strategy])
+    else:
+        strategy_text = str(strategy)
 
-💰 <b>{t('notification_levels')}</b>
-• {t('notification_entry')} ${entry_price:.2f}
-• {t('notification_stop_loss')} ${stop_loss:.2f}
-• {t('notification_take_profit')} ${take_profit:.2f}
-• {t('notification_rr')} {rr:.2f}
+    rr = 0.0
+    try:
+        if direction == "long":
+            denom = (entry_price - stop_loss)
+            rr = ((take_profit - entry_price) / denom) if abs(denom) > 1e-12 else 0.0
+        else:
+            denom = (stop_loss - entry_price)
+            rr = ((entry_price - take_profit) / denom) if abs(denom) > 1e-12 else 0.0
+    except Exception:
+        rr = 0.0
 
-⭐ <b>{t('notification_reliability')}</b> {reliability_rating:.1f}%
+    confirmations_line = ""
+    if confirmation_result and confirmations_passed is not None and confirmations_total is not None:
+        details = str(confirmation_result)
+        if ":" in details:
+            details = details.split(":", 1)[1].strip()
+        confirmations_line = f"✅ {t('notification_confirmations')} ({confirmations_passed}/{confirmations_total}): {details}"
 
-⏰ <b>{t('notification_time')}</b> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-"""
-    return message.strip()
+    def _format_tf_label(tf: str) -> str:
+        if not tf:
+            return ""
+
+        if language == "uk":
+            suffix_map = {
+                "m": "хв",
+                "h": "г",
+                "d": "д",
+                "w": "т",
+                "M": "м",
+            }
+        elif language == "ru":
+            suffix_map = {
+                "m": "м",
+                "h": "ч",
+                "d": "д",
+                "w": "н",
+                "M": "м",
+            }
+        else:
+            suffix_map = {}
+
+        for unit, repl in suffix_map.items():
+            if tf.endswith(unit):
+                return tf[:-1] + repl
+        return tf
+
+    higher_tf_line = ""
+    if isinstance(higher_timeframes, (list, tuple)) and higher_timeframes:
+        parts = []
+        for item in higher_timeframes:
+            try:
+                tf = item.get("timeframe")
+                tf_trend = item.get("trend")
+                if not tf or not tf_trend:
+                    continue
+                tf_trend_text = t("trend_up") if tf_trend == "Uptrend" else t("trend_down")
+                parts.append(f"{_format_tf_label(tf)}: {tf_trend_text}")
+            except Exception:
+                continue
+        if parts:
+            higher_tf_line = f"🧭 {t('notification_higher_timeframes')} " + " | ".join(parts)
+
+    rr_label = t("notification_rr_full")
+    if rr_label == "notification_rr_full":
+        rr_label = t("notification_rr")
+
+    lines = [
+        f"🚨 {t('notification_new_signal')}",
+        "",
+        f"📊 {t('notification_instrument')} {symbol}",
+        f"{direction_emoji} {t('notification_direction')} {direction_text}",
+        f"📈 {t('notification_trend')} {trend_text}",
+    ]
+    if confirmations_line:
+        lines.append(confirmations_line)
+    if higher_tf_line:
+        lines.append(higher_tf_line)
+    if timeframe:
+        lines.append(f"⏱ {t('timeframe')} {_format_tf_label(str(timeframe))}")
+    lines.extend([
+        f"🎯 {t('notification_strategy')} {strategy_text}",
+        "",
+        f"💰 {t('notification_levels')}",
+        f"• {t('notification_entry')} ${entry_price:.2f}",
+        f"• {t('notification_stop_loss')} ${stop_loss:.2f}",
+        f"• {t('notification_take_profit')} ${take_profit:.2f}",
+        f"• {rr_label} {rr:.2f}",
+        "",
+        f"⭐ {t('notification_reliability')} {reliability_rating:.1f}%",
+        "",
+        f"⏰ {t('notification_time')} {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+    ])
+
+    return "\n".join(lines).strip()
 
 def generate_heatmap_data(reports):
     """
@@ -1612,7 +1800,7 @@ def generate_heatmap_data(reports):
         try:
             import pandas as pd
         except ImportError:
-            print("⚠️ pandas не установлен, heatmap недоступен")
+            print("pandas не установлен, heatmap недоступен")
             return None, None
         
         df = pd.DataFrame(data)
@@ -1910,6 +2098,191 @@ def get_notification_settings():
         print(f"⚠️ Ошибка загрузки настроек: {e}")
         return jsonify({"error": str(e)}), 500
 
+
+# === API: Тест Telegram уведомления ===
+@app.route("/api/test_telegram_notification", methods=["POST"])
+def test_telegram_notification():
+    """Отправляет тестовое Telegram уведомление текущему пользователю."""
+    if not session.get("user_id"):
+        language = request.args.get('language') or (request.json.get('language') if request.json else None) or 'ru'
+        return jsonify({"error": get_translation("error_unauthorized", language)}), 401
+
+    data = request.json or {}
+    language = data.get('language', 'ru')
+    if language not in ['ru', 'en', 'uk']:
+        language = 'ru'
+
+    user_id = session["user_id"]
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": get_translation("error_user_not_found", language)}), 404
+
+    test_message = {
+        'ru': '✅ Тестовое сообщение: уведомления настроены и работают.',
+        'en': '✅ Test message: notifications are configured and working.',
+        'uk': '✅ Тестове повідомлення: сповіщення налаштовані та працюють.'
+    }.get(language, '✅ Тестовое сообщение: уведомления настроены и работают.')
+
+    sent_telegram = False
+    sent_email = False
+    errors = []
+
+    if user.enable_telegram_notifications:
+        chat_id = (user.telegram_chat_id or '').strip()
+        if not TELEGRAM_BOT_TOKEN:
+            errors.append('telegram_not_configured')
+        elif not chat_id:
+            errors.append('telegram_chat_id_missing')
+        else:
+            try:
+                ok = send_telegram_notification(chat_id, test_message)
+                if ok:
+                    sent_telegram = True
+                else:
+                    errors.append('telegram_failed')
+            except Exception:
+                errors.append('telegram_exception')
+
+    if user.enable_email_notifications:
+        if not user.email:
+            errors.append('email_missing')
+        else:
+            subject = {
+                'ru': '✅ Тестовое сообщение Crypto Analyzer',
+                'en': '✅ Crypto Analyzer test message',
+                'uk': '✅ Тестове повідомлення Crypto Analyzer'
+            }.get(language, '✅ Тестовое сообщение Crypto Analyzer')
+            html_message = f"<p>{test_message}</p>"
+            try:
+                ok = send_email_notification(user.email, subject, html_message)
+                if ok:
+                    sent_email = True
+                else:
+                    errors.append('email_failed')
+            except Exception:
+                errors.append('email_exception')
+
+    if sent_telegram or sent_email:
+        return jsonify({"success": True, "sent": {"telegram": sent_telegram, "email": sent_email}})
+
+    if not user.enable_telegram_notifications and not user.enable_email_notifications:
+        msg = {
+            'ru': 'Включите Telegram и/или Email уведомления в настройках, затем повторите тест.',
+            'en': 'Enable Telegram and/or Email notifications in settings, then retry the test.',
+            'uk': 'Увімкніть Telegram та/або Email сповіщення в налаштуваннях, потім повторіть тест.'
+        }.get(language, 'Включите Telegram и/или Email уведомления в настройках, затем повторите тест.')
+        return jsonify({"error": msg, "details": errors}), 400
+
+    msg = {
+        'ru': 'Не удалось отправить тестовое сообщение. Проверьте настройки уведомлений и ключи доступа.',
+        'en': 'Failed to send test message. Please check notification settings and credentials.',
+        'uk': 'Не вдалося надіслати тестове повідомлення. Перевірте налаштування сповіщень та ключі доступу.'
+    }.get(language, 'Не удалось отправить тестовое сообщение. Проверьте настройки уведомлений и ключи доступа.')
+    return jsonify({"error": msg, "details": errors}), 400
+
+
+# === API: TradingView webhook (incoming alerts) ===
+@app.route("/api/webhook/tradingview", methods=["POST"])
+def tradingview_webhook():
+    """Принимает webhook от TradingView и отправляет уведомления пользователю."""
+    data = request.json or {}
+
+    secret = (data.get('secret') or '').strip()
+    if not TRADINGVIEW_WEBHOOK_SECRET or secret != TRADINGVIEW_WEBHOOK_SECRET:
+        return jsonify({"error": "Invalid webhook secret"}), 401
+
+    language = (data.get('language') or 'ru').strip()
+    if language not in ['ru', 'en', 'uk']:
+        language = 'ru'
+
+    email = (data.get('email') or '').strip().lower()
+    if not email:
+        return jsonify({"error": "email is required"}), 400
+
+    user = User.query.filter(func.lower(User.email) == email).first()
+    if not user:
+        return jsonify({"error": get_translation("error_user_not_found", language)}), 404
+
+    symbol = data.get('symbol') or data.get('ticker') or data.get('pair') or 'BTC/USDT'
+    raw_action = (data.get('action') or data.get('signal') or data.get('side') or '').strip().lower()
+    direction = 'long' if raw_action in ['buy', 'long'] else 'short' if raw_action in ['sell', 'short'] else None
+    if not direction:
+        return jsonify({"error": "action must be BUY/SELL (or LONG/SHORT)"}), 400
+
+    def _safe_float(v):
+        try:
+            if v is None:
+                return None
+            return float(v)
+        except Exception:
+            return None
+
+    entry_price = _safe_float(data.get('entry_price') or data.get('price') or data.get('close'))
+    stop_loss = _safe_float(data.get('stop_loss') or data.get('sl'))
+    take_profit = _safe_float(data.get('take_profit') or data.get('tp'))
+
+    if entry_price is None or stop_loss is None or take_profit is None:
+        return jsonify({"error": "entry_price/stop_loss/take_profit are required"}), 400
+
+    reliability = _safe_float(data.get('reliability') or data.get('reliability_rating') or data.get('rating'))
+    if reliability is None:
+        reliability = 0.0
+
+    strategy = data.get('strategy') or 'TradingView'
+    trend = data.get('trend') or 'Uptrend'
+    timeframe = data.get('timeframe') or data.get('interval')
+
+    comment = data.get('comment') or data.get('message') or ''
+    confirmation_result = f"TradingView: {comment}" if comment else "TradingView"
+
+    alert_message = format_alert_message(
+        symbol=symbol,
+        direction=direction,
+        entry_price=entry_price,
+        stop_loss=stop_loss,
+        take_profit=take_profit,
+        reliability_rating=float(reliability),
+        strategy=strategy,
+        trend=trend,
+        language=language,
+        confirmation_result=confirmation_result,
+        confirmations_passed=1,
+        confirmations_total=1,
+        timeframe=timeframe,
+    )
+
+    sent_any = False
+    errors = []
+
+    # Telegram
+    if user.enable_telegram_notifications and user.telegram_chat_id:
+        try:
+            ok = send_telegram_notification(user.telegram_chat_id, alert_message)
+            if ok:
+                sent_any = True
+            else:
+                errors.append('telegram_failed')
+        except Exception:
+            errors.append('telegram_exception')
+
+    # Email
+    if user.enable_email_notifications and user.email:
+        try:
+            email_subject = f"🚨 TradingView signal: {symbol} {direction.upper()}"
+            email_message = alert_message.replace("\n", "<br>")
+            ok = send_email_notification(user.email, email_subject, email_message)
+            if ok:
+                sent_any = True
+            else:
+                errors.append('email_failed')
+        except Exception:
+            errors.append('email_exception')
+
+    if not sent_any:
+        return jsonify({"error": "No notifications sent", "details": errors}), 400
+
+    return jsonify({"success": True})
+
 # === API: Сохранение настроек торговли ===
 @app.route("/api/save_trading_settings", methods=["POST"])
 def save_trading_settings():
@@ -1976,9 +2349,11 @@ def send_problem_message():
     user_id = session["user_id"]
     data = request.json or {}
     message = data.get("message", "").strip()
+    language = (data.get('language') or 'ru')
+    if language not in ['ru', 'en', 'uk']:
+        language = 'ru'
     
     if not message:
-        language = data.get('language', 'ru')
         return jsonify({"error": get_translation("error_message_empty", language)}), 400
     
     try:
@@ -1986,6 +2361,16 @@ def send_problem_message():
         if not user:
             language = request.args.get('language') or (request.json.get('language') if request.json else None) or 'ru'
             return jsonify({"error": get_translation("error_user_not_found", language)}), 404
+
+        if not RESEND_API_KEY or not RESEND_FROM_EMAIL:
+            try:
+                feedback_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "feedback_messages.log")
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                with open(feedback_path, 'a', encoding='utf-8') as f:
+                    f.write(f"[{timestamp}] user={user.email}\n{message}\n---\n")
+                return jsonify({"success": True, "message": get_translation("message_saved_locally", language)})
+            except Exception:
+                return jsonify({"error": get_translation("error_email_not_configured", language)}), 400
         
         # Формируем письмо
         subject = f"Сообщение о проблеме от пользователя {user.email}"
@@ -1996,14 +2381,12 @@ Email пользователя: {user.email}
 {message}
 """
         
-        # Отправляем на tirion2025@gmail.com
-        admin_email = "tirion2025@gmail.com"
+        # Отправляем на cryptoanalyzpro@gmail.com
+        admin_email = "cryptoanalyzpro@gmail.com"
         if send_email_notification(admin_email, subject, email_body):
             print(f"✅ Сообщение о проблеме отправлено на {admin_email} от {user.email}")
-            language = data.get('language', 'ru')
             return jsonify({"success": True, "message": get_translation("error_message_sent", language)})
         else:
-            language = data.get('language', 'ru')
             return jsonify({"error": get_translation("error_message_failed", language)}), 500
     except Exception as e:
         print(f"⚠️ Ошибка отправки сообщения о проблеме: {e}")
@@ -2363,7 +2746,7 @@ def cleanup_connections():
 
 def signal_handler(signum, frame):
     """Обработчик сигналов для корректного завершения."""
-    print("\n🛑 Получен сигнал завершения, закрываю соединения...")
+    print("\nПолучен сигнал завершения, закрываю соединения...")
     cleanup_connections()
     exit(0)
 
@@ -2379,17 +2762,17 @@ if hasattr(signal, 'SIGBREAK'):
 # === Запуск ===
 if __name__ == "__main__":
     port = 5051  # Изменён с 5050 на 5051 из-за конфликта портов
-    print(f"🖥️ Flask сервер запущен на http://127.0.0.1:{port}")
+    print(f"Flask сервер запущен на http://127.0.0.1:{port}")
     try:
         app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False, threaded=True)
     except KeyboardInterrupt:
-        print("\n🛑 Получен сигнал прерывания (Ctrl+C)")
+        print("\nПолучен сигнал прерывания (Ctrl+C)")
         cleanup_connections()
     except OSError as e:
         if "address already in use" in str(e).lower() or "access" in str(e).lower():
-            print(f"❌ Ошибка: Порт {port} занят или недоступен. Попробуйте другой порт или закройте другие приложения.")
+            print(f"Ошибка: Порт {port} занят или недоступен. Попробуйте другой порт или закройте другие приложения.")
         else:
-            print(f"❌ Ошибка запуска сервера: {e}")
+            print(f"Ошибка запуска сервера: {e}")
         raise
     finally:
         cleanup_connections()

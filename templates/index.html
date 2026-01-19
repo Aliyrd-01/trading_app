@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <title>📊 Crypto Trading Analyzer</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v=static_version) }}">
   <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
   <!-- Chart.js для real-time графика -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <!-- Translations -->
-  <script src="{{ url_for('static', filename='translations.js') }}"></script>
+  <script src="{{ url_for('static', filename='translations.js', v=static_version) }}"></script>
 </head>
-<body>
+<body data-demo-mode="{{ 'true' if demo_mode else 'false' }}">
   <div class="container">
     <!-- ✅ Demo режим баннер -->
     {% if demo_mode %}
@@ -78,6 +78,8 @@
           -->
           
           <button id="saveNotificationSettingsBtn" type="button" data-i18n="save_notification_settings" style="margin-top: 15px; background: #3fa9f5; color: #fff; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 14px;">Сохранить настройки уведомлений</button>
+
+          <button id="testTelegramNotificationBtn" type="button" data-i18n="test_telegram_notification" style="margin-top: 10px; background: #23283b; color: #fff; border: 1px solid #2c3350; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 14px;">Отправить тестовое сообщение</button>
         </div>
 
         <!-- Настройки торговли -->
@@ -149,21 +151,39 @@
               <input type="number" id="autoSignalRisk" min="0" max="100" step="0.01" placeholder="1.0" style="width: 100%; padding: 10px; background: #0f1320; border: 1px solid #2c3350; border-radius: 5px; color: #fff; font-size: 14px; box-sizing: border-box;">
             </div>
             
-            <div style="margin-bottom: 15px;">
-              <label style="display: block; color: #fff; margin-bottom: 8px;" data-i18n="auto_signal_confirmation_label">Подтверждения:</label>
-              <select id="autoSignalConfirmation" style="width: 100%; padding: 10px; background: #0f1320; border: 1px solid #2c3350; border-radius: 5px; color: #fff; font-size: 14px; box-sizing: border-box;">
-                <option value="NONE" data-i18n="confirmation_none">Без фильтров</option>
-                <option value="RSI" data-i18n="confirmation_rsi">RSI</option>
-                <option value="MACD" data-i18n="confirmation_macd">MACD</option>
-                <option value="EMA" data-i18n="confirmation_ema">EMA</option>
-                <option value="VWMA" data-i18n="confirmation_vwma">VWMA</option>
-                <option value="ADX" data-i18n="confirmation_adx">ADX</option>
-                <option value="BB" data-i18n="confirmation_bb">Bollinger Bands</option>
-                <option value="RSI+MACD" data-i18n="confirmation_rsi_macd">RSI + MACD</option>
-                <option value="EMA+ADX+VWMA" data-i18n="confirmation_ema_adx_vwma">EMA + ADX + VWMA</option>
-                <option value="ALL" data-i18n="confirmation_all">Все фильтры подтверждены</option>
-              </select>
-              <p style="color: #8ea0bf; font-size: 12px; margin-top: 5px; margin-bottom: 0;" data-i18n="auto_signal_confirmation_hint">Выберите тип подтверждения из списка</p>
+            <div class="confirmation-panel" style="margin-bottom: 15px;">
+              <div class="label-row">
+                <span data-i18n="auto_signal_confirmation_label">Подтверждения:</span>
+              </div>
+              <input type="hidden" id="autoSignalConfirmation" value="NONE">
+              <div id="autoSignalConfirmationBox" class="confirmation-box">
+                <div class="confirmation-modes">
+                  <label class="confirmation-mode">
+                    <input type="radio" name="autoSignalConfirmationMode" value="ALL"><span data-i18n="confirmation_all">Все фильтры подтверждены</span>
+                  </label>
+                  <label class="confirmation-mode">
+                    <input type="radio" name="autoSignalConfirmationMode" value="NONE" checked><span data-i18n="confirmation_none">Без фильтров</span>
+                  </label>
+                  <label class="confirmation-mode">
+                    <input type="radio" name="autoSignalConfirmationMode" value="CUSTOM"><span data-i18n="confirmation_custom">Custom</span>
+                  </label>
+                </div>
+                <div id="autoSignalConfirmationIndicators" class="confirmation-indicators">
+                  <label class="confirmation-indicator"><input type="checkbox" value="EMA"><span data-i18n="confirmation_ema">EMA</span></label>
+                  <label class="confirmation-indicator"><input type="checkbox" value="RSI"><span data-i18n="confirmation_rsi">RSI</span></label>
+                  <label class="confirmation-indicator"><input type="checkbox" value="MACD"><span data-i18n="confirmation_macd">MACD</span></label>
+                  <label class="confirmation-indicator"><input type="checkbox" value="ADX"><span data-i18n="confirmation_adx">ADX</span></label>
+                  <label class="confirmation-indicator"><input type="checkbox" value="VWMA"><span data-i18n="confirmation_vwma">VWMA</span></label>
+                  <label class="confirmation-indicator"><input type="checkbox" value="BB"><span data-i18n="confirmation_bb">Bollinger Bands</span></label>
+                  <label class="confirmation-indicator"><input type="checkbox" value="VWAP"><span data-i18n="confirmation_vwap">VWAP</span></label>
+                  <label class="confirmation-indicator"><input type="checkbox" value="AVWAP"><span data-i18n="confirmation_avwap">AVWAP</span></label>
+                  <label class="confirmation-indicator"><input type="checkbox" value="SUPERTREND"><span data-i18n="confirmation_supertrend">Supertrend</span></label>
+                  <label class="confirmation-indicator"><input type="checkbox" value="STOCHRSI"><span data-i18n="confirmation_stochrsi">StochRSI</span></label>
+                  <label class="confirmation-indicator"><input type="checkbox" value="OBV"><span data-i18n="confirmation_obv">OBV</span></label>
+                  <label class="confirmation-indicator"><input type="checkbox" value="MSTRUCT"><span data-i18n="confirmation_mstruct">Market Structure</span></label>
+                </div>
+                <p class="confirmation-hint" data-i18n="auto_signal_confirmation_hint">Выберите тип подтверждения из списка</p>
+              </div>
             </div>
             
             <div style="margin-bottom: 15px;">
@@ -209,7 +229,7 @@
 
     <script>
       // ✅ Проверка demo режима
-      const isDemoMode = {{ 'true' if demo_mode else 'false' }};
+      const isDemoMode = document.body && document.body.dataset && document.body.dataset.demoMode === 'true';
       
       // В demo режиме скрываем некоторые элементы через JavaScript
       if (isDemoMode) {
@@ -234,7 +254,7 @@
         });
       }
     </script>
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script src="{{ url_for('static', filename='script.js', v=static_version) }}"></script>
 
     <!-- Режим новичка - упрощенная форма -->
     <div id="beginnerForm" class="form-grid" style="display: none;">
@@ -317,25 +337,6 @@
 
       <label class="with-info">
         <div class="label-row">
-          <span data-i18n="confirmation">Тип подтверждения входа:</span>
-          <span class="info" data-tip-key="tooltip_confirmation">ℹ️</span>
-        </div>
-        <select id="confirmation">
-          <option value="EMA" data-i18n="confirmation_ema">EMA</option>
-          <option value="RSI" data-i18n="confirmation_rsi">RSI</option>
-          <option value="MACD" data-i18n="confirmation_macd">MACD</option>
-          <option value="VWMA" data-i18n="confirmation_vwma">VWMA</option>
-          <option value="ADX" data-i18n="confirmation_adx">ADX</option>
-          <option value="BB" data-i18n="confirmation_bb">Bollinger Bands (возврат внутрь)</option>
-          <option value="RSI+MACD" data-i18n="confirmation_rsi_macd">RSI + MACD</option>
-          <option value="EMA+ADX+VWMA" data-i18n="confirmation_ema_adx_vwma">EMA + ADX + VWMA</option>
-          <option value="ALL" data-i18n="confirmation_all">Все фильтры подтверждены</option>
-          <option value="NONE" data-i18n="confirmation_none">Без фильтров</option>
-        </select>
-      </label>
-
-      <label class="with-info">
-        <div class="label-row">
           <span data-i18n="timeframe">📊 Таймфрейм:</span>
           <span class="info" data-tip-key="tooltip_timeframe">ℹ️</span>
         </div>
@@ -382,6 +383,41 @@
           <option value="1M" data-i18n="1M">1 месяц</option>
         </select>
       </label>
+
+      <div class="confirmation-panel">
+        <div class="label-row">
+          <span data-i18n="confirmation">Тип подтверждения входа:</span>
+          <span class="info" data-tip-key="tooltip_confirmation">ℹ️</span>
+        </div>
+        <input type="hidden" id="confirmation" value="NONE">
+        <div id="confirmationBox" class="confirmation-box">
+          <div class="confirmation-modes">
+            <label class="confirmation-mode">
+              <input type="radio" name="confirmationMode" value="ALL"><span data-i18n="confirmation_all">Все фильтры подтверждены</span>
+            </label>
+            <label class="confirmation-mode">
+              <input type="radio" name="confirmationMode" value="NONE" checked><span data-i18n="confirmation_none">Без фильтров</span>
+            </label>
+            <label class="confirmation-mode">
+              <input type="radio" name="confirmationMode" value="CUSTOM"><span data-i18n="confirmation_custom">Custom</span>
+            </label>
+          </div>
+          <div id="confirmationIndicators" class="confirmation-indicators">
+            <label class="confirmation-indicator"><input type="checkbox" value="EMA"><span data-i18n="confirmation_ema">EMA</span></label>
+            <label class="confirmation-indicator"><input type="checkbox" value="RSI"><span data-i18n="confirmation_rsi">RSI</span></label>
+            <label class="confirmation-indicator"><input type="checkbox" value="MACD"><span data-i18n="confirmation_macd">MACD</span></label>
+            <label class="confirmation-indicator"><input type="checkbox" value="ADX"><span data-i18n="confirmation_adx">ADX</span></label>
+            <label class="confirmation-indicator"><input type="checkbox" value="VWMA"><span data-i18n="confirmation_vwma">VWMA</span></label>
+            <label class="confirmation-indicator"><input type="checkbox" value="BB"><span data-i18n="confirmation_bb">Bollinger Bands (возврат внутрь)</span></label>
+            <label class="confirmation-indicator"><input type="checkbox" value="VWAP"><span data-i18n="confirmation_vwap">VWAP</span></label>
+            <label class="confirmation-indicator"><input type="checkbox" value="AVWAP"><span data-i18n="confirmation_avwap">AVWAP</span></label>
+            <label class="confirmation-indicator"><input type="checkbox" value="SUPERTREND"><span data-i18n="confirmation_supertrend">Supertrend</span></label>
+            <label class="confirmation-indicator"><input type="checkbox" value="STOCHRSI"><span data-i18n="confirmation_stochrsi">StochRSI</span></label>
+            <label class="confirmation-indicator"><input type="checkbox" value="OBV"><span data-i18n="confirmation_obv">OBV</span></label>
+            <label class="confirmation-indicator"><input type="checkbox" value="MSTRUCT"><span data-i18n="confirmation_mstruct">Market Structure</span></label>
+          </div>
+        </div>
+      </div>
 
       <p id="tfInfo" class="info-text" data-i18n="recommended">Рекомендуемый таймфрейм: 5m</p>
 
@@ -499,17 +535,15 @@
 
     <!-- 📄 Демонстрационный отчёт -->
     <div id="result" class="demo">
-      <h2 style="margin:0;">📄 Отчёт (демо)</h2>
+      <h2 style="margin:0;" data-i18n="report_demo">📄 Отчёт (демо)</h2>
       <div id="reportText"></div>
       
-      <!--
-      График кривой баланса бэктеста
       <div id="backtestChartContainer" class="hidden" style="margin-top: 30px;">
-        <h3 style="color: #3fa9f5; margin-bottom: 15px;">📈 Кривая баланса бэктеста</h3>
+        <h3 style="color: #3fa9f5; margin-bottom: 15px;" data-i18n="backtest_equity_curve">📈 Кривая баланса бэктеста</h3>
         <canvas id="backtestChart" style="max-height: 400px;"></canvas>
       </div>
       
-      <span data-i18n="run_comparative_backtest">Сравнительный бэктест всех стратегий</span>
+      <span class="hidden" data-i18n="run_comparative_backtest">Сравнительный бэктест всех стратегий</span>
       <div id="compareBacktestContainer" class="hidden" style="margin-top: 30px;">
         <h3 style="color: #3fa9f5; margin-bottom: 15px;" data-i18n="strategy_comparison">📊 Сравнение стратегий</h3>
         <button id="runCompareBacktestBtn" style="margin-bottom: 20px; padding: 10px 20px; background: #3fa9f5; color: white; border: none; border-radius: 5px; cursor: pointer;" data-i18n="run_comparative_backtest">
@@ -520,7 +554,24 @@
           <div id="compareBacktestTable"></div>
         </div>
       </div>
-      -->
+
+      <script>
+        document.addEventListener('DOMContentLoaded', () => {
+          const btn = document.getElementById('runCompareBacktestBtn');
+          if (!btn) return;
+
+          btn.addEventListener('click', () => {
+            const enableBacktest = document.getElementById('enableBacktest');
+            if (enableBacktest) {
+              enableBacktest.checked = true;
+            }
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            if (analyzeBtn) {
+              analyzeBtn.click();
+            }
+          });
+        });
+      </script>
       <script id="demoReport" type="text/plain">=== Аналитический отчёт по BTC/USDT ===  
 Сгенерировано: 2025-10-31 17:42:18 (Europe/Kyiv)  
 Текущий рынок (bias):  Бычий
@@ -622,12 +673,18 @@
 
       <div id="strategyStats" class="strategy-stats">
         <h3 data-i18n="strategy_comparison">📈 Сравнение стратегий</h3>
+        <div id="strategySummaryLine" class="strategy-summary-line"></div>
         <div id="strategyStatsTable" class="stats-table"></div>
       </div>
 
       <div id="benchmarkComparison" class="benchmark-comparison">
         <h3 data-i18n="benchmark_title">⚖️ Benchmark: Стратегия vs "Купить и держать"</h3>
         <div id="benchmarkContent" class="benchmark-content"></div>
+      </div>
+
+      <div id="additionalRecommendations" class="additional-recommendations hidden">
+        <h3 data-i18n="recommendations_title">💡 Рекомендации</h3>
+        <div id="additionalRecommendationsContent" class="recommendations-content"></div>
       </div>
 
       <div id="heatmapSection" class="heatmap-section">

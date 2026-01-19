@@ -1,2 +1,7 @@
 dist/
 build/
+.env
+.secret_key
+*.log
+__pycache__/
+instance/

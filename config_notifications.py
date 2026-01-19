@@ -7,12 +7,12 @@
 
 # === Telegram настройки ===
 # Получите токен у @BotFather в Telegram
-TELEGRAM_BOT_TOKEN = "8559314895:AAFI0pwIcJgy7iZqtiSitIZM7DMHnrV5dbw"
+TELEGRAM_BOT_TOKEN = ""
 
 # === Email настройки (Resend API) ===
 # Получите API ключ на https://resend.com/api-keys
-RESEND_API_KEY = "re_aJY2AAvt_KrbfPNiGWEcJLibcsgUJ7tnK"
-RESEND_FROM_EMAIL = "tirion2025@gmail.com"  # Email отправителя (должен быть верифицирован в Resend)
+RESEND_API_KEY = ""
+RESEND_FROM_EMAIL = ""  # Email отправителя (должен быть верифицирован в Resend)
 
 # === Старые SMTP настройки (оставлены для обратной совместимости, но не используются) ===
 SMTP_HOST = "smtp.gmail.com"
