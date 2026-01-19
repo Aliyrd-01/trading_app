@@ -153,18 +153,26 @@
             
             <div style="margin-bottom: 15px;">
               <label style="display: block; color: #fff; margin-bottom: 8px;" data-i18n="auto_signal_confirmation_label">Подтверждения:</label>
-              <select id="autoSignalConfirmation" style="width: 100%; padding: 10px; background: #0f1320; border: 1px solid #2c3350; border-radius: 5px; color: #fff; font-size: 14px; box-sizing: border-box;">
-                <option value="NONE" data-i18n="confirmation_none">Без фильтров</option>
-                <option value="RSI" data-i18n="confirmation_rsi">RSI</option>
-                <option value="MACD" data-i18n="confirmation_macd">MACD</option>
-                <option value="EMA" data-i18n="confirmation_ema">EMA</option>
-                <option value="VWMA" data-i18n="confirmation_vwma">VWMA</option>
-                <option value="ADX" data-i18n="confirmation_adx">ADX</option>
-                <option value="BB" data-i18n="confirmation_bb">Bollinger Bands</option>
-                <option value="RSI+MACD" data-i18n="confirmation_rsi_macd">RSI + MACD</option>
-                <option value="EMA+ADX+VWMA" data-i18n="confirmation_ema_adx_vwma">EMA + ADX + VWMA</option>
-                <option value="ALL" data-i18n="confirmation_all">Все фильтры подтверждены</option>
-              </select>
+              <div class="confirmations-block">
+                <div class="confirmations-actions">
+                  <button type="button" id="autoConfirmationsNoneBtn" style="padding: 8px 12px; background: #2c3245; color: #fff; border: 1px solid #3a3f52; border-radius: 8px; cursor: pointer; font-size: 12px;">NONE</button>
+                  <button type="button" id="autoConfirmationsAllBtn" style="padding: 8px 12px; background: #2c3245; color: #fff; border: 1px solid #3a3f52; border-radius: 8px; cursor: pointer; font-size: 12px;">ALL</button>
+                </div>
+                <div class="confirmations-grid" id="autoSignalConfirmationCheckboxes">
+                  <label class="confirm-checkbox"><input type="checkbox" value="EMA"> <span data-i18n="confirmation_ema">EMA</span></label>
+                  <label class="confirm-checkbox"><input type="checkbox" value="RSI"> <span data-i18n="confirmation_rsi">RSI</span></label>
+                  <label class="confirm-checkbox"><input type="checkbox" value="MACD"> <span data-i18n="confirmation_macd">MACD</span></label>
+                  <label class="confirm-checkbox"><input type="checkbox" value="ADX"> <span data-i18n="confirmation_adx">ADX</span></label>
+                  <label class="confirm-checkbox"><input type="checkbox" value="VWMA"> <span data-i18n="confirmation_vwma">VWMA</span></label>
+                  <label class="confirm-checkbox"><input type="checkbox" value="BB"> <span data-i18n="confirmation_bb">Bollinger Bands</span></label>
+                  <label class="confirm-checkbox"><input type="checkbox" value="VWAP"> <span data-i18n="confirmation_vwap">VWAP</span></label>
+                  <label class="confirm-checkbox"><input type="checkbox" value="AVWAP"> <span data-i18n="confirmation_avwap">AVWAP</span></label>
+                  <label class="confirm-checkbox"><input type="checkbox" value="SUPERTREND"> <span data-i18n="confirmation_supertrend">SUPERTREND</span></label>
+                  <label class="confirm-checkbox"><input type="checkbox" value="STOCHRSI"> <span data-i18n="confirmation_stochrsi">STOCHRSI</span></label>
+                  <label class="confirm-checkbox"><input type="checkbox" value="OBV"> <span data-i18n="confirmation_obv">OBV</span></label>
+                  <label class="confirm-checkbox"><input type="checkbox" value="MSTRUCT"> <span data-i18n="confirmation_mstruct">MSTRUCT</span></label>
+                </div>
+              </div>
               <p style="color: #8ea0bf; font-size: 12px; margin-top: 5px; margin-bottom: 0;" data-i18n="auto_signal_confirmation_hint">Выберите тип подтверждения из списка</p>
             </div>
             
@@ -322,18 +330,26 @@
           <span data-i18n="confirmation">Тип подтверждения входа:</span>
           <span class="info" data-tip-key="tooltip_confirmation">ℹ️</span>
         </div>
-        <select id="confirmation">
-          <option value="EMA" data-i18n="confirmation_ema">EMA</option>
-          <option value="RSI" data-i18n="confirmation_rsi">RSI</option>
-          <option value="MACD" data-i18n="confirmation_macd">MACD</option>
-          <option value="VWMA" data-i18n="confirmation_vwma">VWMA</option>
-          <option value="ADX" data-i18n="confirmation_adx">ADX</option>
-          <option value="BB" data-i18n="confirmation_bb">Bollinger Bands (возврат внутрь)</option>
-          <option value="RSI+MACD" data-i18n="confirmation_rsi_macd">RSI + MACD</option>
-          <option value="EMA+ADX+VWMA" data-i18n="confirmation_ema_adx_vwma">EMA + ADX + VWMA</option>
-          <option value="ALL" data-i18n="confirmation_all">Все фильтры подтверждены</option>
-          <option value="NONE" data-i18n="confirmation_none">Без фильтров</option>
-        </select>
+        <div class="confirmations-block">
+          <div class="confirmations-actions">
+            <button type="button" id="confirmationsNoneBtn" style="padding: 8px 12px; background: #2c3245; color: #fff; border: 1px solid #3a3f52; border-radius: 8px; cursor: pointer; font-size: 12px;">NONE</button>
+            <button type="button" id="confirmationsAllBtn" style="padding: 8px 12px; background: #2c3245; color: #fff; border: 1px solid #3a3f52; border-radius: 8px; cursor: pointer; font-size: 12px;">ALL</button>
+          </div>
+          <div class="confirmations-grid" id="confirmationCheckboxes">
+            <label class="confirm-checkbox"><input type="checkbox" value="EMA"> <span data-i18n="confirmation_ema">EMA</span></label>
+            <label class="confirm-checkbox"><input type="checkbox" value="RSI"> <span data-i18n="confirmation_rsi">RSI</span></label>
+            <label class="confirm-checkbox"><input type="checkbox" value="MACD"> <span data-i18n="confirmation_macd">MACD</span></label>
+            <label class="confirm-checkbox"><input type="checkbox" value="ADX"> <span data-i18n="confirmation_adx">ADX</span></label>
+            <label class="confirm-checkbox"><input type="checkbox" value="VWMA"> <span data-i18n="confirmation_vwma">VWMA</span></label>
+            <label class="confirm-checkbox"><input type="checkbox" value="BB"> <span data-i18n="confirmation_bb">Bollinger Bands</span></label>
+            <label class="confirm-checkbox"><input type="checkbox" value="VWAP"> <span data-i18n="confirmation_vwap">VWAP</span></label>
+            <label class="confirm-checkbox"><input type="checkbox" value="AVWAP"> <span data-i18n="confirmation_avwap">AVWAP</span></label>
+            <label class="confirm-checkbox"><input type="checkbox" value="SUPERTREND"> <span data-i18n="confirmation_supertrend">SUPERTREND</span></label>
+            <label class="confirm-checkbox"><input type="checkbox" value="STOCHRSI"> <span data-i18n="confirmation_stochrsi">STOCHRSI</span></label>
+            <label class="confirm-checkbox"><input type="checkbox" value="OBV"> <span data-i18n="confirmation_obv">OBV</span></label>
+            <label class="confirm-checkbox"><input type="checkbox" value="MSTRUCT"> <span data-i18n="confirmation_mstruct">MSTRUCT</span></label>
+          </div>
+        </div>
       </label>
 
       <label class="with-info">

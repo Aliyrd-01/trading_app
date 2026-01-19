@@ -1,0 +1,378 @@
+{
+  "info": {
+    "name": "CryptoAnalyz - All APIs (Raw URLs)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {"key": "siteBaseUrl", "value": "https://cryptoanalyz.net/api"},
+    {"key": "localBaseUrl", "value": "http://127.0.0.1:5051"},
+    {"key": "email", "value": ""},
+    {"key": "password", "value": ""},
+    {"key": "name", "value": ""},
+    {"key": "language", "value": "ru"},
+    {"key": "laravelToken", "value": ""},
+    {"key": "schedulerKey", "value": ""},
+    {"key": "webhookSecret", "value": ""},
+    {"key": "telegramChatId", "value": ""}
+  ],
+  "item": [
+    {
+      "name": "Laravel Site API",
+      "item": [
+        {
+          "name": "Health - GET /test",
+          "request": {
+            "method": "GET",
+            "url": "{{siteBaseUrl}}/test"
+          }
+        },
+        {
+          "name": "Webhook - TradingView - POST /webhook/tradingview",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"secret\": \"{{webhookSecret}}\",\n  \"email\": \"{{email}}\",\n  \"symbol\": \"BTC/USDT\",\n  \"action\": \"BUY\",\n  \"entry_price\": 43000,\n  \"stop_loss\": 42500,\n  \"take_profit\": 44000,\n  \"timeframe\": \"15m\",\n  \"language\": \"{{language}}\",\n  \"comment\": \"manual test\"\n}"
+            },
+            "url": "{{siteBaseUrl}}/webhook/tradingview"
+          }
+        },
+        {
+          "name": "Scheduler - GET /scheduler/run",
+          "request": {
+            "method": "GET",
+            "url": "{{siteBaseUrl}}/scheduler/run?key={{schedulerKey}}"
+          }
+        },
+        {
+          "name": "Auth",
+          "item": [
+            {
+              "name": "POST /auth/register",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {"mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"name\": \"{{name}}\"\n}"},
+                "url": "{{siteBaseUrl}}/auth/register"
+              }
+            },
+            {
+              "name": "POST /auth/login",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {"mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"},
+                "url": "{{siteBaseUrl}}/auth/login"
+              }
+            },
+            {
+              "name": "POST /auth/token (sets laravelToken)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "try {",
+                      "  const j = pm.response.json();",
+                      "  if (j && j.token) pm.collectionVariables.set('laravelToken', j.token);",
+                      "} catch (e) {}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {"mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"},
+                "url": "{{siteBaseUrl}}/auth/token"
+              }
+            },
+            {
+              "name": "POST /auth/logout",
+              "request": {"method": "POST", "url": "{{siteBaseUrl}}/auth/logout"}
+            },
+            {
+              "name": "GET /auth/me",
+              "request": {"method": "GET", "url": "{{siteBaseUrl}}/auth/me"}
+            },
+            {
+              "name": "DELETE /auth/account",
+              "request": {
+                "method": "DELETE",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {"mode": "raw", "raw": "{\n  \"password\": \"{{password}}\"\n}"},
+                "url": "{{siteBaseUrl}}/auth/account"
+              }
+            },
+            {
+              "name": "POST /auth/verify-email",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {"mode": "raw", "raw": "{\n  \"token\": \"\"\n}"},
+                "url": "{{siteBaseUrl}}/auth/verify-email"
+              }
+            },
+            {
+              "name": "POST /auth/resend-verification",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {"mode": "raw", "raw": "{\n  \"email\": \"{{email}}\"\n}"},
+                "url": "{{siteBaseUrl}}/auth/resend-verification"
+              }
+            },
+            {
+              "name": "POST /auth/reset-password-request",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {"mode": "raw", "raw": "{\n  \"email\": \"{{email}}\"\n}"},
+                "url": "{{siteBaseUrl}}/auth/reset-password-request"
+              }
+            },
+            {
+              "name": "POST /auth/reset-password",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {"mode": "raw", "raw": "{\n  \"token\": \"\",\n  \"password\": \"{{password}}\"\n}"},
+                "url": "{{siteBaseUrl}}/auth/reset-password"
+              }
+            }
+          ]
+        },
+        {
+          "name": "User",
+          "item": [
+            {
+              "name": "PATCH /user/plan",
+              "request": {
+                "method": "PATCH",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {"mode": "raw", "raw": "{\n  \"plan\": \"free\"\n}"},
+                "url": "{{siteBaseUrl}}/user/plan"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Auto Signals",
+          "item": [
+            {"name": "GET /auto_signals/settings", "request": {"method": "GET", "url": "{{siteBaseUrl}}/auto_signals/settings"}},
+            {
+              "name": "POST /auto_signals/settings",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {"mode": "raw", "raw": "{\n  \"enabled\": true,\n  \"symbol\": \"BTC/USDT\",\n  \"capital\": 10000,\n  \"trading_type\": \"Дейли трейдинг\",\n  \"strategy\": \"Сбалансированная\",\n  \"risk\": 1,\n  \"confirmation\": \"ALL\",\n  \"min_reliability\": 60,\n  \"check_interval\": 5,\n  \"language\": \"{{language}}\",\n  \"enable_email_notifications\": true,\n  \"enable_telegram_notifications\": false,\n  \"telegram_chat_id\": \"{{telegramChatId}}\"\n}"},
+                "url": "{{siteBaseUrl}}/auto_signals/settings"
+              }
+            },
+            {"name": "GET /auto_signals/status", "request": {"method": "GET", "url": "{{siteBaseUrl}}/auto_signals/status"}},
+            {
+              "name": "POST /auto_signals/test",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {"mode": "raw", "raw": "{\n  \"language\": \"{{language}}\"\n}"},
+                "url": "{{siteBaseUrl}}/auto_signals/test"
+              }
+            },
+            {"name": "GET /auto_signals/logs", "request": {"method": "GET", "url": "{{siteBaseUrl}}/auto_signals/logs?limit=20"}}
+          ]
+        },
+        {
+          "name": "Desktop (Sanctum)",
+          "item": [
+            {
+              "name": "GET /desktop/auto_signals/settings",
+              "request": {
+                "method": "GET",
+                "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{laravelToken}}", "type": "string"}]},
+                "url": "{{siteBaseUrl}}/desktop/auto_signals/settings"
+              }
+            },
+            {
+              "name": "POST /desktop/auto_signals/settings",
+              "request": {
+                "method": "POST",
+                "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{laravelToken}}", "type": "string"}]},
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {"mode": "raw", "raw": "{\n  \"enabled\": true,\n  \"symbol\": \"BTC/USDT\",\n  \"capital\": 10000,\n  \"trading_type\": \"Дейли трейдинг\",\n  \"strategy\": \"Сбалансированная\",\n  \"risk\": 1,\n  \"confirmation\": \"ALL\",\n  \"min_reliability\": 60,\n  \"check_interval\": 5,\n  \"language\": \"{{language}}\",\n  \"enable_email_notifications\": true,\n  \"enable_telegram_notifications\": false,\n  \"telegram_chat_id\": \"{{telegramChatId}}\"\n}"},
+                "url": "{{siteBaseUrl}}/desktop/auto_signals/settings"
+              }
+            },
+            {
+              "name": "POST /desktop/auto_signals/test",
+              "request": {
+                "method": "POST",
+                "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{laravelToken}}", "type": "string"}]},
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {"mode": "raw", "raw": "{\n  \"language\": \"{{language}}\"\n}"},
+                "url": "{{siteBaseUrl}}/desktop/auto_signals/test"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Payments",
+          "item": [
+            {"name": "GET /payment/currencies", "request": {"method": "GET", "url": "{{siteBaseUrl}}/payment/currencies"}},
+            {
+              "name": "POST /payment/create",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {"mode": "raw", "raw": "{\n  \"plan\": \"pro\",\n  \"payment_method\": \"crypto\",\n  \"pay_currency\": \"ETH\"\n}"},
+                "url": "{{siteBaseUrl}}/payment/create"
+              }
+            },
+            {
+              "name": "POST /payment/create-multi",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {"mode": "raw", "raw": "{\n  \"plan\": \"pro\",\n  \"payment_method\": \"crypto\"\n}"},
+                "url": "{{siteBaseUrl}}/payment/create-multi"
+              }
+            },
+            {"name": "POST /payment/webhook", "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{}"}, "url": "{{siteBaseUrl}}/payment/webhook"}},
+            {"name": "GET /payment/status", "request": {"method": "GET", "url": "{{siteBaseUrl}}/payment/status"}}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Desktop/Local Python API",
+      "item": [
+        {
+          "name": "POST /api/login",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"remember\": true,\n  \"language\": \"{{language}}\"\n}"},
+            "url": "{{localBaseUrl}}/api/login"
+          }
+        },
+        {"name": "POST /api/logout", "request": {"method": "POST", "url": "{{localBaseUrl}}/api/logout"}},
+        {"name": "GET /session_check", "request": {"method": "GET", "url": "{{localBaseUrl}}/session_check"}},
+        {"name": "GET /api/user_info", "request": {"method": "GET", "url": "{{localBaseUrl}}/api/user_info?language={{language}}"}},
+        {"name": "GET /api/klines", "request": {"method": "GET", "url": "{{localBaseUrl}}/api/klines?symbol=BTCUSDT&interval=1h&limit=500&language={{language}}"}},
+        {
+          "name": "POST /api/analyze",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"symbol\": \"BTC/USDT\",\n  \"timeframe\": \"auto\",\n  \"strategy\": \"balanced\",\n  \"trading_type\": \"daytrading\",\n  \"capital\": 10000,\n  \"risk\": 1,\n  \"confirmation\": \"ALL\",\n  \"min_reliability\": 60,\n  \"enable_forecast\": false,\n  \"enable_backtest\": false,\n  \"enable_ml\": false,\n  \"enable_trailing\": false,\n  \"language\": \"{{language}}\"\n}"},
+            "url": "{{localBaseUrl}}/api/analyze"
+          }
+        },
+        {
+          "name": "POST /api/translate_report",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"text\": \"Example report text\",\n  \"language\": \"{{language}}\"\n}"},
+            "url": "{{localBaseUrl}}/api/translate_report"
+          }
+        },
+        {
+          "name": "Notifications",
+          "item": [
+            {
+              "name": "POST /api/save_notification_settings",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {"mode": "raw", "raw": "{\n  \"enable_email_notifications\": true,\n  \"enable_telegram_notifications\": false,\n  \"telegram_chat_id\": \"{{telegramChatId}}\",\n  \"language\": \"{{language}}\"\n}"},
+                "url": "{{localBaseUrl}}/api/save_notification_settings"
+              }
+            },
+            {"name": "GET /api/get_notification_settings", "request": {"method": "GET", "url": "{{localBaseUrl}}/api/get_notification_settings?language={{language}}"}},
+            {
+              "name": "POST /api/test_telegram_notification",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {"mode": "raw", "raw": "{\n  \"language\": \"{{language}}\"\n}"},
+                "url": "{{localBaseUrl}}/api/test_telegram_notification"
+              }
+            }
+          ]
+        },
+        {
+          "name": "TradingView webhook (local) - POST /api/webhook/tradingview",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"secret\": \"{{webhookSecret}}\",\n  \"email\": \"{{email}}\",\n  \"symbol\": \"BTC/USDT\",\n  \"action\": \"BUY\",\n  \"entry_price\": 43000,\n  \"stop_loss\": 42500,\n  \"take_profit\": 44000,\n  \"timeframe\": \"15m\",\n  \"language\": \"{{language}}\",\n  \"comment\": \"manual test\"\n}"},
+            "url": "{{localBaseUrl}}/api/webhook/tradingview"
+          }
+        },
+        {
+          "name": "Trading settings",
+          "item": [
+            {
+              "name": "POST /api/save_trading_settings",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {"mode": "raw", "raw": "{\n  \"exchange_spread\": 0.1,\n  \"language\": \"{{language}}\"\n}"},
+                "url": "{{localBaseUrl}}/api/save_trading_settings"
+              }
+            },
+            {"name": "GET /api/get_trading_settings", "request": {"method": "GET", "url": "{{localBaseUrl}}/api/get_trading_settings?language={{language}}"}}
+          ]
+        },
+        {
+          "name": "Feedback - POST /api/send_problem_message",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"message\": \"Test problem report\",\n  \"language\": \"{{language}}\"\n}"},
+            "url": "{{localBaseUrl}}/api/send_problem_message"
+          }
+        },
+        {"name": "Strategy analysis - GET /api/strategy_analysis", "request": {"method": "GET", "url": "{{localBaseUrl}}/api/strategy_analysis?language={{language}}"}},
+        {
+          "name": "Smart Combine - POST /api/smart_combine",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"symbol\": \"BTC/USDT\",\n  \"timeframe\": \"1h\",\n  \"language\": \"{{language}}\"\n}"},
+            "url": "{{localBaseUrl}}/api/smart_combine"
+          }
+        },
+        {
+          "name": "Export TradingView - POST /api/export_tradingview",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"language\": \"{{language}}\"\n}"},
+            "url": "{{localBaseUrl}}/api/export_tradingview"
+          }
+        },
+        {
+          "name": "Auto Signals",
+          "item": [
+            {"name": "GET /api/auto_signals/settings", "request": {"method": "GET", "url": "{{localBaseUrl}}/api/auto_signals/settings"}},
+            {
+              "name": "POST /api/auto_signals/settings",
+              "request": {
+                "method": "POST",
+                "header": [{"key": "Content-Type", "value": "application/json"}],
+                "body": {"mode": "raw", "raw": "{\n  \"auto_signals_enabled\": true,\n  \"auto_signal_symbol\": \"BTC/USDT\",\n  \"auto_signal_capital\": 10000,\n  \"auto_signal_trading_type\": \"daytrading\",\n  \"auto_signal_strategy\": \"balanced\",\n  \"auto_signal_risk\": 1,\n  \"auto_signal_confirmation\": \"ALL\",\n  \"auto_signal_min_reliability\": 60,\n  \"auto_signal_check_interval\": 60,\n  \"language\": \"{{language}}\"\n}"},
+                "url": "{{localBaseUrl}}/api/auto_signals/settings"
+              }
+            },
+            {"name": "POST /api/auto_signals/test", "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"language\": \"{{language}}\"\n}"}, "url": "{{localBaseUrl}}/api/auto_signals/test"}}
+          ]
+        },
+        {"name": "Demo page - GET /demo", "request": {"method": "GET", "url": "{{localBaseUrl}}/demo"}}
+      ]
+    }
+  ]
+}

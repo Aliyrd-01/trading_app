@@ -21,6 +21,7 @@ def run_migration():
         try:
             inspector = inspect(db.engine)
             columns = [col['name'] for col in inspector.get_columns('users')]
+            columns_info = {col['name']: col for col in inspector.get_columns('users')}
             
             migrations = [
                 ('auto_signals_enabled', 'BOOLEAN DEFAULT FALSE'),
@@ -29,7 +30,7 @@ def run_migration():
                 ('auto_signal_trading_type', 'VARCHAR(50) NULL'),
                 ('auto_signal_strategy', 'VARCHAR(50) NULL'),
                 ('auto_signal_risk', 'FLOAT NULL'),
-                ('auto_signal_confirmation', 'VARCHAR(100) NULL'),
+                ('auto_signal_confirmation', 'VARCHAR(255) NULL'),
                 ('auto_signal_min_reliability', 'FLOAT DEFAULT 60.0'),
                 ('auto_signal_check_interval', 'INT DEFAULT 60'),
                 ('auto_signal_last_check', 'DATETIME NULL'),
@@ -44,6 +45,18 @@ def run_migration():
                     logger.info(f"✅ Колонка {col_name} добавлена")
                 else:
                     logger.info(f"ℹ️ Колонка {col_name} уже существует")
+
+            # Расширяем длину auto_signal_confirmation, если колонка уже была создана ранее с меньшей длиной
+            info = columns_info.get('auto_signal_confirmation')
+            if info and info.get('type') is not None and hasattr(info['type'], 'length'):
+                try:
+                    current_len = int(getattr(info['type'], 'length') or 0)
+                except Exception:
+                    current_len = 0
+                if current_len and current_len < 255:
+                    logger.info(f"Обновление длины auto_signal_confirmation: {current_len} -> 255")
+                    db.session.execute(text("ALTER TABLE users MODIFY COLUMN auto_signal_confirmation VARCHAR(255) NULL"))
+                    logger.info("✅ Колонка auto_signal_confirmation обновлена")
             
             db.session.commit()
             logger.info("✅ Миграция завершена успешно!")

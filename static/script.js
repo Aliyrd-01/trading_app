@@ -174,6 +174,46 @@ let lastAnalysisData = null; // Данные последнего анализа
 let lastReportMarkdown = null; // Markdown отчета с ключами переводов
 let lastReportsByLanguage = null; // ✅ Отчеты на всех трех языках {"ru": "...", "en": "...", "uk": "..."}
 
+function getSelectedConfirmationsFromCheckboxes(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return [];
+  const boxes = Array.from(container.querySelectorAll('input[type="checkbox"]'));
+  return boxes.filter(b => b.checked).map(b => String(b.value || '').trim()).filter(Boolean);
+}
+
+function setConfirmationCheckboxesFromValue(containerId, value) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const boxes = Array.from(container.querySelectorAll('input[type="checkbox"]'));
+  const raw = (value || '').toString().trim();
+  const upper = raw.toUpperCase();
+  if (!raw || upper === 'NONE' || upper === 'N/A') {
+    boxes.forEach(b => { b.checked = false; });
+    return;
+  }
+  if (upper === 'ALL') {
+    boxes.forEach(b => { b.checked = true; });
+    return;
+  }
+  const set = new Set(raw.split('+').map(s => s.trim().toUpperCase()).filter(Boolean));
+  boxes.forEach(b => {
+    const v = String(b.value || '').trim().toUpperCase();
+    b.checked = set.has(v);
+  });
+}
+
+function getConfirmationValueForAnalyze() {
+  const selected = getSelectedConfirmationsFromCheckboxes('confirmationCheckboxes');
+  if (!selected.length) return 'NONE';
+  return selected;
+}
+
+function getAutoSignalConfirmationValue() {
+  const selected = getSelectedConfirmationsFromCheckboxes('autoSignalConfirmationCheckboxes');
+  if (!selected.length) return 'NONE';
+  return selected;
+}
+
 function t(key, params = {}) {
   const translation = translations[currentLanguage]?.[key] || translations['ru'][key] || key;
   if (Object.keys(params).length === 0) {
@@ -1604,6 +1644,19 @@ document.addEventListener("DOMContentLoaded", () => {
   const enableBacktest = document.getElementById("enableBacktest");
   const enableML = document.getElementById("enableML");
 
+  const confirmationsNoneBtn = document.getElementById('confirmationsNoneBtn');
+  const confirmationsAllBtn = document.getElementById('confirmationsAllBtn');
+  if (confirmationsNoneBtn) {
+    confirmationsNoneBtn.addEventListener('click', () => {
+      setConfirmationCheckboxesFromValue('confirmationCheckboxes', 'NONE');
+    });
+  }
+  if (confirmationsAllBtn) {
+    confirmationsAllBtn.addEventListener('click', () => {
+      setConfirmationCheckboxesFromValue('confirmationCheckboxes', 'ALL');
+    });
+  }
+
   // === Logout ===
   if (logoutBtn) {
     logoutBtn.addEventListener("click", async (e) => {
@@ -2296,28 +2349,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const data = await res.json();
         
         if (res.ok && data.indicators) {
-          // Устанавливаем выбранные индикаторы
-          const confirmationSelect = document.getElementById("confirmation");
-          const indicatorValue = data.indicators.join("+");
-          
-          // Ищем существующий вариант или создаём новый
-          let found = false;
-          for (let option of confirmationSelect.options) {
-            if (option.value === indicatorValue) {
-              confirmationSelect.value = indicatorValue;
-              found = true;
-              break;
-            }
-          }
-          
-          if (!found) {
-            // Создаём новый option
-            const newOption = document.createElement("option");
-            newOption.value = indicatorValue;
-            newOption.textContent = data.indicators.join(" + ");
-            confirmationSelect.appendChild(newOption);
-            confirmationSelect.value = indicatorValue;
-          }
+          setConfirmationCheckboxesFromValue('confirmationCheckboxes', data.indicators.join('+'));
           
           // Показываем результат под кнопкой (не исчезает до следующего запуска анализа)
           const indicatorNames = data.indicators.join(" + ");
@@ -2640,7 +2672,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     const risk = parseFloat(document.getElementById("risk").value);
-    const confirmation = document.getElementById("confirmation").value;
+    const confirmation = getConfirmationValueForAnalyze();
     const timeframe = timeframeSelect && timeframeSelect.value !== "auto" ? timeframeSelect.value : null;
 
     if (!confirmation) {
@@ -3853,7 +3885,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const autoSignalTradingType = document.getElementById('autoSignalTradingType');
         const autoSignalStrategy = document.getElementById('autoSignalStrategy');
         const autoSignalRisk = document.getElementById('autoSignalRisk');
-        const autoSignalConfirmation = document.getElementById('autoSignalConfirmation');
         const autoSignalMinReliability = document.getElementById('autoSignalMinReliability');
         const autoSignalCheckInterval = document.getElementById('autoSignalCheckInterval');
         const autoSignalsConfig = document.getElementById('autoSignalsConfig');
@@ -3879,9 +3910,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (autoSignalRisk && settings.auto_signal_risk) {
           autoSignalRisk.value = settings.auto_signal_risk;
         }
-        if (autoSignalConfirmation && settings.auto_signal_confirmation) {
-          autoSignalConfirmation.value = settings.auto_signal_confirmation;
-        }
+        setConfirmationCheckboxesFromValue('autoSignalConfirmationCheckboxes', settings.auto_signal_confirmation || 'NONE');
         if (autoSignalMinReliability && settings.auto_signal_min_reliability) {
           autoSignalMinReliability.value = settings.auto_signal_min_reliability;
         }
@@ -3903,6 +3932,19 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  const autoConfirmationsNoneBtn = document.getElementById('autoConfirmationsNoneBtn');
+  const autoConfirmationsAllBtn = document.getElementById('autoConfirmationsAllBtn');
+  if (autoConfirmationsNoneBtn) {
+    autoConfirmationsNoneBtn.addEventListener('click', () => {
+      setConfirmationCheckboxesFromValue('autoSignalConfirmationCheckboxes', 'NONE');
+    });
+  }
+  if (autoConfirmationsAllBtn) {
+    autoConfirmationsAllBtn.addEventListener('click', () => {
+      setConfirmationCheckboxesFromValue('autoSignalConfirmationCheckboxes', 'ALL');
+    });
+  }
+
   // Сохранение настроек автосигналов
   const saveAutoSignalsSettingsBtn = document.getElementById('saveAutoSignalsSettingsBtn');
   if (saveAutoSignalsSettingsBtn) {
@@ -3913,7 +3955,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const autoSignalTradingType = document.getElementById('autoSignalTradingType');
       const autoSignalStrategy = document.getElementById('autoSignalStrategy');
       const autoSignalRisk = document.getElementById('autoSignalRisk');
-      const autoSignalConfirmation = document.getElementById('autoSignalConfirmation');
       const autoSignalMinReliability = document.getElementById('autoSignalMinReliability');
       const autoSignalCheckInterval = document.getElementById('autoSignalCheckInterval');
       
@@ -3928,7 +3969,7 @@ document.addEventListener("DOMContentLoaded", () => {
             auto_signal_trading_type: autoSignalTradingType?.value || null,
             auto_signal_strategy: autoSignalStrategy?.value || null,
             auto_signal_risk: parseFloat(autoSignalRisk?.value || 0) || null,
-            auto_signal_confirmation: autoSignalConfirmation?.value || null,
+            auto_signal_confirmation: getAutoSignalConfirmationValue(),
             auto_signal_min_reliability: parseFloat(autoSignalMinReliability?.value || 60) || 60,
             auto_signal_check_interval: parseInt(autoSignalCheckInterval?.value || 60) || 60
           })

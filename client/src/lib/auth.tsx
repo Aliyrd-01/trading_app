@@ -87,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw errorWithCode;
     }
 
-    const userData = await response.json();
+    const userData: any = await response.json();
     queryClient.clear();
     setUser(userData);
     setLocation('/dashboard');
@@ -116,8 +116,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(msg || 'Registration failed');
     }
 
-    const userData = await response.json();
+    const userData: any = await response.json();
     queryClient.clear();
+    if (userData && typeof userData === 'object' && userData.verification_required) {
+      setUser(null);
+      setLocation('/auth?verify=1');
+      return;
+    }
     setUser(userData);
     setLocation('/dashboard');
   };

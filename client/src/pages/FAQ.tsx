@@ -115,6 +115,20 @@ export default function FAQ() {
                     </AccordionContent>
                   </AccordionItem>
 
+                  <AccordionItem value="desktop-tradingview-webhook">
+                    <AccordionTrigger>{t("faq.desktopApp.q.tradingviewWebhook")}</AccordionTrigger>
+                    <AccordionContent className="text-muted-foreground whitespace-pre-wrap">
+                      {t("faq.desktopApp.a.tradingviewWebhook")}
+                    </AccordionContent>
+                  </AccordionItem>
+
+                  <AccordionItem value="desktop-notifications-changes">
+                    <AccordionTrigger>{t("faq.desktopApp.q.notificationsTestChanged")}</AccordionTrigger>
+                    <AccordionContent className="text-muted-foreground whitespace-pre-wrap">
+                      {t("faq.desktopApp.a.notificationsTestChanged")}
+                    </AccordionContent>
+                  </AccordionItem>
+
                   <AccordionItem value="desktop-logs">
                     <AccordionTrigger>{t("faq.desktopApp.q.logs")}</AccordionTrigger>
                     <AccordionContent className="text-muted-foreground">

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -96,6 +96,30 @@ type AutoSignalsStatusResponse = {
   access?: AutoSignalsAccess;
 };
 
+function formatIsoLocal(iso: string | null | undefined, language: string): string {
+  const raw = (iso ?? "").trim();
+  if (!raw) return "-";
+
+  const locale = language === "ru" ? "ru-RU" : language === "uk" ? "uk-UA" : "en-GB";
+  const dt = new Date(raw);
+  if (Number.isNaN(dt.getTime())) {
+    return raw.replace("T", " ").replace("Z", "");
+  }
+
+  const date = new Intl.DateTimeFormat(locale, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(dt);
+  const time = new Intl.DateTimeFormat(locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(dt);
+
+  return `${date} ${time}`;
+}
+
 function normalizeTradingType(v: string | null | undefined): string | null {
   const raw = (v ?? "").trim();
   if (!raw) return null;
@@ -163,6 +187,72 @@ function buildConfirmationString(ui: ConfirmationUi): string {
   return ui.selected.join("+");
 }
 
+function useIsTouchDevice(): boolean {
+  const [isTouch, setIsTouch] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia?.("(pointer: coarse)");
+    const update = () => setIsTouch(Boolean(mq?.matches));
+    update();
+    mq?.addEventListener?.("change", update);
+    return () => mq?.removeEventListener?.("change", update);
+  }, []);
+
+  return isTouch;
+}
+
+function InfoHelp({ label, text }: { label: string; text: string }) {
+  const isTouch = useIsTouchDevice();
+  const _id = useId();
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isTouch && open) setOpen(false);
+  }, [isTouch, open]);
+
+  return (
+    <>
+      {isTouch && open ? (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setOpen(false)}
+          aria-hidden="true"
+          data-testid="autosignals-tooltip-overlay"
+        />
+      ) : null}
+      <Tooltip open={isTouch ? open : undefined} onOpenChange={isTouch ? setOpen : undefined}>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className="inline-flex items-center text-muted-foreground hover:text-foreground"
+            aria-label={label}
+            aria-describedby={_id}
+            onClick={
+              isTouch
+                ? (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setOpen((v) => !v);
+                  }
+                : undefined
+            }
+          >
+            <Info className="h-4 w-4" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent
+          side="top"
+          align="start"
+          className="max-w-[calc(100vw-24px)] sm:max-w-[340px] whitespace-pre-line break-words"
+          id={_id}
+        >
+          {text}
+        </TooltipContent>
+      </Tooltip>
+    </>
+  );
+}
+
 const defaultPairs = [
   "BTC/USDT",
   "ETH/USDT",
@@ -190,7 +280,20 @@ const strategies: Array<{ value: string; labelKey: string }> = [
   { value: "Агрессивная", labelKey: "autoSignals.strategy.aggressive" },
 ];
 
-const confirmationIndicators = ["EMA", "RSI", "MACD", "ADX", "VWMA", "BB"];
+const confirmationIndicators = [
+  "EMA",
+  "RSI",
+  "MACD",
+  "ADX",
+  "VWMA",
+  "VWAP",
+  "AVWAP",
+  "SUPERTREND",
+  "STOCHRSI",
+  "OBV",
+  "MSTRUCT",
+  "BB",
+];
 
 function ChoiceCard({
   title,
@@ -383,22 +486,22 @@ export default function AutoSignalsPanel() {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center shrink-0">
             <LineChart className="w-6 h-6 text-primary" />
           </div>
           <div className="min-w-0">
-            <div className="text-xs sm:text-sm text-muted-foreground">
+            <div className="text-fluid-xs sm:text-sm text-muted-foreground">
               {t("learnMore.trading.title")}
             </div>
-            <div className="text-xl sm:text-2xl font-bold truncate leading-tight">
+            <div className="text-lg sm:text-2xl font-bold leading-tight break-words">
               {t("header.tradingAnalyzer")}
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
           {locked ? (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -416,7 +519,12 @@ export default function AutoSignalsPanel() {
             </Tooltip>
           ) : null}
 
-          <Badge variant="outline" className={cn(form.enabled && !locked ? "text-primary border-primary/50" : "")}
+          <Badge
+            variant="outline"
+            className={cn(
+              "text-[11px] sm:text-xs",
+              form.enabled && !locked ? "text-primary border-primary/50" : ""
+            )}
           >
             {locked ? t("autoSignals.disabled") : form.enabled ? t("autoSignals.enabled") : t("autoSignals.disabled")}
           </Badge>
@@ -425,9 +533,9 @@ export default function AutoSignalsPanel() {
 
       <Card className="p-4 sm:p-6 border-card-border">
         <div className="flex items-center justify-between gap-4">
-          <div className="space-y-1">
+          <div className="space-y-1 min-w-0">
             <div className="font-semibold">{t("autoSignals.toggleTitle")}</div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-fluid-xs sm:text-xs text-muted-foreground">
               {t("autoSignals.toggleHint")}
             </div>
           </div>
@@ -435,24 +543,21 @@ export default function AutoSignalsPanel() {
             checked={!!form.enabled}
             onCheckedChange={(v) => setForm((p) => ({ ...p, enabled: v }))}
             disabled={locked}
+            className="shrink-0"
           />
         </div>
 
         {status ? (
-          <div className="pt-3 text-xs text-muted-foreground grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <div>
+          <div className="pt-3 text-fluid-xs sm:text-xs text-muted-foreground grid grid-cols-1 sm:grid-cols-3 gap-2 min-w-0">
+            <div className="min-w-0">
               <span className="font-medium">{t("autoSignals.lastCheck")}: </span>
-              <span className="font-mono">
-                {(status.last_check ?? "").replace("T", " ").replace("Z", "") || "-"}
-              </span>
+              <span className="font-mono break-words">{formatIsoLocal(status.last_check, language)}</span>
             </div>
-            <div>
+            <div className="min-w-0">
               <span className="font-medium">{t("autoSignals.nextCheck")}: </span>
-              <span className="font-mono">
-                {(status.next_check ?? "").replace("T", " ").replace("Z", "") || "-"}
-              </span>
+              <span className="font-mono break-words">{formatIsoLocal(status.next_check, language)}</span>
             </div>
-            <div>
+            <div className="min-w-0">
               <span className="font-medium">{t("autoSignals.nextCheckIn")}: </span>
               <span className="font-mono">{status.minutes_until_next}m</span>
             </div>
@@ -495,20 +600,7 @@ export default function AutoSignalsPanel() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="font-semibold">{t("autoSignals.tradingTypeTitle")}</div>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    className="inline-flex items-center text-muted-foreground hover:text-foreground"
-                    aria-label={t("autoSignals.tradingTypeTitle")}
-                  >
-                    <Info className="h-4 w-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top" align="start" className="max-w-[340px]">
-                  {t("autoSignals.tradingTypeInfo")}
-                </TooltipContent>
-              </Tooltip>
+              <InfoHelp label={t("autoSignals.tradingTypeTitle")} text={t("autoSignals.tradingTypeInfo")} />
             </div>
           </div>
 
@@ -533,20 +625,7 @@ export default function AutoSignalsPanel() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="font-semibold">{t("autoSignals.strategyTitle")}</div>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    className="inline-flex items-center text-muted-foreground hover:text-foreground"
-                    aria-label={t("autoSignals.strategyTitle")}
-                  >
-                    <Info className="h-4 w-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top" align="start" className="max-w-[340px]">
-                  {t("autoSignals.strategyInfo")}
-                </TooltipContent>
-              </Tooltip>
+              <InfoHelp label={t("autoSignals.strategyTitle")} text={t("autoSignals.strategyInfo")} />
             </div>
           </div>
 
@@ -627,21 +706,21 @@ export default function AutoSignalsPanel() {
             <div className="flex flex-wrap items-center justify-end gap-2">
               <Badge
                 variant={confirmationUi.mode === "ALL" ? "default" : "outline"}
-                className="cursor-pointer text-xs"
+                className="cursor-pointer"
                 onClick={() => setConfirmationUi({ mode: "ALL", selected: [] })}
               >
                 {t("autoSignals.confirmation.all")}
               </Badge>
               <Badge
                 variant={confirmationUi.mode === "NONE" ? "default" : "outline"}
-                className="cursor-pointer text-xs"
+                className="cursor-pointer"
                 onClick={() => setConfirmationUi({ mode: "NONE", selected: [] })}
               >
                 {t("autoSignals.confirmation.none")}
               </Badge>
               <Badge
                 variant={confirmationUi.mode === "CUSTOM" ? "default" : "outline"}
-                className="cursor-pointer text-xs"
+                className="cursor-pointer"
                 onClick={() => setConfirmationUi((p) => ({ mode: "CUSTOM", selected: p.selected }))}
               >
                 {t("autoSignals.custom")}
@@ -732,6 +811,7 @@ export default function AutoSignalsPanel() {
 
       <div className="flex flex-col sm:flex-row gap-3">
         <Button
+          type="button"
           onClick={() => saveMutation.mutate()}
           disabled={locked || saving || settingsLoading || !isDirty}
           className="w-full sm:w-auto"
@@ -739,15 +819,9 @@ export default function AutoSignalsPanel() {
           {saving ? t("autoSignals.saving") : t("autoSignals.save")}
         </Button>
         <Button
+          type="button"
           variant="outline"
           onClick={() => {
-            // Ensure the test uses the latest UI state (notification toggles, chat id, trading mode, etc.)
-            if (isDirty) {
-              saveMutation.mutate(undefined, {
-                onSuccess: () => testMutation.mutate(),
-              });
-              return;
-            }
             testMutation.mutate();
           }}
           disabled={locked || testing || settingsLoading || saving}
@@ -772,8 +846,8 @@ export default function AutoSignalsPanel() {
             <div className="font-semibold">{t("autoSignals.logsTitle")}</div>
           </div>
 
-          <div className="rounded-xl border border-card-border overflow-x-hidden sm:overflow-x-auto autosignals-logs-scrollbar">
-            <Table className="text-xs w-full table-auto" data-no-x-scroll>
+          <div className="rounded-xl border border-card-border overflow-x-auto autosignals-logs-scrollbar">
+            <Table className="text-xs w-full table-auto">
               <TableHeader>
                 <TableRow>
                   <TableHead className="h-9 px-2 text-[11px] whitespace-nowrap">{t("autoSignals.table.id")}</TableHead>
@@ -826,10 +900,10 @@ export default function AutoSignalsPanel() {
                         <TableCell className="px-2 py-2 font-mono text-[10px] whitespace-nowrap tabular-nums hidden md:table-cell">{item.reliability ?? ""}</TableCell>
                         <TableCell className="px-2 py-2 text-[11px] text-muted-foreground">
                           {(() => {
-                            const raw = (item.created_at ?? "").replace("T", " ").replace("Z", "");
+                            const raw = formatIsoLocal(item.created_at ?? "", language);
                             const parts = raw.split(" ");
-                            const date = parts[0] ?? "";
-                            const time = (parts[1] ?? "").slice(0, 8);
+                            const date = parts.slice(0, -1).join(" ") || "-";
+                            const time = parts.slice(-1)[0] || "-";
                             return (
                               <div className="leading-tight">
                                 <div className="whitespace-normal sm:whitespace-nowrap">{date}</div>
@@ -840,7 +914,7 @@ export default function AutoSignalsPanel() {
                         </TableCell>
                       </TableRow>
                     </DialogTrigger>
-                    <DialogContent className="max-w-3xl w-[calc(100vw-24px)] sm:w-full">
+                    <DialogContent className="max-w-3xl w-[calc(100%-24px)] sm:w-full">
                       <DialogHeader>
                         <DialogTitle>
                           {t("autoSignals.logTitle")} #{item.id}

@@ -251,6 +251,26 @@ const translations: Translations = {
     uk: 'Використовуйте Advanced режим, щоб налаштувати таймфрейми, підтвердження, параметри ризику та додаткові опції аналізу.',
     ru: 'Используйте Advanced режим, чтобы настроить таймфреймы, подтверждения, параметры риска и дополнительные опции анализа.'
   },
+  'faq.desktopApp.q.tradingviewWebhook': {
+    en: 'How do I connect TradingView alerts (webhook)?',
+    uk: 'Як підключити алерти TradingView (webhook)?',
+    ru: 'Как подключить TradingView (webhook)?'
+  },
+  'faq.desktopApp.a.tradingviewWebhook': {
+    en: '1) In the Desktop App, enable Telegram and/or Email notifications in Settings and save.\n\n2) In TradingView, create an Alert and enable Webhook URL.\nWebhook URL: https://cryptoanalyz.net/api/webhook/tradingview\n\n3) Set the Alert message to JSON. Required fields: secret, email, action (BUY/SELL), entry_price, stop_loss, take_profit.\nExample:\n{\n  "secret": "YOUR_WEBHOOK_SECRET",\n  "email": "your@email.com",\n  "symbol": "BTC/USDT",\n  "action": "BUY",\n  "entry_price": 43000,\n  "stop_loss": 42500,\n  "take_profit": 44000,\n  "timeframe": "15m",\n  "language": "en",\n  "comment": "Signal from TradingView"\n}\n\nNote: the email must match your account email in the app.',
+    uk: '1) У Desktop App увімкніть Telegram та/або Email сповіщення в Налаштуваннях і збережіть.\n\n2) У TradingView створіть Alert і увімкніть Webhook URL.\nWebhook URL: https://cryptoanalyz.net/api/webhook/tradingview\n\n3) У полі Message вставте JSON. Обов’язкові поля: secret, email, action (BUY/SELL), entry_price, stop_loss, take_profit.\nПриклад:\n{\n  "secret": "YOUR_WEBHOOK_SECRET",\n  "email": "your@email.com",\n  "symbol": "BTC/USDT",\n  "action": "BUY",\n  "entry_price": 43000,\n  "stop_loss": 42500,\n  "take_profit": 44000,\n  "timeframe": "15m",\n  "language": "uk",\n  "comment": "Signal from TradingView"\n}\n\nПримітка: email має збігатися з email вашого акаунта в додатку.',
+    ru: '1) В Desktop App включите Telegram и/или Email уведомления в Настройках и сохраните.\n\n2) В TradingView создайте Alert и включите Webhook URL.\nWebhook URL: https://cryptoanalyz.net/api/webhook/tradingview\n\n3) В поле Message вставьте JSON. Обязательные поля: secret, email, action (BUY/SELL), entry_price, stop_loss, take_profit.\nПример:\n{\n  "secret": "YOUR_WEBHOOK_SECRET",\n  "email": "your@email.com",\n  "symbol": "BTC/USDT",\n  "action": "BUY",\n  "entry_price": 43000,\n  "stop_loss": 42500,\n  "take_profit": 44000,\n  "timeframe": "15m",\n  "language": "ru",\n  "comment": "Signal from TradingView"\n}\n\nПримечание: email должен совпадать с email вашего аккаунта в приложении.'
+  },
+  'faq.desktopApp.q.notificationsTestChanged': {
+    en: 'Why did the test notification button change?',
+    uk: 'Чому змінилася кнопка тестового повідомлення?',
+    ru: 'Что изменилось в кнопке тестового уведомления?'
+  },
+  'faq.desktopApp.a.notificationsTestChanged': {
+    en: 'Previously the test button was Telegram-only. Now the button “Send test message” sends a test message to all enabled channels (Telegram and/or Email).\nIf nothing is enabled, turn on at least one channel in Settings and try again.',
+    uk: 'Раніше тестова кнопка працювала лише для Telegram. Тепер кнопка “Відправити тестове повідомлення” надсилає тест у всі увімкнені канали (Telegram та/або Email).\nЯкщо нічого не увімкнено — активуйте хоча б один канал у Налаштуваннях і спробуйте знову.',
+    ru: 'Раньше тестовая кнопка была только для Telegram. Теперь кнопка “Отправить тестовое сообщение” отправляет тест во все включённые каналы (Telegram и/или Email).\nЕсли ничего не включено — активируйте хотя бы один канал в Настройках и повторите тест.'
+  },
   'faq.desktopApp.q.logs': {
     en: 'Where are logs and reports stored?',
     uk: 'Де зберігаються логи та звіти?',

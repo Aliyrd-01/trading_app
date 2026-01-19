@@ -5,7 +5,7 @@ export default function DemoRedirect() {
   const iframeSrc = useMemo(() => `https://cryptoanalyz.net/demo_static.html?cb=${Date.now()}`, []);
 
   return (
-    <div className="min-h-screen w-full bg-[#0f1320] relative">
+    <div className="min-h-[100dvh] w-full bg-[#0f1320] relative">
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center text-white">
           <div className="text-center">
@@ -16,7 +16,7 @@ export default function DemoRedirect() {
       )}
       <iframe
         src={iframeSrc}
-        className="w-full h-screen border-none"
+        className="w-full h-[100dvh] border-none"
         allow="fullscreen"
         allowFullScreen
         title="Demo Application"

@@ -379,10 +379,17 @@ class CheckSignalsCommand extends Command
             return '';
         }
 
-        $symbol = str_replace([' ', '-'], '', $symbol);
-        $symbol = str_replace('/', '', $symbol);
+        // Handle TradingView-like format: EXCHANGE:BASE/QUOTE
+        if (strpos($symbol, ':') !== false) {
+            $parts = explode(':', $symbol);
+            $symbol = (string) end($parts);
+        }
 
-        return strtoupper($symbol);
+        $symbol = strtoupper($symbol);
+        $symbol = str_replace([' ', '-', '/'], '', $symbol);
+        $symbol = preg_replace('/[^A-Z0-9]/', '', $symbol) ?? '';
+
+        return $symbol;
     }
 
     private function fetchKlines(Client $client, string $symbol, string $interval, int $limit): array
@@ -538,6 +545,8 @@ class CheckSignalsCommand extends Command
             'MACD' => $macd['macd'] > $macd['signal'],
             'ADX' => $adx > 25,
             'VWMA' => end($closes) > $vwma20,
+            'STOCHRSI' => $this->stochRsi($closes, 14) > 50,
+            'MSTRUCT' => $this->marketStructure($highs, $lows, $trend),
             'BB' => (
                 ($prevBb['lower'] !== null && $bb['lower'] !== null && $prevClose < $prevBb['lower'] && end($closes) >= $bb['lower'])
                 || ($prevBb['upper'] !== null && $bb['upper'] !== null && $prevClose > $prevBb['upper'] && end($closes) <= $bb['upper'])
@@ -809,11 +818,94 @@ class CheckSignalsCommand extends Command
         $parts = array_filter(array_map('trim', explode('+', $conf)));
         $out = [];
         foreach ($parts as $p) {
-            $p = strtoupper($p);
-            $out[] = $p;
+            $p = $this->normalizeIndicatorName($p);
+            if ($p !== '') {
+                $out[] = $p;
+            }
         }
 
         return $out;
+    }
+
+    private function normalizeIndicatorName(string $name): string
+    {
+        $s = strtoupper(trim($name));
+        $s = str_replace([' ', '-', '_'], '', $s);
+        return $s;
+    }
+
+    private function stochRsi(array $closes, int $period): float
+    {
+        $n = count($closes);
+        if ($n < $period + 2) {
+            return 0.0;
+        }
+
+        $rsiSeries = [];
+        for ($i = $period; $i < $n; $i++) {
+            $slice = array_slice($closes, 0, $i + 1);
+            $rsiSeries[] = TechnicalIndicators::rsi($slice, $period);
+        }
+
+        $window = array_slice($rsiSeries, -$period);
+        if (count($window) < 2) {
+            return 0.0;
+        }
+
+        $min = min($window);
+        $max = max($window);
+        if (abs($max - $min) <= 1e-12) {
+            return 0.0;
+        }
+
+        $last = (float) end($window);
+        $stoch = ($last - $min) / ($max - $min);
+        $stoch = max(0.0, min(1.0, $stoch));
+        return $stoch * 100.0;
+    }
+
+    private function marketStructure(array $highs, array $lows, string $trend): bool
+    {
+        $n = min(count($highs), count($lows));
+        if ($n < 10) {
+            return false;
+        }
+
+        $pivotHighs = [];
+        $pivotLows = [];
+        for ($i = 2; $i < $n - 2; $i++) {
+            $h = $highs[$i];
+            $l = $lows[$i];
+
+            $isPh = ($h > $highs[$i - 1]) && ($h > $highs[$i - 2]) && ($h > $highs[$i + 1]) && ($h > $highs[$i + 2]);
+            $isPl = ($l < $lows[$i - 1]) && ($l < $lows[$i - 2]) && ($l < $lows[$i + 1]) && ($l < $lows[$i + 2]);
+
+            if ($isPh) {
+                $pivotHighs[] = (float) $h;
+            }
+            if ($isPl) {
+                $pivotLows[] = (float) $l;
+            }
+        }
+
+        if (count($pivotHighs) < 2 || count($pivotLows) < 2) {
+            return false;
+        }
+
+        $lastPh = (float) $pivotHighs[count($pivotHighs) - 1];
+        $prevPh = (float) $pivotHighs[count($pivotHighs) - 2];
+        $lastPl = (float) $pivotLows[count($pivotLows) - 1];
+        $prevPl = (float) $pivotLows[count($pivotLows) - 2];
+
+        if ($trend === 'Uptrend') {
+            return ($lastPh > $prevPh) && ($lastPl > $prevPl);
+        }
+
+        if ($trend === 'Downtrend') {
+            return ($lastPh < $prevPh) && ($lastPl < $prevPl);
+        }
+
+        return false;
     }
 
     private function ema(array $values, int $period): array

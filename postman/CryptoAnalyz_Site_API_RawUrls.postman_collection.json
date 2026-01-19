@@ -1,0 +1,498 @@
+{
+  "info": {
+    "name": "CryptoAnalyz - Site API (Laravel) (Raw URLs)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {"key": "siteBaseUrl", "value": "https://cryptoanalyz.net/api"},
+    {"key": "siteCookie", "value": ""},
+    {"key": "email", "value": ""},
+    {"key": "password", "value": ""},
+    {"key": "name", "value": ""},
+    {"key": "language", "value": "ru"},
+    {"key": "laravelToken", "value": ""},
+    {"key": "schedulerKey", "value": ""},
+    {"key": "webhookSecret", "value": ""},
+    {"key": "telegramChatId", "value": ""}
+  ],
+  "item": [
+    {
+      "name": "00 - Health",
+      "item": [
+        {
+          "name": "GET /test",
+          "request": {
+            "method": "GET",
+            "url": "{{siteBaseUrl}}/test"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });",
+                  "pm.test('Body has message', function () { const j = pm.response.json(); pm.expect(j).to.have.property('message'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 - Auth (Session Cookie)",
+      "description": "Laravel API uses session cookies for most endpoints (Auth::login). Run POST /auth/login first. Postman will store cookies automatically for the domain.",
+      "item": [
+        {
+          "name": "POST /auth/register",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"name\": \"{{name}}\"\n}"
+            },
+            "url": "{{siteBaseUrl}}/auth/register"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200/201/422', function () { pm.expect([200,201,422]).to.include(pm.response.code); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });",
+                  "pm.test('JSON body', function () { pm.response.to.be.json; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login (sets session cookie)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": "{{siteBaseUrl}}/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200/422', function () { pm.expect([200,422]).to.include(pm.response.code); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });",
+                  "try {",
+                  "  const setCookies = pm.response.headers.all().filter(h => (h.key || '').toLowerCase() === 'set-cookie').map(h => (h.value || '').split(';')[0]).filter(Boolean);",
+                  "  if (setCookies.length) pm.collectionVariables.set('siteCookie', setCookies.join('; '));",
+                  "} catch (e) {}",
+                  "pm.test('If 200 then body has email', function () { if (pm.response.code !== 200) return; const j = pm.response.json(); pm.expect(j).to.have.property('email'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Cookie", "value": "{{siteCookie}}"}
+            ],
+            "url": "{{siteBaseUrl}}/auth/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auth/me",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "Cookie", "value": "{{siteCookie}}"}
+            ],
+            "url": "{{siteBaseUrl}}/auth/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 401', function () { pm.expect([200,401]).to.include(pm.response.code); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });",
+                  "pm.test('If 200 then has email', function () { if (pm.response.code !== 200) return; const j = pm.response.json(); pm.expect(j).to.have.property('email'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Auth (Desktop Token / Sanctum)",
+      "description": "Desktop endpoints (/desktop/*) require Bearer token. Run POST /auth/token to set {{laravelToken}}.",
+      "item": [
+        {
+          "name": "POST /auth/token (sets laravelToken)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200/422', function () { pm.expect([200,422]).to.include(pm.response.code); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });",
+                  "try { const j = pm.response.json(); if (j && j.token) pm.collectionVariables.set('laravelToken', j.token); } catch (e) {}",
+                  "pm.test('If 200 then token exists', function () { if (pm.response.code !== 200) return; const j = pm.response.json(); pm.expect(j).to.have.property('token'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": "{{siteBaseUrl}}/auth/token"
+          }
+        }
+        ,
+        {
+          "name": "GET /auth/me (Bearer)",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [{"key": "token", "value": "{{laravelToken}}", "type": "string"}]
+            },
+            "url": "{{siteBaseUrl}}/auth/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 401', function () { pm.expect([200,401]).to.include(pm.response.code); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });",
+                  "pm.test('If 200 then has email', function () { if (pm.response.code !== 200) return; const j = pm.response.json(); pm.expect(j).to.have.property('email'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - TradingView Webhook",
+      "item": [
+        {
+          "name": "POST /webhook/tradingview",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"secret\": \"{{webhookSecret}}\",\n  \"email\": \"{{email}}\",\n  \"symbol\": \"BTC/USDT\",\n  \"action\": \"BUY\",\n  \"entry_price\": 43000,\n  \"stop_loss\": 42500,\n  \"take_profit\": 44000,\n  \"timeframe\": \"15m\",\n  \"language\": \"{{language}}\",\n  \"comment\": \"manual test\"\n}"
+            },
+            "url": "{{siteBaseUrl}}/webhook/tradingview"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 401', function () { pm.expect([200,401]).to.include(pm.response.code); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });",
+                  "pm.test('If 200 then ok=true', function () { if (pm.response.code !== 200) return; const j = pm.response.json(); pm.expect(j).to.have.property('ok', true); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 - Auto Signals (Session Cookie)",
+      "description": "These endpoints require session auth. Run POST /auth/login first (folder 01).",
+      "item": [
+        {
+          "name": "GET /auto_signals/settings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "Cookie", "value": "{{siteCookie}}"}
+            ],
+            "url": "{{siteBaseUrl}}/auto_signals/settings"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 401', function () { pm.expect([200,401]).to.include(pm.response.code); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });",
+                  "pm.test('If 200 then has enabled & symbol', function () { if (pm.response.code !== 200) return; const j = pm.response.json(); pm.expect(j).to.have.property('enabled'); pm.expect(j).to.have.property('symbol'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auto_signals/settings",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Cookie", "value": "{{siteCookie}}"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"enabled\": true,\n  \"symbol\": \"BTC/USDT\",\n  \"capital\": 10000,\n  \"trading_type\": \"Дейли трейдинг\",\n  \"strategy\": \"Сбалансированная\",\n  \"risk\": 1,\n  \"confirmation\": \"ALL\",\n  \"min_reliability\": 60,\n  \"check_interval\": 5,\n  \"language\": \"{{language}}\",\n  \"enable_email_notifications\": true,\n  \"enable_telegram_notifications\": false,\n  \"telegram_chat_id\": \"{{telegramChatId}}\"\n}"
+            },
+            "url": "{{siteBaseUrl}}/auto_signals/settings"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 401 or 422', function () { pm.expect([200,401,422]).to.include(pm.response.code); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });",
+                  "pm.test('If 200 then has enabled', function () { if (pm.response.code !== 200) return; const j = pm.response.json(); pm.expect(j).to.have.property('enabled'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auto_signals/status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "Cookie", "value": "{{siteCookie}}"}
+            ],
+            "url": "{{siteBaseUrl}}/auto_signals/status"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 401', function () { pm.expect([200,401]).to.include(pm.response.code); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });",
+                  "pm.test('If 200 then has next_check', function () { if (pm.response.code !== 200) return; const j = pm.response.json(); pm.expect(j).to.have.property('next_check'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auto_signals/test",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Cookie", "value": "{{siteCookie}}"}
+            ],
+            "body": {"mode": "raw", "raw": "{\n  \"language\": \"{{language}}\"\n}"},
+            "url": "{{siteBaseUrl}}/auto_signals/test"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 401', function () { pm.expect([200,401]).to.include(pm.response.code); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auto_signals/logs?limit=20",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "Cookie", "value": "{{siteCookie}}"}
+            ],
+            "url": "{{siteBaseUrl}}/auto_signals/logs?limit=20"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 401', function () { pm.expect([200,401]).to.include(pm.response.code); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });",
+                  "pm.test('If 200 then response is array', function () { if (pm.response.code !== 200) return; const j = pm.response.json(); pm.expect(Array.isArray(j)).to.equal(true); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 - Desktop (Sanctum Token)",
+      "description": "Requires Bearer {{laravelToken}} (folder 02).",
+      "item": [
+        {
+          "name": "GET /desktop/auto_signals/settings",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [{"key": "token", "value": "{{laravelToken}}", "type": "string"}]
+            },
+            "url": "{{siteBaseUrl}}/desktop/auto_signals/settings"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 401', function () { pm.expect([200,401]).to.include(pm.response.code); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /desktop/auto_signals/settings",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [{"key": "token", "value": "{{laravelToken}}", "type": "string"}]
+            },
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"enabled\": true,\n  \"symbol\": \"BTC/USDT\",\n  \"capital\": 10000,\n  \"trading_type\": \"Дейли трейдинг\",\n  \"strategy\": \"Сбалансированная\",\n  \"risk\": 1,\n  \"confirmation\": \"ALL\",\n  \"min_reliability\": 60,\n  \"check_interval\": 5,\n  \"language\": \"{{language}}\",\n  \"enable_email_notifications\": true,\n  \"enable_telegram_notifications\": false,\n  \"telegram_chat_id\": \"{{telegramChatId}}\"\n}"
+            },
+            "url": "{{siteBaseUrl}}/desktop/auto_signals/settings"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 401 or 422', function () { pm.expect([200,401,422]).to.include(pm.response.code); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /desktop/auto_signals/test",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [{"key": "token", "value": "{{laravelToken}}", "type": "string"}]
+            },
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"language\": \"{{language}}\"\n}"},
+            "url": "{{siteBaseUrl}}/desktop/auto_signals/test"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 401', function () { pm.expect([200,401]).to.include(pm.response.code); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 - Scheduler",
+      "description": "Protected by SCHEDULER_KEY. Use GET /scheduler/run?key={{schedulerKey}}",
+      "item": [
+        {
+          "name": "GET /scheduler/run?key=...",
+          "request": {
+            "method": "GET",
+            "url": "{{siteBaseUrl}}/scheduler/run?key={{schedulerKey}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 403 or 500', function () { pm.expect([200,403,500]).to.include(pm.response.code); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });",
+                  "pm.test('JSON body', function () { pm.response.to.be.json; });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "07 - Payments",
+      "item": [
+        {
+          "name": "GET /payment/currencies",
+          "request": {
+            "method": "GET",
+            "url": "{{siteBaseUrl}}/payment/currencies"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

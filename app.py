@@ -35,7 +35,9 @@ logger = logging.getLogger(__name__)
 # Загрузка переменных окружения из .env файла (если есть)
 try:
     from dotenv import load_dotenv
-    load_dotenv()
+    _here = os.path.abspath(os.path.dirname(__file__))
+    load_dotenv(os.path.join(_here, ".env"), override=False)
+    load_dotenv(override=False)
     # logger будет определен позже, используем print здесь
     print("✅ Загружены переменные окружения из .env файла")
 except ImportError:
@@ -122,12 +124,57 @@ except Exception as e:
 # === Database Configuration ===
 # Use environment variable if available, otherwise fallback to SQLite for local development
 DATABASE_URL = os.getenv('DATABASE_URL')
+
+def _mask_db_url(url: str) -> str:
+    try:
+        from urllib.parse import urlsplit, urlunsplit
+        parts = urlsplit(url)
+        netloc = parts.netloc
+        if "@" in netloc and ":" in netloc.split("@", 1)[0]:
+            userinfo, hostinfo = netloc.split("@", 1)
+            user = userinfo.split(":", 1)[0]
+            netloc = f"{user}:***@{hostinfo}"
+        return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
+    except Exception:
+        return "***"
+
+def _normalize_sqlalchemy_db_url(url: str) -> str:
+    raw = (url or "").strip().strip('"').strip("'")
+    if not raw:
+        return raw
+    if raw.startswith("mysql://"):
+        try:
+            import MySQLdb  # noqa: F401
+            return raw
+        except Exception:
+            return "mysql+pymysql://" + raw[len("mysql://"):]
+    if raw.startswith("postgres://"):
+        return "postgresql+psycopg2://" + raw[len("postgres://"):]
+    return raw
+
+if DATABASE_URL:
+    DATABASE_URL = _normalize_sqlalchemy_db_url(DATABASE_URL)
+    if DATABASE_URL.startswith("mysql+pymysql://"):
+        try:
+            import pymysql  # noqa: F401
+        except Exception as e:
+            raise RuntimeError(
+                "DATABASE_URL points to MySQL (pymysql), but pymysql is not installed. "
+                "Install pymysql or use mysqlclient/MySQLdb."
+            ) from e
+    logger.info("✅ DB configured")
+
 if DATABASE_URL:
     app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 else:
-    # Fallback to SQLite for local development
-    basedir = os.path.abspath(os.path.dirname(__file__))
-    app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(basedir, 'instance', 'crypto_analyzer.db')}"
+    if (os.getenv('ALLOW_SQLITE_FALLBACK') or '').strip() == '1':
+        basedir = os.path.abspath(os.path.dirname(__file__))
+        app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(basedir, 'instance', 'crypto_analyzer.db')}"
+    else:
+        raise RuntimeError(
+            "DATABASE_URL is not set. Application is configured to use MySQL; "
+            "refusing to silently fallback to SQLite. Set DATABASE_URL (or set ALLOW_SQLITE_FALLBACK=1 explicitly)."
+        )
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {"pool_recycle": 280, "pool_pre_ping": True}
 
@@ -159,7 +206,7 @@ class User(db.Model):
     auto_signal_trading_type = db.Column(db.String(50), nullable=True)
     auto_signal_strategy = db.Column(db.String(50), nullable=True)
     auto_signal_risk = db.Column(db.Float, nullable=True)
-    auto_signal_confirmation = db.Column(db.String(100), nullable=True)
+    auto_signal_confirmation = db.Column(db.String(255), nullable=True)
     auto_signal_min_reliability = db.Column(db.Float, default=60.0)
     auto_signal_check_interval = db.Column(db.Integer, default=60)
     auto_signal_last_check = db.Column(db.DateTime, nullable=True)
@@ -280,6 +327,7 @@ def api_login():
     data = request.json or {}
     email = (data.get("email") or "").strip().lower()
     password = (data.get("password") or "").strip()
+    remember = bool(data.get("remember"))
 
     if not email or not password:
         return jsonify({"error": "Email и пароль обязательны"}), 400
@@ -290,9 +338,24 @@ def api_login():
         return jsonify({"error": get_translation("error_user_not_found", language)}), 404
 
     if not verify_password(password, user.password):
-        language = request.json.get('language', 'ru') if request.json else 'ru'
-        return jsonify({"error": get_translation("error_invalid_password", language)}), 401
+        stored = (user.password or "").strip()
+        if stored and stored == password:
+            try:
+                user.password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+                db.session.add(user)
+                db.session.commit()
+            except Exception:
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
+        else:
+            language = request.json.get('language', 'ru') if request.json else 'ru'
+            return jsonify({"error": get_translation("error_invalid_password", language)}), 401
 
+    # ВАЖНО: это единственное место, где управляем "запомнить меня" через persistent cookie.
+    # НЕ ТРОГАТЬ логику авторизации (проверка пользователя/пароля) — только флаг persistence сессии.
+    session.permanent = remember
     session["user_id"] = user.id
     session["email"] = user.email
 
@@ -569,7 +632,11 @@ def run_analysis_route():
             stop_loss,
             take_profit,
             reliability_rating,
-            rsi_value  # ✅ ФАЗА 2: Получаем реальный RSI из run_analysis
+            rsi_value,  # ✅ ФАЗА 2: Получаем реальный RSI из run_analysis
+            user_confirmation_result,
+            passed_count,
+            total_count,
+            user_confirmation_str,
         ) = run_analysis(
             data.get("symbol"),
             timeframe,  # Передаем выбранный таймфрейм (None для автоматического)
@@ -833,7 +900,11 @@ def run_analysis_route():
                 logger.info(f"✅ Условие для отправки уведомлений выполнено (reliability_rating >= alert_min_reliability)")
                 alert_message = format_alert_message(
                     symbol, direction, entry_price, stop_loss, take_profit,
-                    reliability_rating, data.get("strategy"), trend, language=language
+                    reliability_rating, data.get("strategy"), trend, language=language,
+                    confirmation_result=user_confirmation_result,
+                    confirmations_selected=user_confirmation_str,
+                    confirmations_passed=passed_count,
+                    confirmations_total=total_count,
                 )
                 
                 # Email уведомления (если включено)
@@ -1565,29 +1636,81 @@ def send_email_notification(email, subject, message):
         traceback.print_exc()
         return False
 
-def format_alert_message(symbol, direction, entry_price, stop_loss, take_profit, reliability_rating, strategy, trend, language="ru"):
+def format_alert_message(
+    symbol,
+    direction,
+    entry_price,
+    stop_loss,
+    take_profit,
+    reliability_rating,
+    strategy,
+    trend,
+    language="ru",
+    confirmation_result=None,
+    confirmations_selected=None,
+    confirmations_passed=None,
+    confirmations_total=None,
+    timeframe=None,
+    trading_type=None,
+    higher_timeframes=None,
+):
     """
     Форматирует сообщение для уведомления с учетом языка.
     """
-    # Получаем переводы
     t = lambda key, **params: get_translation(key, language, **params)
     direction_emoji = "🟢" if direction == "long" else "🔴"
     direction_text = t("long_direction") if direction == "long" else t("short_direction")
     trend_text = t("bull_market") if trend == "Uptrend" else t("bear_market")
-    rr = ((take_profit - entry_price) / (entry_price - stop_loss) if direction == "long" else (entry_price - take_profit) / (stop_loss - entry_price))
+
+    rr = 0.0
+    try:
+        if direction == "long":
+            denom = (entry_price - stop_loss)
+            rr = ((take_profit - entry_price) / denom) if abs(denom) > 1e-12 else 0.0
+        else:
+            denom = (stop_loss - entry_price)
+            rr = ((entry_price - take_profit) / denom) if abs(denom) > 1e-12 else 0.0
+    except Exception:
+        rr = 0.0
+
     rr_explain = {
         "ru": "(Риск/прибыль)",
         "en": "(Risk/Reward)",
         "uk": "(Ризик/прибуток)",
     }.get((language or "ru")[:2].lower(), "(Риск/прибыль)")
+
+    confirmations_line = ""
+    if confirmation_result and confirmations_passed is not None and confirmations_total is not None:
+        details = str(confirmation_result)
+        if ":" in details:
+            details = details.split(":", 1)[1].strip()
+        confirmations_line = f"✅ {t('notification_confirmations')} ({confirmations_passed}/{confirmations_total}): {details}"
+
+    higher_tf_line = ""
+    if isinstance(higher_timeframes, (list, tuple)) and higher_timeframes:
+        parts = []
+        for item in higher_timeframes:
+            try:
+                tf = item.get("timeframe")
+                tf_trend = item.get("trend")
+                if not tf or not tf_trend:
+                    continue
+                tf_trend_text = t("trend_up") if tf_trend == "Uptrend" else t("trend_down")
+                parts.append(f"{tf}: {tf_trend_text}")
+            except Exception:
+                continue
+        if parts:
+            higher_tf_line = f"🧭 {t('notification_higher_timeframes')} " + " | ".join(parts)
     
+    confirmations_block = f"\n{confirmations_line}\n" if confirmations_line else ""
+    higher_tf_block = f"\n{higher_tf_line}\n" if higher_tf_line else ""
+
     message = f"""
 🚨 <b>{t('notification_new_signal')}</b>
 
 📊 <b>{t('notification_instrument')}</b> {symbol}
 {direction_emoji} <b>{t('notification_direction')}</b> {direction_text}
-📈 <b>{t('notification_trend')}</b> {trend_text}
-🎯 <b>{t('notification_strategy')}</b> {strategy}
+📈 <b>{t('notification_trend')}</b> {trend_text}{confirmations_block}{higher_tf_block}🎯 <b>{t('notification_strategy')}</b> {strategy}
 
 💰 <b>{t('notification_levels')}</b>
 • {t('notification_entry')} ${entry_price:.2f}

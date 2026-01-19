@@ -1,0 +1,296 @@
+{
+  "info": {
+    "name": "CryptoAnalyz - App API (Python/Flask) (Raw URLs)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {"key": "localBaseUrl", "value": "http://127.0.0.1:5050"},
+    {"key": "appCookie", "value": ""},
+    {"key": "email", "value": ""},
+    {"key": "password", "value": ""},
+    {"key": "language", "value": "ru"},
+    {"key": "webhookSecret", "value": ""},
+    {"key": "telegramChatId", "value": ""}
+  ],
+  "item": [
+    {
+      "name": "00 - Health",
+      "item": [
+        {
+          "name": "GET /session_check",
+          "request": {
+            "method": "GET",
+            "url": "{{localBaseUrl}}/session_check"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });",
+                  "pm.test('Body has logged_in', function () { const j = pm.response.json(); pm.expect(j).to.have.property('logged_in'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 - Auth (Session Cookie)",
+      "description": "Most /api/* endpoints require a Flask session cookie. Run POST /api/login first. Postman will store cookies automatically for {{localBaseUrl}}.",
+      "item": [
+        {
+          "name": "POST /api/login (sets session cookie)",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"remember\": true,\n  \"language\": \"{{language}}\"\n}"
+            },
+            "url": "{{localBaseUrl}}/api/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200/400/401/404', function () { pm.expect([200,400,401,404]).to.include(pm.response.code); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });",
+                  "try {",
+                  "  const setCookies = pm.response.headers.all().filter(h => (h.key || '').toLowerCase() === 'set-cookie').map(h => (h.value || '').split(';')[0]).filter(Boolean);",
+                  "  if (setCookies.length) pm.collectionVariables.set('appCookie', setCookies.join('; '));",
+                  "} catch (e) {}",
+                  "pm.test('If 200 then ok=true and user exists', function () { if (pm.response.code !== 200) return; const j = pm.response.json(); pm.expect(j).to.have.property('ok', true); pm.expect(j).to.have.property('user'); pm.expect(j.user).to.have.property('email'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Cookie", "value": "{{appCookie}}"}
+            ],
+            "url": "{{localBaseUrl}}/api/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });",
+                  "pm.test('Body ok=true', function () { const j = pm.response.json(); pm.expect(j).to.have.property('ok', true); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - User (requires login)",
+      "item": [
+        {
+          "name": "GET /api/user_info",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "Cookie", "value": "{{appCookie}}"}
+            ],
+            "url": "{{localBaseUrl}}/api/user_info?language={{language}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 401', function () { pm.expect([200,401]).to.include(pm.response.code); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });",
+                  "pm.test('If 200 then has email & plan', function () { if (pm.response.code !== 200) return; const j = pm.response.json(); pm.expect(j).to.have.property('email'); pm.expect(j).to.have.property('plan'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Notifications (requires login)",
+      "description": "IMPORTANT: Python backend expects fields enable_email and enable_telegram (NOT enable_email_notifications / enable_telegram_notifications).",
+      "item": [
+        {
+          "name": "GET /api/get_notification_settings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "Cookie", "value": "{{appCookie}}"}
+            ],
+            "url": "{{localBaseUrl}}/api/get_notification_settings?language={{language}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 401', function () { pm.expect([200,401]).to.include(pm.response.code); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });",
+                  "pm.test('If 200 then has enable_email and enable_telegram', function () { if (pm.response.code !== 200) return; const j = pm.response.json(); pm.expect(j).to.have.property('enable_email'); pm.expect(j).to.have.property('enable_telegram'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/save_notification_settings",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Cookie", "value": "{{appCookie}}"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"enable_email\": true,\n  \"enable_telegram\": false,\n  \"telegram_chat_id\": \"{{telegramChatId}}\",\n  \"language\": \"{{language}}\"\n}"
+            },
+            "url": "{{localBaseUrl}}/api/save_notification_settings"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 401 or 500', function () { pm.expect([200,401,500]).to.include(pm.response.code); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });",
+                  "pm.test('If 200 then success=true', function () { if (pm.response.code !== 200) return; const j = pm.response.json(); pm.expect(j).to.have.property('success', true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/test_telegram_notification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Cookie", "value": "{{appCookie}}"}
+            ],
+            "body": {"mode": "raw", "raw": "{\n  \"language\": \"{{language}}\"\n}"},
+            "url": "{{localBaseUrl}}/api/test_telegram_notification"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 400 or 401', function () { pm.expect([200,400,401]).to.include(pm.response.code); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });",
+                  "pm.test('JSON body', function () { pm.response.to.be.json; });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 - Trading settings (requires login)",
+      "item": [
+        {
+          "name": "POST /api/save_trading_settings",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Cookie", "value": "{{appCookie}}"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"exchange_spread\": 0.1,\n  \"language\": \"{{language}}\"\n}"
+            },
+            "url": "{{localBaseUrl}}/api/save_trading_settings"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 401', function () { pm.expect([200,401]).to.include(pm.response.code); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });",
+                  "pm.test('JSON body', function () { pm.response.to.be.json; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/get_trading_settings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "Cookie", "value": "{{appCookie}}"}
+            ],
+            "url": "{{localBaseUrl}}/api/get_trading_settings?language={{language}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 401', function () { pm.expect([200,401]).to.include(pm.response.code); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });",
+                  "pm.test('If 200 then has exchange_spread', function () { if (pm.response.code !== 200) return; const j = pm.response.json(); pm.expect(j).to.have.property('exchange_spread'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 - TradingView webhook (no login)",
+      "item": [
+        {
+          "name": "POST /api/webhook/tradingview",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"secret\": \"{{webhookSecret}}\",\n  \"email\": \"{{email}}\",\n  \"symbol\": \"BTC/USDT\",\n  \"action\": \"BUY\",\n  \"entry_price\": 43000,\n  \"stop_loss\": 42500,\n  \"take_profit\": 44000,\n  \"timeframe\": \"15m\",\n  \"language\": \"{{language}}\",\n  \"comment\": \"manual test\"\n}"
+            },
+            "url": "{{localBaseUrl}}/api/webhook/tradingview"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 401', function () { pm.expect([200,401]).to.include(pm.response.code); });",
+                  "pm.test('Response time < 5000ms', function () { pm.expect(pm.response.responseTime).to.be.below(5000); });",
+                  "pm.test('JSON body', function () { pm.response.to.be.json; });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

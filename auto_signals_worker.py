@@ -160,7 +160,8 @@ def run_analysis_for_user(user):
         
         # Выполняем анализ
         (
-            report_text,
+            reports_by_language,
+            _,
             chart_bytes,
             excel_bytes,
             symbol,
@@ -174,7 +175,10 @@ def run_analysis_for_user(user):
             take_profit,
             reliability_rating,
             rsi_value,
-            _  # Игнорируем report_markdown_raw, не нужен для уведомлений
+            user_confirmation_result,
+            passed_count,
+            total_count,
+            user_confirmation_str,
         ) = run_analysis(
             user.auto_signal_symbol,
             timeframe=None,  # Автоматический таймфрейм
@@ -195,6 +199,13 @@ def run_analysis_for_user(user):
             spread=getattr(user, 'exchange_spread', 0.0),
             language=user_lang
         )
+
+        current_lang = user_lang if user_lang in ["ru", "en", "uk"] else "ru"
+        report_text = ""
+        try:
+            report_text = reports_by_language.get(current_lang, reports_by_language.get("ru", ""))
+        except Exception:
+            report_text = ""
         
         # Проверяем, есть ли сигнал
         min_reliability = min_reliability_setting
@@ -225,7 +236,11 @@ def run_analysis_for_user(user):
             "reliability_rating": reliability_rating,
             "trend": trend,
             "strategy": strategy,
-            "report_text": report_text
+            "report_text": report_text,
+            "user_confirmation_result": user_confirmation_result,
+            "passed_count": passed_count,
+            "total_count": total_count,
+            "user_confirmation_str": user_confirmation_str,
         }
         
     except Exception as e:
@@ -247,7 +262,11 @@ def send_signal_notifications(user, result):
             result["reliability_rating"],
             result["strategy"],
             result["trend"],
-            language=user_lang
+            language=user_lang,
+            confirmation_result=result.get("user_confirmation_result"),
+            confirmations_selected=result.get("user_confirmation_str"),
+            confirmations_passed=result.get("passed_count"),
+            confirmations_total=result.get("total_count"),
         )
         
         # Email уведомления

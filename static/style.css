@@ -71,14 +71,14 @@
 /* Более агрессивные стили для option в QWebEngineView */
 select#languageSelect option,
 #languageSelect option {
-  padding: 15px 25px !important; /* Увеличенные отступы */
+  padding: 10px 14px !important;
   background: #23283b !important;
   color: #fff !important;
   font-size: 14px !important;
-  margin: 5px 0 !important; /* Отступы между пунктами */
-  line-height: 2 !important;
-  height: 45px !important; /* Фиксированная высота */
-  display: block !important;
+  margin: 0 !important;
+  line-height: 1.4 !important;
+  height: auto !important;
+  display: initial !important;
 }
 
 /* Альтернативный подход - стили для самого select при открытии */
@@ -151,6 +151,56 @@ select#languageSelect option,
 .custom-dropdown-menu li.selected {
   background: #3fa9f5;
   color: #fff;
+}
+
+/* === Confirmations (checkbox multi-select) === */
+.confirmations-block {
+  margin-top: 8px;
+}
+
+.confirmations-actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.confirmations-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 768px) {
+  .confirmations-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 420px) {
+  .confirmations-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.confirm-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #2c3245;
+  background: #23283b;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1.2;
+  user-select: none;
+}
+
+.confirm-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #3fa9f5;
 }
 
 /* Результат автоподбора индикаторов под кнопкой */

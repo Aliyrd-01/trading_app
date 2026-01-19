@@ -5,9 +5,9 @@
     Header set Expires "0"
   </Files>
 
-  <Files "demo_static.html">
+  <FilesMatch "\.(exe|msi)$">
     Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
     Header set Pragma "no-cache"
     Header set Expires "0"
-  </Files>
+  </FilesMatch>
 </IfModule>

@@ -188,17 +188,22 @@ export default function Dashboard() {
 
             <Card className="p-4 sm:p-6 lg:p-8 hover-elevate transition-all duration-300 border-secondary/20" data-testid="card-arbitrage-tool">
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-secondary/20 to-accent/20 flex items-center justify-center">
                     <Repeat className="w-7 h-7 text-secondary" />
                   </div>
-                  <Badge variant="outline" className="text-secondary border-secondary/50">
+                  <Badge
+                    variant="outline"
+                    className="text-secondary border-secondary/50 text-[11px] sm:text-xs self-start sm:self-auto"
+                  >
                     {t('dashboard.comingSoon')}
                   </Badge>
                 </div>
                 <div className="space-y-2">
-                  <h3 className="text-2xl font-bold">{t('header.arbitrageTool')}</h3>
-                  <p className="text-muted-foreground">
+                  <h3 className="text-lg sm:text-2xl font-bold leading-tight break-words">
+                    {t('header.arbitrageTool')}
+                  </h3>
+                  <p className="text-sm sm:text-base text-muted-foreground break-words">
                     {t('dashboard.arbitrageDescription')}
                   </p>
                 </div>

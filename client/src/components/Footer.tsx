@@ -124,7 +124,7 @@ export default function Footer() {
 
         <div className="mt-12 pt-8 border-t border-border/50">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-xs sm:text-sm text-muted-foreground">
-            <p className="break-words text-center md:text-left">© 2025 Cryptoanaliz. {t('footer.copyright')}</p>
+            <p className="break-words text-center md:text-left">© {new Date().getFullYear()} Cryptoanaliz. {t('footer.copyright')}</p>
             <div className="flex gap-4 sm:gap-6 flex-wrap justify-center">
               <Button 
                 variant="ghost" 

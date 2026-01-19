@@ -381,13 +381,26 @@ class AuthController extends Controller
             'plan' => $user->plan,
             'plan_expires_at' => $planExpiresAt,
             'trial_expires_at' => $trialExpiresAt,
-            'auto_signals_access' => [
-                'allowed' => $autoSignalsAllowed,
-                'reason' => $autoSignalsReason,
-                'trial_expires_at' => $trialExpiresAt,
-            ],
+            'auto_signals_allowed' => $autoSignalsAllowed,
+            'auto_signals_reason' => $autoSignalsReason,
             'createdAt' => $user->created_at->toIso8601String(),
         ]);
+    }
+
+    public function meToken(Request $request)
+    {
+        $user = null;
+        try {
+            $user = $request->user('sanctum');
+        } catch (\Throwable $e) {
+            $user = null;
+        }
+
+        if (!$user) {
+            return response()->json(['error' => 'Unauthenticated'], 401);
+        }
+
+        return $this->me($request);
     }
 
     public function verifyEmail(Request $request)

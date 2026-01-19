@@ -78,7 +78,8 @@ class AutoSignalsController extends BaseController
     {
         $user = $this->resolveUser($request);
         if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
+            return response()->json(['error' => 'Unauthenticated'], 401)
+                ->header('X-AutoSignals-Backend', 'server-php/app/Http/Controllers/AutoSignalsController.php');
         }
 
         $this->ensureFreeTrialStarted($user);
@@ -162,14 +163,15 @@ class AutoSignalsController extends BaseController
             'telegram_chat_id' => $user->telegram_chat_id,
             'locked' => $locked,
             'access' => $access,
-        ]);
+        ])->header('X-AutoSignals-Backend', 'server-php/app/Http/Controllers/AutoSignalsController.php');
     }
 
     public function status(Request $request)
     {
         $user = $this->resolveUser($request);
         if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
+            return response()->json(['error' => 'Unauthenticated'], 401)
+                ->header('X-AutoSignals-Backend', 'server-php/app/Http/Controllers/AutoSignalsController.php');
         }
 
         $this->ensureFreeTrialStarted($user);
@@ -202,14 +204,15 @@ class AutoSignalsController extends BaseController
             'last_fired_at' => $lastFiredAt ? $lastFiredAt->toIso8601String() : null,
             'locked' => $locked,
             'access' => $access,
-        ]);
+        ])->header('X-AutoSignals-Backend', 'server-php/app/Http/Controllers/AutoSignalsController.php');
     }
 
     public function saveSettings(Request $request)
     {
         $user = $this->resolveUser($request);
         if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
+            return response()->json(['error' => 'Unauthenticated'], 401)
+                ->header('X-AutoSignals-Backend', 'server-php/app/Http/Controllers/AutoSignalsController.php');
         }
 
         $this->ensureFreeTrialStarted($user);
@@ -229,7 +232,7 @@ class AutoSignalsController extends BaseController
             'trading_type' => 'nullable|string|max:50',
             'strategy' => 'nullable|string|max:50',
             'risk' => 'nullable|numeric|min:0|max:100',
-            'confirmation' => 'nullable|string|max:50',
+            'confirmation' => 'nullable|string|max:500',
             'min_reliability' => 'nullable|integer|min:0|max:100',
             'check_interval' => 'nullable|integer|min:1|max:10080',
             'language' => 'nullable|string|max:5',
@@ -291,7 +294,8 @@ class AutoSignalsController extends BaseController
     {
         $user = $this->resolveUser($request);
         if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
+            return response()->json(['error' => 'Unauthenticated'], 401)
+                ->header('X-AutoSignals-Backend', 'server-php/app/Http/Controllers/AutoSignalsController.php');
         }
 
         $this->ensureFreeTrialStarted($user);
@@ -305,7 +309,7 @@ class AutoSignalsController extends BaseController
                 'error' => 'Trial expired',
                 'locked' => true,
                 'access' => $access,
-            ], 403);
+            ], 403)->header('X-AutoSignals-Backend', 'server-php/app/Http/Controllers/AutoSignalsController.php');
         }
 
         $lang = $request->input('language', null);
@@ -322,20 +326,21 @@ class AutoSignalsController extends BaseController
             return response()->json([
                 'error' => 'Test failed',
                 'message' => $e->getMessage(),
-            ], 500);
+            ], 500)->header('X-AutoSignals-Backend', 'server-php/app/Http/Controllers/AutoSignalsController.php');
         }
 
         return response()->json([
             'message' => 'Test finished',
             'output' => $output ?? '',
-        ]);
+        ])->header('X-AutoSignals-Backend', 'server-php/app/Http/Controllers/AutoSignalsController.php');
     }
 
     public function logs(Request $request)
     {
         $user = $this->resolveUser($request);
         if (!$user) {
-            return response()->json(['error' => 'Unauthenticated'], 401);
+            return response()->json(['error' => 'Unauthenticated'], 401)
+                ->header('X-AutoSignals-Backend', 'server-php/app/Http/Controllers/AutoSignalsController.php');
         }
 
         $limit = (int) $request->query('limit', 20);
@@ -360,6 +365,7 @@ class AutoSignalsController extends BaseController
                 'created_at',
             ]);
 
-        return response()->json(['items' => $items]);
+        return response()->json(['items' => $items])
+            ->header('X-AutoSignals-Backend', 'server-php/app/Http/Controllers/AutoSignalsController.php');
     }
 }

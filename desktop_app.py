@@ -5,14 +5,37 @@ import base64
 import requests
 import os
 
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QFileDialog
-from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineSettings
-from PyQt5.QtWebChannel import QWebChannel
-from PyQt5.QtCore import QObject, pyqtSlot, QUrl
+os.environ.setdefault("QT_OPENGL", "angle")
+os.environ.setdefault(
+    "QTWEBENGINE_CHROMIUM_FLAGS",
+    "--use-gl=angle --use-angle=d3d11 --ignore-gpu-blocklist --disable-gpu-sandbox --no-sandbox --disable-gpu --disable-gpu-compositing",
+)
+os.environ.setdefault("QTWEBENGINE_DISABLE_SANDBOX", "1")
+
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QFileDialog, QLabel, QPushButton
+from PyQt5.QtCore import QObject, pyqtSlot, QUrl, Qt, QCoreApplication, QLibraryInfo
 from PyQt5.QtGui import QIcon
 
 # импорт твоего backend Flask
 from app import app  # Flask backend на 5050
+
+
+_WEBENGINE_IMPORT_ERROR = None
+
+
+def _setup_qt_runtime_paths():
+    try:
+        qt_bin = QLibraryInfo.location(QLibraryInfo.BinariesPath)
+        qt_plugins = QLibraryInfo.location(QLibraryInfo.PluginsPath)
+        if qt_bin and os.path.isdir(qt_bin):
+            os.environ["PATH"] = qt_bin + os.pathsep + os.environ.get("PATH", "")
+            process_path = os.path.join(qt_bin, "QtWebEngineProcess.exe")
+            if os.path.exists(process_path):
+                os.environ.setdefault("QTWEBENGINEPROCESS_PATH", process_path)
+        if qt_plugins and os.path.isdir(qt_plugins):
+            os.environ.setdefault("QT_PLUGIN_PATH", qt_plugins)
+    except Exception:
+        pass
 
 
 # --- WebBridge для взаимодействия с JS (сохранение ZIP, уведомление о login) ---
@@ -88,23 +111,82 @@ class MainWindow(QMainWindow):
         layout.setSpacing(0)
         central.setLayout(layout)
 
-        self.web = QWebEngineView()
-        layout.addWidget(self.web)
+        global _WEBENGINE_IMPORT_ERROR
+        if _WEBENGINE_IMPORT_ERROR is not None:
+            self._init_error_view(layout, e=_WEBENGINE_IMPORT_ERROR)
+            return
 
-        # Ускорение WebEngine
-        self.web.settings().setAttribute(QWebEngineSettings.Accelerated2dCanvasEnabled, True)
-        self.web.settings().setAttribute(QWebEngineSettings.WebGLEnabled, True)
+        try:
+            from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineSettings, QWebEngineProfile, QWebEnginePage
+            from PyQt5.QtWebChannel import QWebChannel
 
-        # WebChannel
-        self.channel = QWebChannel()
-        self.bridge = WebBridge()
-        self.channel.registerObject("pyjs", self.bridge)
-        self.web.page().setWebChannel(self.channel)
+            self.web = QWebEngineView()
+            layout.addWidget(self.web)
 
-        # Загружаем страницу логина
-        self.web.setUrl(QUrl("http://127.0.0.1:5050/login"))
+            # ВАЖНО: это слой хранения браузера (cookies/localStorage) для "Запомнить меня".
+            # НЕ ТРОГАТЬ авторизацию (логин/пароль/проверки) — только persistence WebEngine.
+            base_root = os.environ.get('LOCALAPPDATA') or os.path.expanduser('~')
+            base_dir = os.path.join(base_root, "CryptoInsightX", "qt_profile")
+            os.makedirs(base_dir, exist_ok=True)
 
-        self.web.loadFinished.connect(self._on_page_load)
+            self.profile = QWebEngineProfile("CryptoInsightX", self.web)
+            self.profile.setPersistentStoragePath(base_dir)
+            self.profile.setCachePath(base_dir)
+            self.profile.setHttpCacheType(QWebEngineProfile.DiskHttpCache)
+            self.profile.setPersistentCookiesPolicy(QWebEngineProfile.ForcePersistentCookies)
+
+            self.page = QWebEnginePage(self.profile, self.web)
+            self.web.setPage(self.page)
+
+            self.web.settings().setAttribute(QWebEngineSettings.Accelerated2dCanvasEnabled, False)
+            self.web.settings().setAttribute(QWebEngineSettings.WebGLEnabled, False)
+            try:
+                self.web.settings().setAttribute(QWebEngineSettings.SpellCheckEnabled, False)
+            except Exception:
+                pass
+
+            try:
+                self.profile.setSpellCheckEnabled(False)
+            except Exception:
+                try:
+                    QWebEngineProfile.defaultProfile().setSpellCheckEnabled(False)
+                except Exception:
+                    pass
+
+            self.channel = QWebChannel()
+            self.bridge = WebBridge()
+            self.channel.registerObject("pyjs", self.bridge)
+            self.web.page().setWebChannel(self.channel)
+
+            self.web.setUrl(QUrl("http://127.0.0.1:5050/login"))
+            self.web.loadFinished.connect(self._on_page_load)
+        except Exception as e:
+            self._init_error_view(layout, e=e)
+
+    def _init_error_view(self, layout, e=None):
+        import webbrowser
+
+        info = QLabel(
+            "Не удалось запустить встроенный WebEngine (проблема с OpenGL/ANGLE DLL).\n"
+            "Нужно, чтобы были доступны libEGL.dll/libGLESv2.dll/d3dcompiler_*.dll (обычно в папке Qt/PyQt5)."
+        )
+        info.setStyleSheet("padding:20px; white-space: pre-line;")
+
+        btn = QPushButton("Открыть в браузере")
+        btn.clicked.connect(lambda: webbrowser.open("http://127.0.0.1:5050/login"))
+
+        wrap = QWidget()
+        v = QVBoxLayout()
+        v.addWidget(info)
+        v.addWidget(btn)
+        wrap.setLayout(v)
+        layout.addWidget(wrap)
+
+        if e is not None:
+            try:
+                print("WebEngine init error:", repr(e))
+            except Exception:
+                pass
 
     def _on_page_load(self, ok):
         if not ok:
@@ -126,6 +208,15 @@ if __name__ == "__main__":
     print("Запуск Flask-сервера...")
     if not wait_for_server():
         print("⚠️ Сервер не доступен на http://127.0.0.1:5050")
+
+    _setup_qt_runtime_paths()
+    QCoreApplication.setAttribute(Qt.AA_ShareOpenGLContexts, True)
+
+    try:
+        from PyQt5 import QtWebEngineWidgets  # noqa: F401
+        _WEBENGINE_IMPORT_ERROR = None
+    except Exception as e:
+        _WEBENGINE_IMPORT_ERROR = e
 
     app_qt = QApplication(sys.argv)
     app_qt.setStyleSheet("QPushButton { outline: none; } QPushButton:focus { outline: none; }")

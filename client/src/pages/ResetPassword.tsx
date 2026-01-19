@@ -115,22 +115,22 @@ export default function ResetPassword() {
                         onChange={(e) => setPassword(e.target.value)}
                         required
                         disabled={isLoading}
+                        className="pr-11"
                         data-testid="input-password"
                       />
-                      <Button
+                      <button
                         type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-full"
+                        className="absolute inset-y-0 right-0 flex items-center justify-center px-3 text-muted-foreground hover:text-foreground"
                         onClick={() => setShowPassword(!showPassword)}
                         data-testid="button-toggle-password"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
                       >
                         {showPassword ? (
                           <EyeOff className="h-4 w-4" />
                         ) : (
                           <Eye className="h-4 w-4" />
                         )}
-                      </Button>
+                      </button>
                     </div>
                   </div>
 
@@ -147,22 +147,22 @@ export default function ResetPassword() {
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         required
                         disabled={isLoading}
+                        className="pr-11"
                         data-testid="input-confirm-password"
                       />
-                      <Button
+                      <button
                         type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-full"
+                        className="absolute inset-y-0 right-0 flex items-center justify-center px-3 text-muted-foreground hover:text-foreground"
                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                         data-testid="button-toggle-confirm-password"
+                        aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                       >
                         {showConfirmPassword ? (
                           <EyeOff className="h-4 w-4" />
                         ) : (
                           <Eye className="h-4 w-4" />
                         )}
-                      </Button>
+                      </button>
                     </div>
                   </div>
 

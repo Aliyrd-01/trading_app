@@ -12,6 +12,7 @@ scipy
 bcrypt
 python-dotenv
 sqlalchemy
+pymysql
 urllib3
 werkzeug
 psycopg2-binary

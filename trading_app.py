@@ -1564,6 +1564,162 @@ def add_indicators(df):
     df["ATR_14"] = tr.rolling(14).mean()
 
     df["Trend"] = np.where(df["EMA_50"] > df["EMA_200"], "Uptrend", "Downtrend")
+
+    try:
+        typical_price = (df["High"] + df["Low"] + df["Close"]) / 3.0
+        vol = df["Volume"].replace(0, np.nan)
+        df["VWAP"] = (typical_price.mul(vol)).cumsum() / vol.cumsum()
+    except Exception:
+        df["VWAP"] = np.nan
+
+    try:
+        n = 2
+        pivot_low = (
+            (df["Low"] < df["Low"].shift(1)) &
+            (df["Low"] < df["Low"].shift(2)) &
+            (df["Low"] < df["Low"].shift(-1)) &
+            (df["Low"] < df["Low"].shift(-2))
+        )
+        pivot_high = (
+            (df["High"] > df["High"].shift(1)) &
+            (df["High"] > df["High"].shift(2)) &
+            (df["High"] > df["High"].shift(-1)) &
+            (df["High"] > df["High"].shift(-2))
+        )
+
+        trend_last = df["Trend"].iloc[-1] if len(df) else "Uptrend"
+        if trend_last == "Uptrend":
+            pivots = np.where(pivot_low.fillna(False).values)[0]
+        else:
+            pivots = np.where(pivot_high.fillna(False).values)[0]
+
+        anchor_pos = int(pivots[-1]) if len(pivots) else 0
+        avwap = pd.Series(index=df.index, dtype=float)
+        if len(df) and anchor_pos < len(df):
+            tpv = (typical_price.iloc[anchor_pos:] * df["Volume"].iloc[anchor_pos:]).cumsum()
+            cv = df["Volume"].iloc[anchor_pos:].cumsum().replace(0, np.nan)
+            avwap.iloc[:anchor_pos] = np.nan
+            avwap.iloc[anchor_pos:] = tpv / cv
+        df["AVWAP"] = avwap
+    except Exception:
+        df["AVWAP"] = np.nan
+
+    try:
+        direction = np.sign(df["Close"].diff()).fillna(0.0)
+        obv = (direction * df["Volume"]).cumsum()
+        df["OBV"] = obv
+        df["OBV_EMA_20"] = obv.ewm(span=20, adjust=False).mean()
+    except Exception:
+        df["OBV"] = np.nan
+        df["OBV_EMA_20"] = np.nan
+
+    try:
+        rsi = df["RSI_14"]
+        rsi_min = rsi.rolling(14).min()
+        rsi_max = rsi.rolling(14).max()
+        stoch_rsi = (rsi - rsi_min) / (rsi_max - rsi_min)
+        stoch_rsi = stoch_rsi.replace([np.inf, -np.inf], np.nan).clip(0, 1)
+        k = stoch_rsi.rolling(3).mean() * 100.0
+        d = k.rolling(3).mean()
+        df["STOCHRSI_K"] = k
+        df["STOCHRSI_D"] = d
+    except Exception:
+        df["STOCHRSI_K"] = np.nan
+        df["STOCHRSI_D"] = np.nan
+
+    try:
+        st_period = 10
+        st_mult = 3.0
+        atr_st = tr.rolling(st_period).mean()
+        hl2 = (df["High"] + df["Low"]) / 2.0
+        upperband = hl2 + st_mult * atr_st
+        lowerband = hl2 - st_mult * atr_st
+
+        final_upper = upperband.copy()
+        final_lower = lowerband.copy()
+        close = df["Close"].values
+
+        for i in range(1, len(df)):
+            if np.isnan(final_upper.iat[i - 1]):
+                final_upper.iat[i - 1] = upperband.iat[i - 1]
+            if np.isnan(final_lower.iat[i - 1]):
+                final_lower.iat[i - 1] = lowerband.iat[i - 1]
+
+            if upperband.iat[i] < final_upper.iat[i - 1] or close[i - 1] > final_upper.iat[i - 1]:
+                final_upper.iat[i] = upperband.iat[i]
+            else:
+                final_upper.iat[i] = final_upper.iat[i - 1]
+
+            if lowerband.iat[i] > final_lower.iat[i - 1] or close[i - 1] < final_lower.iat[i - 1]:
+                final_lower.iat[i] = lowerband.iat[i]
+            else:
+                final_lower.iat[i] = final_lower.iat[i - 1]
+
+        supertrend = pd.Series(index=df.index, dtype=float)
+        supertrend_dir = pd.Series(index=df.index, dtype=float)
+        if len(df):
+            supertrend.iat[0] = final_upper.iat[0]
+            supertrend_dir.iat[0] = -1.0
+        for i in range(1, len(df)):
+            prev_st = supertrend.iat[i - 1]
+            if prev_st == final_upper.iat[i - 1]:
+                if close[i] <= final_upper.iat[i]:
+                    supertrend.iat[i] = final_upper.iat[i]
+                    supertrend_dir.iat[i] = -1.0
+                else:
+                    supertrend.iat[i] = final_lower.iat[i]
+                    supertrend_dir.iat[i] = 1.0
+            else:
+                if close[i] >= final_lower.iat[i]:
+                    supertrend.iat[i] = final_lower.iat[i]
+                    supertrend_dir.iat[i] = 1.0
+                else:
+                    supertrend.iat[i] = final_upper.iat[i]
+                    supertrend_dir.iat[i] = -1.0
+
+        df["SUPERTREND"] = supertrend
+        df["SUPERTREND_DIR"] = supertrend_dir
+    except Exception:
+        df["SUPERTREND"] = np.nan
+        df["SUPERTREND_DIR"] = np.nan
+
+    try:
+        pivot_low = (
+            (df["Low"] < df["Low"].shift(1)) &
+            (df["Low"] < df["Low"].shift(2)) &
+            (df["Low"] < df["Low"].shift(-1)) &
+            (df["Low"] < df["Low"].shift(-2))
+        ).fillna(False).values
+        pivot_high = (
+            (df["High"] > df["High"].shift(1)) &
+            (df["High"] > df["High"].shift(2)) &
+            (df["High"] > df["High"].shift(-1)) &
+            (df["High"] > df["High"].shift(-2))
+        ).fillna(False).values
+
+        last_ph = None
+        prev_ph = None
+        last_pl = None
+        prev_pl = None
+        mstruct = np.zeros(len(df), dtype=bool)
+        for i in range(len(df)):
+            if pivot_high[i]:
+                prev_ph = last_ph
+                last_ph = float(df["High"].iat[i])
+            if pivot_low[i]:
+                prev_pl = last_pl
+                last_pl = float(df["Low"].iat[i])
+
+            trend_i = df["Trend"].iat[i]
+            if prev_ph is None or prev_pl is None or last_ph is None or last_pl is None:
+                mstruct[i] = False
+            elif trend_i == "Uptrend":
+                mstruct[i] = (last_ph > prev_ph) and (last_pl > prev_pl)
+            else:
+                mstruct[i] = (last_ph < prev_ph) and (last_pl < prev_pl)
+        df["MSTRUCT"] = mstruct
+    except Exception:
+        df["MSTRUCT"] = False
     
     # === Расширение волатильности (Фаза 1) ===
     # Историческая волатильность (стандартное отклонение доходности)
@@ -1773,6 +1929,12 @@ def check_confirmations(row, selected, prev_row=None, language="ru"):
         "MACD": row["MACD"] > row["Signal_Line"],
         "ADX": row["ADX"] > 25,
         "VWMA": row["Close"] > row.get("VWMA_20", 0),
+        "VWAP": row["Close"] > row.get("VWAP", 0),
+        "AVWAP": row["Close"] > row.get("AVWAP", 0),
+        "SUPERTREND": row["Close"] > row.get("SUPERTREND", 0),
+        "STOCHRSI": row.get("STOCHRSI_K", 0) > 50,
+        "OBV": row.get("OBV", 0) > row.get("OBV_EMA_20", 0),
+        "MSTRUCT": bool(row.get("MSTRUCT", False)),
         # BB: консервативный «возврат внутрь полос»
         "BB": (
             (
@@ -1819,6 +1981,14 @@ def check_confirmations(row, selected, prev_row=None, language="ru"):
     reliability_rating = (len(passed) / total * 100) if total > 0 else 0
 
     if not passed:
+        if failed:
+            return (
+                f"{t('partially_confirmed')} (0/{total}): "
+                + ", ".join([f"{i} ❌" for i in failed]),
+                0,
+                total,
+                reliability_rating,
+            )
         return f"{t('no_confirmations')} ❌", 0, total, reliability_rating
     elif len(passed) == total:
         return f"{t('all_confirmations')} ✅", len(passed), total, reliability_rating
@@ -3302,7 +3472,11 @@ def run_analysis(symbol, timeframe=None, strategy="Сбалансированн�
             stop_loss,
             take_profit,
             reliability_rating,
-            rsi_value  # ✅ Добавлен RSI
+            rsi_value,  # ✅ Добавлен RSI
+            user_confirmation_result,
+            passed_count,
+            total_count,
+            user_confirmation_str,
         )
 
 
