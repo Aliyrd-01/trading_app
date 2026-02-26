@@ -486,24 +486,42 @@ class CheckCryptoMonitorCommand extends Command
         }
 
         if (count($bases) < $tokensToScan) {
-            $binanceTickers = $allTickers['Binance'] ?? [];
-            foreach ($binanceTickers as $symbol => $_price) {
-                if (!is_string($symbol) || $symbol === '') {
+            $upperQuote = strtoupper($quote);
+            $seen = array_fill_keys($bases, true);
+
+            foreach ($bulkExchanges as $ex) {
+                $exC = $this->canonicalizeExchange((string) $ex);
+                $tickers = $allTickers[$exC] ?? [];
+                if (!is_array($tickers) || empty($tickers)) {
                     continue;
                 }
-                $s = strtoupper($symbol);
-                if (!str_ends_with($s, strtoupper($quote))) {
-                    continue;
-                }
-                $base = substr($s, 0, -1 * strlen($quote));
-                $base = trim($base);
-                if ($base === '') {
-                    continue;
-                }
-                if (!in_array($base, $bases, true)) {
-                    $bases[] = $base;
-                    if (count($bases) >= $tokensToScan) {
-                        break;
+
+                foreach ($tickers as $pair => $_price) {
+                    if (!is_string($pair) || $pair === '') {
+                        continue;
+                    }
+
+                    $p = strtoupper($pair);
+                    $base = '';
+                    if (str_contains($p, '-') && str_ends_with($p, '-' . $upperQuote)) {
+                        $base = substr($p, 0, -1 * (strlen($upperQuote) + 1));
+                    } elseif (str_contains($p, '_') && str_ends_with($p, '_' . $upperQuote)) {
+                        $base = substr($p, 0, -1 * (strlen($upperQuote) + 1));
+                    } elseif (str_ends_with($p, $upperQuote)) {
+                        $base = substr($p, 0, -1 * strlen($upperQuote));
+                    }
+
+                    $base = trim($base);
+                    if ($base === '') {
+                        continue;
+                    }
+
+                    if (!isset($seen[$base])) {
+                        $bases[] = $base;
+                        $seen[$base] = true;
+                        if (count($bases) >= $tokensToScan) {
+                            break 2;
+                        }
                     }
                 }
             }
@@ -518,7 +536,8 @@ class CheckCryptoMonitorCommand extends Command
         foreach ($bases as $base) {
             $prices = [];
             foreach ($exchanges as $ex) {
-                $p = $this->getPriceFromCache($allTickers, $ex, $base, $quote);
+                $exC = $this->canonicalizeExchange((string) $ex);
+                $p = $this->getPriceFromCache($allTickers, $exC, $base, $quote);
                 if (!$p && $ticker && !$this->isBulkSupportedExchange((string) $ex)) {
                     $exKey = (string) $ex;
                     $pairKey = strtoupper($base . '/' . $quote);
@@ -534,7 +553,7 @@ class CheckCryptoMonitorCommand extends Command
                     }
                 }
                 if ($p) {
-                    $prices[$ex] = $p;
+                    $prices[$exC !== '' ? $exC : (string) $ex] = $p;
                 }
             }
 
@@ -577,6 +596,7 @@ class CheckCryptoMonitorCommand extends Command
 
     private function getPriceFromCache(array $allTickers, string $exchange, string $base, string $quote): ?array
     {
+        $exchange = $this->canonicalizeExchange($exchange);
         $data = $allTickers[$exchange] ?? [];
         if (empty($data)) return null;
 
