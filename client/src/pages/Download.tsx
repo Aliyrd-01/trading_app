@@ -62,8 +62,15 @@ export default function Download() {
     if (product === "trading-analyzer" && platform === "windows") {
       // Путь к exe файлу - нужно будет загрузить его в public папку
       const link = document.createElement("a");
-      link.href = "/downloads/CryptoTradingAnalyzer-Setup-latest.exe"; // Путь к файлу
+      link.href = "/downloads/cryptotradinganalyzer/CryptoTradingAnalyzer-Setup-latest.exe"; // Путь к файлу
       link.download = "CryptoTradingAnalyzer-Setup-latest.exe";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else if (product === "arbitrage-tool" && platform === "windows") {
+      const link = document.createElement("a");
+      link.href = "/downloads/cryptomonitor/CryptoMonitor-Setup-latest.exe";
+      link.download = "CryptoMonitor-Setup-latest.exe";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

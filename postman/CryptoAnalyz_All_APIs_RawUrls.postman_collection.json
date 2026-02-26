@@ -5,7 +5,10 @@
   },
   "variable": [
     {"key": "siteBaseUrl", "value": "https://cryptoanalyz.net/api"},
-    {"key": "localBaseUrl", "value": "http://127.0.0.1:5051"},
+    {"key": "localBaseUrl", "value": "http://127.0.0.1:5050"},
+    {"key": "apiKey", "value": "cix_20260119_9f1c6a7e3d0b4c2a8e5f7a1b0c9d3e4f6a8b2c0d7e5f1a3c9b0d2e4f6a8"},
+    {"key": "autoGenerateUser", "value": "true"},
+    {"key": "userEmail", "value": ""},
     {"key": "email", "value": ""},
     {"key": "password", "value": ""},
     {"key": "name", "value": ""},
@@ -14,6 +17,42 @@
     {"key": "schedulerKey", "value": ""},
     {"key": "webhookSecret", "value": ""},
     {"key": "telegramChatId", "value": ""}
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Turnkey defaults (no Environment / no Collection Variables required)",
+          "if (!pm.globals.get('siteBaseUrl')) pm.globals.set('siteBaseUrl', 'https://cryptoanalyz.net/api');",
+          "if (!pm.globals.get('localBaseUrl')) pm.globals.set('localBaseUrl', 'http://127.0.0.1:5050');",
+          "const _lb = (pm.globals.get('localBaseUrl') || '').trim();",
+          "if (_lb.toLowerCase().startsWith('https://127.0.0.1')) pm.globals.set('localBaseUrl', 'http://' + _lb.slice('https://'.length));",
+          "if (_lb.toLowerCase().startsWith('https://localhost')) pm.globals.set('localBaseUrl', 'http://' + _lb.slice('https://'.length));",
+          "if (!pm.globals.get('apiKey')) pm.globals.set('apiKey', 'cix_20260119_9f1c6a7e3d0b4c2a8e5f7a1b0c9d3e4f6a8b2c0d7e5f1a3c9b0d2e4f6a8');",
+          "if (!pm.globals.get('autoGenerateUser')) pm.globals.set('autoGenerateUser', 'true');",
+          "if (!pm.globals.get('email')) pm.globals.set('email', '');",
+          "if (!pm.globals.get('password')) pm.globals.set('password', '');",
+          "if (!pm.globals.get('name')) pm.globals.set('name', '');",
+          "if (!pm.globals.get('userEmail')) pm.globals.set('userEmail', 'tirion2025@gmail.com');",
+          "",
+          "// Mirror globals into runtime variables so {{email}}/{{password}} always substitute",
+          "pm.variables.set('siteBaseUrl', pm.globals.get('siteBaseUrl') || '');",
+          "pm.variables.set('localBaseUrl', pm.globals.get('localBaseUrl') || '');",
+          "pm.variables.set('email', pm.globals.get('email') || '');",
+          "pm.variables.set('password', pm.globals.get('password') || '');",
+          "pm.variables.set('name', pm.globals.get('name') || '');",
+          "pm.variables.set('userEmail', pm.globals.get('userEmail') || pm.globals.get('email') || '');",
+          "",
+          "const apiKey = pm.globals.get('apiKey') || '';",
+          "if (apiKey) pm.request.headers.upsert({ key: 'X-API-KEY', value: apiKey });",
+          "",
+          "const email = pm.variables.get('userEmail') || pm.variables.get('email') || '';",
+          "if (email) pm.request.headers.upsert({ key: 'X-User-Email', value: email });"
+        ]
+      }
+    }
   ],
   "item": [
     {
@@ -50,6 +89,47 @@
           "item": [
             {
               "name": "POST /auth/register",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const autoGenerate = (pm.globals.get('autoGenerateUser') || 'false') === 'true';",
+                      "const curEmail = pm.globals.get('email') || '';",
+                      "if (autoGenerate || !curEmail) {",
+                      "  const rand = (Math.random().toString(36).slice(2, 10) + Date.now().toString().slice(-4)).toLowerCase();",
+                      "  pm.globals.set('email', `postman_${rand}@example.com`);",
+                      "  pm.globals.set('userEmail', pm.globals.get('email'));",
+                      "  pm.globals.set('password', `Pass_${rand}#`);",
+                      "  pm.globals.set('name', `Postman ${rand}`);",
+                      "}",
+                      "const apiKey = pm.globals.get('apiKey') || '';",
+                      "if (apiKey) pm.request.headers.upsert({ key: 'X-API-KEY', value: apiKey });",
+                      "pm.request.headers.upsert({ key: 'X-User-Email', value: pm.globals.get('userEmail') || pm.globals.get('email') || '' });",
+                      "pm.request.body.raw = JSON.stringify({",
+                      "  email: pm.globals.get('email') || '',",
+                      "  password: pm.globals.get('password') || '',",
+                      "  name: pm.globals.get('name') || ''",
+                      "}, null, 2);"
+                    ]
+                  }
+                }
+                ,
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('register: status is 200/201', function () {",
+                      "  pm.expect([200, 201]).to.include(pm.response.code);",
+                      "});",
+                      "const email = pm.globals.get('email') || '';",
+                      "if (email && !pm.globals.get('userEmail')) pm.globals.set('userEmail', email);"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [{"key": "Content-Type", "value": "application/json"}],
@@ -59,6 +139,20 @@
             },
             {
               "name": "POST /auth/login",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.request.body.raw = JSON.stringify({",
+                      "  email: pm.globals.get('email') || '',",
+                      "  password: pm.globals.get('password') || ''",
+                      "}, null, 2);"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [{"key": "Content-Type", "value": "application/json"}],
@@ -70,13 +164,25 @@
               "name": "POST /auth/token (sets laravelToken)",
               "event": [
                 {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.request.body.raw = JSON.stringify({",
+                      "  email: pm.globals.get('email') || '',",
+                      "  password: pm.globals.get('password') || ''",
+                      "}, null, 2);"
+                    ]
+                  }
+                },
+                {
                   "listen": "test",
                   "script": {
                     "type": "text/javascript",
                     "exec": [
                       "try {",
                       "  const j = pm.response.json();",
-                      "  if (j && j.token) pm.collectionVariables.set('laravelToken', j.token);",
+                      "  if (j && j.token) pm.globals.set('laravelToken', j.token);",
                       "} catch (e) {}"
                     ]
                   }
@@ -99,6 +205,34 @@
             },
             {
               "name": "DELETE /auth/account",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.request.body.raw = JSON.stringify({",
+                      "  password: pm.globals.get('password') || ''",
+                      "}, null, 2);"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('delete account: status is 200', function () {",
+                      "  pm.expect(pm.response.code).to.equal(200);",
+                      "});",
+                      "pm.globals.unset('email');",
+                      "pm.globals.unset('userEmail');",
+                      "pm.globals.unset('password');",
+                      "pm.globals.unset('name');"
+                    ]
+                  }
+                }
+              ],
               "request": {
                 "method": "DELETE",
                 "header": [{"key": "Content-Type", "value": "application/json"}],

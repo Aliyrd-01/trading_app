@@ -11,6 +11,16 @@ interface Translations {
 }
 
 const translations: Translations = {
+  'common.loading': {
+    en: 'Loading...',
+    uk: 'Завантаження...',
+    ru: 'Загрузка...'
+  },
+  'demo.loading': {
+    en: 'Loading demo...',
+    uk: 'Завантаження демо...',
+    ru: 'Загрузка демо...'
+  },
   'header.tradingAnalyzer': {
     en: 'Trading Analyzer',
     uk: 'Торговий Аналізатор',
@@ -82,9 +92,9 @@ const translations: Translations = {
     ru: 'Узнайте больше о наших инструментах'
   },
   'learnMore.subtitle': {
-    en: 'How the Crypto Trading Analyzer works today and what will be available in the upcoming Arbitrage app.',
-    uk: 'Як працює Crypto Trading Analyzer сьогодні та що з’явиться у майбутньому застосунку для арбітражу.',
-    ru: 'Как работает Crypto Trading Analyzer сегодня и что появится в будущем приложении для арбитража.'
+    en: 'How Crypto Trading Analyzer works today, what CryptoMonitor already offers for arbitrage monitoring, and what will be available in the upcoming Arbitrage app.',
+    uk: 'Як працює Crypto Trading Analyzer сьогодні, що вже вміє CryptoMonitor для моніторингу арбітражу, та що з’явиться у майбутньому застосунку для арбітражу.',
+    ru: 'Как работает Crypto Trading Analyzer сегодня, что уже умеет CryptoMonitor для мониторинга арбитража и что появится в будущем приложении для арбитража.'
   },
   'learnMore.openDemo': {
     en: 'Open Demo',
@@ -105,6 +115,92 @@ const translations: Translations = {
     en: 'Answers about the Web App, Desktop App, payments, and basic account topics.',
     uk: 'Відповіді про Web App, Desktop App, оплату та основні питання щодо акаунта.',
     ru: 'Ответы про Web App, Desktop App, оплату и базовые вопросы по аккаунту.'
+  },
+  'faq.arbitrage.subtitle': {
+    en: 'CryptoMonitor is our desktop tool for monitoring arbitrage opportunities and alerts across exchanges.',
+    uk: 'CryptoMonitor — це наш desktop-інструмент для моніторингу арбітражних можливостей та алертів між біржами.',
+    ru: 'CryptoMonitor — это наше desktop-приложение для мониторинга арбитражных возможностей и алертов между биржами.'
+  },
+  'faq.arbitrage.q.whatIsCryptoMonitor': {
+    en: 'What is CryptoMonitor?',
+    uk: 'Що таке CryptoMonitor?',
+    ru: 'Что такое CryptoMonitor?'
+  },
+  'faq.arbitrage.a.whatIsCryptoMonitor': {
+    en: 'CryptoMonitor is a Windows desktop app that helps you track spreads, prices and key parameters across exchanges to spot potential arbitrage situations faster.',
+    uk: 'CryptoMonitor — це desktop-додаток для Windows, який допомагає відстежувати спреди, ціни та ключові параметри між біржами, щоб швидше знаходити арбітражні ситуації.',
+    ru: 'CryptoMonitor — это desktop-приложение для Windows, которое помогает отслеживать спреды, цены и ключевые параметры между биржами, чтобы быстрее находить арбитражные ситуации.'
+  },
+  'faq.arbitrage.q.signals': {
+    en: 'How do signals work?',
+    uk: 'Як працюють сигнали?',
+    ru: 'Как работают сигналы?'
+  },
+  'faq.arbitrage.a.signals': {
+    en: 'You set rules (thresholds) and CryptoMonitor notifies you when an opportunity meets your criteria. Notifications can be shown in the app and sent to enabled channels (e.g., Telegram/Email if available). To keep messages readable, notifications include only the first 10 pairs with the largest spread.',
+    uk: 'Ви задаєте правила (пороги), і CryptoMonitor сповіщає, коли можливість відповідає вашим критеріям. Сповіщення можуть показуватися в додатку та надсилатися у ввімкнені канали (наприклад, Telegram/Email за наявності). Щоб повідомлення були зручними, в сповіщеннях надсилаються лише перші 10 пар з найбільшим спредом.',
+    ru: 'Вы задаёте правила (пороги), и CryptoMonitor уведомляет, когда возможность соответствует вашим критериям. Уведомления могут отображаться в приложении и отправляться в включённые каналы (например, Telegram/Email при наличии). Чтобы уведомления были читаемыми, в них отправляются только первые 10 пар с самым большим спредом.'
+  },
+  'faq.arbitrage.q.smtpSetup': {
+    en: 'How do I configure SMTP for email notifications?',
+    uk: 'Як налаштувати SMTP для Email/Telegram сповіщень?',
+    ru: 'Как настроить SMTP для Email/Telegram уведомлений?'
+  },
+  'faq.arbitrage.a.smtpSetup': {
+    en: '1) Open CryptoMonitor → Settings → Notifications → Email.\n2) Enable Email notifications.\n3) Fill in SMTP settings:\n   - SMTP Host (example: smtp.gmail.com)\n   - SMTP Port (usually 587 for TLS)\n   - SMTP User (your email)\n   - SMTP Password (recommended: app password)\n4) Enable TLS/STARTTLS if the option exists.\n5) Save settings and use the “Test notification” button to verify delivery.\n\nGmail note: you must use an App Password (Google Account → Security → App passwords). Regular account password will not work.',
+    uk: '1) Відкрийте CryptoMonitor → Settings → Notifications → Email.\n2) Увімкніть Email/Telegram сповіщення (за потреби).\n3) Для Email заповніть SMTP параметри:\n   - SMTP Host (приклад: smtp.gmail.com)\n   - SMTP Port (зазвичай 587 для TLS)\n   - SMTP User (ваш email)\n   - SMTP Password (рекомендовано: пароль додатка)\n4) Увімкніть TLS/STARTTLS (якщо є опція).\n5) Збережіть налаштування і натисніть “Test notification”, щоб перевірити доставку.\n\nПримітка для Gmail: потрібен App Password (Google Account → Security → App passwords). Звичайний пароль акаунта не підійде.',
+    ru: '1) Откройте CryptoMonitor → Settings → Notifications → Email.\n2) Включите Email/Telegram уведомления (при необходимости).\n3) Для Email заполните SMTP параметры:\n   - SMTP Host (пример: smtp.gmail.com)\n   - SMTP Port (обычно 587 для TLS)\n   - SMTP User (ваш email)\n   - SMTP Password (рекомендуется: пароль приложения)\n4) Включите TLS/STARTTLS (если есть опция).\n5) Сохраните настройки и нажмите “Test notification”, чтобы проверить доставку.\n\nПримечание для Gmail: нужен App Password (Google Account → Security → App passwords). Обычный пароль аккаунта не подойдет.'
+  },
+  'faq.arbitrage.q.apiKeys': {
+    en: 'Do I need exchange API keys?',
+    uk: 'Чи потрібні API-ключі бірж?',
+    ru: 'Нужны ли API-ключи бирж?'
+  },
+  'faq.arbitrage.a.apiKeys': {
+    en: 'For basic monitoring you usually do not need withdrawal/trading permissions. If you connect exchange APIs, use read-only keys and never share them with anyone.',
+    uk: 'Для базового моніторингу зазвичай не потрібні права на вивід/торгівлю. Якщо підключаєте API біржі — використовуйте ключі тільки для читання (read-only) і нікому їх не передавайте.',
+    ru: 'Для базового мониторинга обычно не нужны права на вывод/торговлю. Если подключаете API биржи — используйте ключи только для чтения (read-only) и никому их не передавайте.'
+  },
+  'faq.arbitrage.q.download': {
+    en: 'Where can I download CryptoMonitor?',
+    uk: 'Де завантажити CryptoMonitor?',
+    ru: 'Где скачать CryptoMonitor?'
+  },
+  'faq.arbitrage.a.download': {
+    en: '1) Register on the website.\n2) Download the latest CryptoMonitor installer from the Download page.\n3) Install the app and sign in using the same email and password you used on the website.',
+    uk: '1) Зареєструйтеся на сайті.\n2) Завантажте останній інсталятор CryptoMonitor на сторінці Download.\n3) Встановіть додаток і увійдіть, використовуючи той самий email і пароль, що й на сайті.',
+    ru: '1) Зарегистрируйтесь на сайте.\n2) Скачайте актуальный установщик CryptoMonitor на странице Download.\n3) Установите приложение и войдите, используя тот же email и пароль, что и на сайте.'
+  },
+  'faq.arbitrage.q.howToStart': {
+    en: 'How do I start monitoring?',
+    uk: 'Як почати моніторинг?',
+    ru: 'Как начать мониторинг?'
+  },
+  'faq.arbitrage.a.howToStart': {
+    en: 'Install CryptoMonitor, sign in, choose exchanges and pairs, then enable scanning. Start with conservative thresholds and adjust based on your strategy and fees.',
+    uk: 'Встановіть CryptoMonitor, увійдіть, оберіть біржі та пари, потім увімкніть сканування. Почніть з консервативних порогів і коригуйте з урахуванням стратегії та комісій.',
+    ru: 'Установите CryptoMonitor, войдите, выберите биржи и пары, затем включите сканирование. Начинайте с консервативных порогов и корректируйте с учётом стратегии и комиссий.'
+  },
+  'faq.arbitrage.q.autoTrading': {
+    en: 'Does CryptoMonitor trade automatically?',
+    uk: 'CryptoMonitor торгує автоматично?',
+    ru: 'CryptoMonitor торгует автоматически?'
+  },
+  'faq.arbitrage.a.autoTrading': {
+    en: 'CryptoMonitor is designed for monitoring and alerts. If automated execution becomes available, it will be an optional feature with clear risk controls.',
+    uk: 'CryptoMonitor призначений для моніторингу та алертів. Якщо з’явиться автоматичне виконання — це буде опційна функція з чіткими контролями ризику.',
+    ru: 'CryptoMonitor предназначен для мониторинга и алертов. Если появится автоматическое исполнение — это будет опциональная функция с понятными контролями риска.'
+  },
+
+  'faq.arbitrage.q.freeLimits': {
+    en: 'What are the Free version limitations for CryptoMonitor?',
+    uk: 'Які обмеження Free-версії для CryptoMonitor?',
+    ru: 'Какие ограничения Free-версии для CryptoMonitor?'
+  },
+  'faq.arbitrage.a.freeLimits': {
+    en: 'After the trial ends, Free accounts have reduced limits:\n\n- Tokens to scan: up to 50\n- Results (Top N): up to 5\n- Continuous scan interval: at least 5 minutes\n- Notifications (Email/Telegram): up to 1 send per day\n\nTo remove limits, upgrade to Pro.',
+    uk: 'Після завершення Trial, для Free акаунтів діють обмеження:\n\n- Токенів для аналізу: до 50\n- Результат (Top N): до 5\n- Інтервал безперервного сканування: не менше 5 хвилин\n- Сповіщення (Email/Telegram): до 1 відправки на добу\n\nЩоб зняти обмеження, перейдіть на Pro.',
+    ru: 'После окончания Trial, для Free аккаунтов действуют ограничения:\n\n- Токенов для анализа: до 50\n- Результат (Top N): до 5\n- Интервал непрерывного сканирования: не меньше 5 минут\n- Уведомления (Email/Telegram): до 1 отправки в сутки\n\nЧтобы снять ограничения, перейдите на Pro.'
   },
   'faq.webApp.title': {
     en: 'Web App',
@@ -287,9 +383,20 @@ const translations: Translations = {
     ru: 'Есть ли демо-режим?'
   },
   'faq.desktopApp.a.demo': {
-    en: 'Yes. You can try a demo to see the interface and workflow before purchasing a plan.',
-    uk: 'Так. Ви можете спробувати демо, щоб побачити інтерфейс і процес роботи перед покупкою.',
-    ru: 'Да. Вы можете попробовать демо, чтобы увидеть интерфейс и процесс работы перед покупкой.'
+    en: 'Yes. Demo mode helps you explore the UI without changing your account settings. Some actions can be limited depending on your plan.',
+    uk: 'Так. Демо-режим допомагає ознайомитися з інтерфейсом без зміни налаштувань акаунта. Деякі дії можуть бути обмежені залежно від тарифу.',
+    ru: 'Да. Демо-режим помогает ознакомиться с интерфейсом без изменения настроек аккаунта. Некоторые действия могут быть ограничены в зависимости от тарифа.'
+  },
+
+  'faq.desktopApp.q.freeLimits': {
+    en: 'What are the Free version limitations for CryptoAnalyzer?',
+    uk: 'Які обмеження Free-версії для CryptoAnalyzer?',
+    ru: 'Какие ограничения Free-версии для CryptoAnalyzer?'
+  },
+  'faq.desktopApp.a.freeLimits': {
+    en: 'After the trial ends, Free accounts have reduced access:\n\n- Run limit: 1 analysis run per day\n- Advanced settings: unavailable\n- Investor report download: unavailable\n- TradingView export: unavailable\n- Download statistics: unavailable\n- Strategy analysis: unavailable\n\nTo unlock these features, upgrade to Pro.',
+    uk: 'Після завершення Trial, для Free акаунтів діє урізаний доступ:\n\n- Ліміт запусків: 1 запуск аналізу на добу\n- Розширені налаштування: недоступні\n- Завантаження Investor report: недоступно\n- Експорт у TradingView: недоступно\n- Завантаження статистики: недоступно\n- Аналіз стратегій: недоступно\n\nЩоб відкрити ці функції, перейдіть на Pro.',
+    ru: 'После окончания Trial, для Free аккаунтов доступ урезан:\n\n- Лимит запусков: 1 запуск анализа в сутки\n- Расширенные настройки: недоступны\n- Скачать Investor report: недоступно\n- Экспорт в TradingView: недоступно\n- Скачать статистику: недоступно\n- Анализ стратегий: недоступно\n\nЧтобы открыть эти функции, перейдите на Pro.'
   },
   'faq.general.title': {
     en: 'General',
@@ -313,15 +420,24 @@ const translations: Translations = {
   },
   'faq.general.q.deleteAccount': {
     en: 'How does the 7-day trial work?',
-    uk: 'Як працює 7-денний trial?',
-    ru: 'Как работает 7-дневный trial?'
+    uk: 'Як працює 7-денний Trial?',
+    ru: 'Как работает 7-дневный Trial?'
   },
   'faq.general.a.deleteAccount': {
     en: 'After registration you get full access to all features for 7 days. No card required. When the trial ends, Auto-Signals will be locked on the Free plan until you upgrade.',
-    uk: 'Після реєстрації ви отримуєте повний доступ до всіх функцій на 7 днів. Картка не потрібна. Після завершення trial автосигнали будуть заблоковані на Free-плані до апгрейду.',
-    ru: 'После регистрации вы получаете полный доступ ко всем функциям на 7 дней. Карта не нужна. После завершения trial автосигналы будут заблокированы на Free-плане до апгрейда.'
+    uk: 'Після реєстрації ви отримуєте повний доступ до всіх функцій на 7 днів. Картка не потрібна. Після завершення Trial автосигнали будуть заблоковані на Free-плані до апгрейду.',
+    ru: 'После регистрации вы получаете полный доступ ко всем функциям на 7 дней. Карта не нужна. После завершения Trial автосигнали будут заблокированы на Free-плане до апгрейда.'
   },
-
+  'faq.general.q.telegramNotifications': {
+    en: 'How do I set up Telegram notifications?',
+    uk: 'Як налаштувати Telegram-сповіщення?',
+    ru: 'Как настроить Telegram уведомления?'
+  },
+  'faq.general.a.telegramNotifications': {
+    en: '1) Open our Telegram bot: @CryptoTraderAnalyzerBot\nDirect link: https://t.me/CryptoTraderAnalyzerBot?start=cryptoanalyz\nIf you cannot find it in search, open the direct link above.\n\n2) Open the bot chat and press Start (or send any message).\nImportant: Telegram does not allow a bot to message you until you start a chat with it. Otherwise you may get “Bad Request: chat not found”.\n\n3) In the app Settings → Notifications, enable Telegram and enter your Chat ID (a number) or username (e.g. @username).\n\nHow to get Chat ID (User ID):\n1) Open @userinfobot in Telegram.\n2) Send /start.\n3) Copy the numeric Id and paste it into the settings.',
+    uk: '1) Відкрийте нашого Telegram-бота: @CryptoTraderAnalyzerBot\nПряме посилання: https://t.me/CryptoTraderAnalyzerBot?start=cryptoanalyz\nЯкщо бот не знаходиться через пошук — відкрийте пряме посилання вище.\n\n2) Відкрийте чат з ботом і натисніть Start (або надішліть будь-яке повідомлення).\nВажливо: Telegram не дозволяє боту писати вам, доки ви не почнете діалог з ним. Інакше може бути помилка “Bad Request: chat not found”.\n\n3) У Налаштуваннях → Сповіщення увімкніть Telegram і введіть Chat ID (число) або username (наприклад @username).\n\nЯк отримати Chat ID (User ID):\n1) Відкрийте бота @userinfobot в Telegram.\n2) Надішліть /start.\n3) Скопіюйте числовий Id і вставте його в налаштування.',
+    ru: '1) Откройте нашего Telegram-бота: @CryptoTraderAnalyzerBot\nПрямая ссылка: https://t.me/CryptoTraderAnalyzerBot?start=cryptoanalyz\nЕсли бот не находится через поиск — откройте прямую ссылку выше.\n\n2) Откройте чат с ботом и нажмите Start (или отправьте любое сообщение).\nВажно: Telegram не позволяет боту писать вам, пока вы не начнете диалог с ним. Иначе будет ошибка “Bad Request: chat not found”.\n\n3) В настройках приложения → Уведомления включите Telegram и укажите Chat ID (число) или username (например @username).\n\nКак получить Chat ID (User ID):\n1) Откройте бота @userinfobot в Telegram.\n2) Отправьте /start.\n3) Скопируйте числовой Id и вставьте его в настройки.'
+  },
   'dashboard.deleteAccount': {
     en: 'Delete Account',
     uk: 'Видалити акаунт',
@@ -422,6 +538,69 @@ const translations: Translations = {
     en: 'Auto-select indicators (Smart Combine) — suggests optimal confirmations for current market mode.',
     uk: 'Автопідбір індикаторів (Smart Combine) — підказує оптимальні підтвердження під режим ринку.',
     ru: 'Автоподбор индикаторов (Smart Combine) — подсказывает оптимальные подтверждения под режим рынка.'
+  },
+
+  'learnMore.advanced.bullet7': {
+    en: 'Risk settings in Advanced mode — position size, stop-loss/take-profit, and risk/reward control.',
+    uk: 'Налаштування ризиків у Advanced режимі — розмір позиції, stop-loss/take-profit та контроль risk/reward.',
+    ru: 'Настройки рисков в расширенном режиме — размер позиции, stop-loss/take-profit и контроль risk/reward.'
+  },
+
+  'learnMore.investorReport.title': {
+    en: 'Investor Report',
+    uk: 'Investor Report',
+    ru: 'Investor Report'
+  },
+  'learnMore.investorReport.description': {
+    en: 'A separate investor-style report that explains the idea and key metrics in a clear, structured format.',
+    uk: 'Окремий звіт у “інвесторському” форматі: ідея, логіка та ключові метрики — структуровано і зрозуміло.',
+    ru: 'Отдельный отчет в “инвесторском” формате: идея, логика и ключевые метрики — структурировано и понятно.'
+  },
+  'learnMore.investorReport.bullet1': {
+    en: 'Clear summary: direction, levels, and rationale.',
+    uk: 'Зрозумілий підсумок: напрям, рівні та логіка.',
+    ru: 'Понятное резюме: направление, уровни и логика.'
+  },
+  'learnMore.investorReport.bullet2': {
+    en: 'Risk section: stop-loss, take-profit and risk/reward.',
+    uk: 'Блок ризику: stop-loss, take-profit та risk/reward.',
+    ru: 'Блок риска: stop-loss, take-profit и risk/reward.'
+  },
+  'learnMore.investorReport.bullet3': {
+    en: 'Export-ready: convenient for sharing and archiving.',
+    uk: 'Зручно для експорту: легко ділитися та зберігати.',
+    ru: 'Удобно для экспорта: легко делиться и хранить.'
+  },
+
+  'learnMore.investorReport.screens.shot1': {
+    en: 'Investor report: overview & key levels',
+    uk: 'Investor report: огляд і ключові рівні',
+    ru: 'Investor report: обзор и ключевые уровни'
+  },
+  'learnMore.investorReport.screens.shot2': {
+    en: 'Investor report: thesis & confirmations',
+    uk: 'Investor report: теза та підтвердження',
+    ru: 'Investor report: тезис и подтверждения'
+  },
+  'learnMore.investorReport.screens.shot3': {
+    en: 'Investor report: risk/reward & scenarios',
+    uk: 'Investor report: risk/reward та сценарії',
+    ru: 'Investor report: risk/reward и сценарии'
+  },
+  'learnMore.investorReport.screens.shot4': {
+    en: 'Investor report: entry/exit plan',
+    uk: 'Investor report: план входу/виходу',
+    ru: 'Investor report: план входа/выхода'
+  },
+  'learnMore.investorReport.screens.shot5': {
+    en: 'Investor report: metrics & notes',
+    uk: 'Investor report: метрики та нотатки',
+    ru: 'Investor report: метрики и заметки'
+  },
+  'learnMore.investorReport.screens.shot6': {
+    en: 'Investor report: export/share view',
+    uk: 'Investor report: вигляд для експорту/шерингу',
+    ru: 'Investor report: вид для экспорта/шеринга'
   },
 
   'learnMore.analysis.title': {
@@ -529,6 +708,72 @@ const translations: Translations = {
     uk: 'Миттєві сповіщення (Telegram/Email) про найкращі можливості',
     ru: 'Мгновенные уведомления (Telegram/Email) о лучших возможностях'
   },
+
+  'learnMore.cryptoMonitor.title': {
+    en: 'CryptoMonitor',
+    uk: 'CryptoMonitor',
+    ru: 'CryptoMonitor'
+  },
+  'learnMore.cryptoMonitor.description': {
+    en: 'A Windows desktop app that monitors prices and spreads across up to 15 exchanges, ranks opportunities in real time, and helps you react faster with alerts, logs, charts, and export.',
+    uk: 'Додаток для Windows, який відстежує ціни та спреди на до 15 біржах, ранжує можливості в реальному часі та допомагає швидше реагувати завдяки алертам, логам, графікам і експорту.',
+    ru: 'Приложение для Windows, которое отслеживает цены и спреды на до 15 биржах, ранжирует возможности в реальном времени и помогает быстрее реагировать благодаря алертам, логам, графикам и экспорту.'
+  },
+  'learnMore.cryptoMonitor.description2': {
+    en: 'CryptoMonitor is built for fast decision-making: you can filter by quote currency, limit the number of results, open exchange pages in one click, and keep a clear scan history in logs.',
+    uk: 'CryptoMonitor створений для швидких рішень: можна фільтрувати за котирувальною валютою, обмежувати кількість результатів, відкривати сторінки бірж в один клік і зберігати історію сканів у логах.',
+    ru: 'CryptoMonitor сделан для быстрых решений: можно фильтровать по котировке, ограничивать количество результатов, открывать страницы бирж в один клик и сохранять историю сканов в логах.'
+  },
+  'learnMore.cryptoMonitor.bullet1': {
+    en: 'Multi-exchange scanner: finds top spreads by selected quote and exchanges.',
+    uk: 'Сканер по кількох біржах: знаходить топ-спреди за вибраною котирувальною валютою та біржами.',
+    ru: 'Сканер по нескольким биржам: находит топ-спреды по выбранной котировке и биржам.'
+  },
+  'learnMore.cryptoMonitor.bullet2': {
+    en: 'Alerts: set thresholds (min/max spread) and get notifications when a pair matches your range.',
+    uk: 'Алерти: задайте пороги (мін/макс спред) і отримуйте сповіщення, коли пара потрапляє у ваш діапазон.',
+    ru: 'Алерты: задайте пороги (мин/макс спред) и получайте уведомления, когда пара попадает в ваш диапазон.'
+  },
+  'learnMore.cryptoMonitor.bullet3': {
+    en: 'Charts & history: review spreads and price dynamics (if enabled).',
+    uk: 'Графіки та історія: перегляд спредів і динаміки ціни (якщо увімкнено).',
+    ru: 'Графики и история: просмотр спредов и динамики цены (если включено).'
+  },
+  'learnMore.cryptoMonitor.bullet4': {
+    en: 'Fast workflow: open exchange pages and search in one click.',
+    uk: 'Швидкий workflow: відкриття біржі та пошуку в один клік.',
+    ru: 'Быстрый workflow: открытие биржи и поиска в один клик.'
+  },
+  'learnMore.cryptoMonitor.bullet5': {
+    en: 'Logs & transparency: view detailed logs to understand what happened during scans.',
+    uk: 'Логи та прозорість: переглядайте детальні логи, щоб розуміти, що відбувалося під час сканів.',
+    ru: 'Логи и прозрачность: можно просматривать подробные логи и понимать, что происходило во время сканов.'
+  },
+  'learnMore.cryptoMonitor.bullet6': {
+    en: 'Data export: save results for later analysis (CSV/TSV) to compare scans and build your own reports.',
+    uk: 'Експорт даних: зберігайте результати для подальшого аналізу (CSV/TSV), порівнюйте скани та формуйте власні звіти.',
+    ru: 'Экспорт данных: сохраняй результаты для дальнейшего анализа (CSV/TSV), сравнивай сканы и делай свои отчеты.'
+  },
+  'learnMore.cryptoMonitor.bullet7': {
+    en: 'Exchange health checks: quickly see which exchanges are reachable and which are failing.',
+    uk: 'Перевірка доступності бірж: швидко видно, які біржі працюють, а які недоступні.',
+    ru: 'Проверка доступности бирж: быстро видно, какие биржи доступны, а какие в ошибке.'
+  },
+  'learnMore.cryptoMonitor.bullet8': {
+    en: 'Email notifications: configure SMTP in Settings to receive alerts even when the app is minimized (depends on your email provider).',
+    uk: 'Email/Telegram сповіщення: для Email налаштуйте SMTP у Settings, щоб отримувати алерти навіть коли додаток згорнуто (залежить від поштового провайдера).',
+    ru: 'Email/Telegram уведомления: для Email настрой SMTP в Settings, чтобы получать алерты даже когда приложение свернуто (зависит от почтового провайдера).'
+  },
+  'learnMore.cryptoMonitor.bullet9': {
+    en: 'Per-symbol alerts: set rules like BTC=3, ETH=2.5 to track only coins you care about.',
+    uk: 'Алерти за символом: задавайте правила на кшталт BTC=3, ETH=2.5, щоб відстежувати лише потрібні монети.',
+    ru: 'Алерты по символам: задавай правила вроде BTC=3, ETH=2.5, чтобы отслеживать только нужные монеты.'
+  },
+  'learnMore.cryptoMonitor.bullet10': {
+    en: 'Transparent workflow: every scan step is visible in logs, so you can debug issues (network, exchange rate limits, unavailable markets).',
+    uk: 'Прозорий workflow: кожен крок скану видно в логах — зручно для дебагу проблем (мережа, ліміти бірж, недоступні ринки).',
+    ru: 'Прозрачный workflow: каждый шаг скана виден в логах — удобно для дебага проблем (сеть, лимиты бирж, недоступные рынки).'
+  },
   'learnMore.screens.title': {
     en: 'Screenshots (optional)',
     uk: 'Скріншоти (опційно)',
@@ -538,6 +783,16 @@ const translations: Translations = {
     en: 'If you send screenshots, we will place them here to visually explain key features.',
     uk: 'Якщо ви надішлете скріншоти — ми розмістимо їх тут, щоб наочно показати ключові можливості.',
     ru: 'Если ты пришлёшь скриншоты — мы разместим их здесь, чтобы наглядно показать ключевые возможности.'
+  },
+  'learnMore.screens.cryptoAnalyzerTitle': {
+    en: 'Crypto Trading Analyzer — Screenshots',
+    uk: 'Crypto Trading Analyzer — Скріншоти',
+    ru: 'Crypto Trading Analyzer — Скриншоты'
+  },
+  'learnMore.screens.cryptoMonitorTitle': {
+    en: 'CryptoMonitor — Screenshots',
+    uk: 'CryptoMonitor — Скріншоти',
+    ru: 'CryptoMonitor — Скриншоты'
   },
   'learnMore.screens.shot1': {
     en: 'Beginner mode: quick setup & analysis',
@@ -558,6 +813,16 @@ const translations: Translations = {
     en: 'Real-time chart & key levels',
     uk: 'Графік у реальному часі та ключові рівні',
     ru: 'График в реальном времени и ключевые уровни'
+  },
+  'learnMore.screens.cmShot1': {
+    en: 'CryptoMonitor: main dashboard & spreads',
+    uk: 'CryptoMonitor: головний екран і спреди',
+    ru: 'CryptoMonitor: главный экран и спреды'
+  },
+  'learnMore.screens.cmShot2': {
+    en: 'CryptoMonitor: charts & analysis',
+    uk: 'CryptoMonitor: графіки та аналіз',
+    ru: 'CryptoMonitor: графики и анализ'
   },
   'autoSignals.title': {
     en: 'Automatic Signals',
@@ -904,6 +1169,11 @@ const translations: Translations = {
     uk: 'Вивід тесту',
     ru: 'Вывод теста'
   },
+  'autoSignals.testOutputPlaceholder': {
+    en: 'Test result',
+    uk: 'Результат тесту',
+    ru: 'Результат теста'
+  },
   'autoSignals.toast.saved': {
     en: 'Saved',
     uk: 'Збережено',
@@ -919,10 +1189,50 @@ const translations: Translations = {
     uk: 'Тест виконано',
     ru: 'Тест выполнен'
   },
+  'autoSignals.toast.testDoneDesc': {
+    en: 'Test finished',
+    uk: 'Тест завершено',
+    ru: 'Тест завершен'
+  },
   'autoSignals.toast.testError': {
     en: 'Test error',
     uk: 'Помилка тесту',
     ru: 'Ошибка теста'
+  },
+  'autoSignals.validation.invalid': {
+    en: 'Invalid value',
+    uk: 'Некоректне значення',
+    ru: 'Некорректное значение'
+  },
+  'autoSignals.validation.capitalInvalid': {
+    en: 'Invalid capital value',
+    uk: 'Некоректне значення капіталу',
+    ru: 'Некорректное значение капитала'
+  },
+  'autoSignals.validation.capitalMax': {
+    en: 'Capital cannot be greater than 999999999999',
+    uk: 'Капітал не може бути більшим за 999999999999',
+    ru: 'Капитал не может быть больше 999999999999'
+  },
+  'autoSignals.validation.riskMax': {
+    en: 'Risk cannot be greater than 100%',
+    uk: 'Ризик не може бути більшим за 100%',
+    ru: 'Риск не может быть больше 100%'
+  },
+  'autoSignals.validation.minReliabilityMax': {
+    en: 'Min reliability cannot be greater than 100%',
+    uk: 'Мін. надійність не може бути більшою за 100%',
+    ru: 'Мин. надежность не может быть больше 100%'
+  },
+  'autoSignals.validation.checkIntervalMin': {
+    en: 'Check interval must be at least 1 minute',
+    uk: 'Інтервал перевірки має бути не менше 1 хв',
+    ru: 'Интервал проверки должен быть не меньше 1 мин'
+  },
+  'autoSignals.validation.checkIntervalMax': {
+    en: 'Check interval cannot be greater than 10080 minutes',
+    uk: 'Інтервал перевірки не може бути більшим за 10080 хв',
+    ru: 'Интервал проверки не может быть больше 10080 мин'
   },
   'trading.badge': {
     en: 'Product 1',
@@ -1169,6 +1479,36 @@ const translations: Translations = {
     uk: 'Пароль має бути не менше 6 символів',
     ru: 'Пароль должен быть не менее 6 символов'
   },
+  'auth.invalidEmail': {
+    en: 'Please enter a valid email address',
+    uk: 'Будь ласка, введіть коректну адресу електронної пошти',
+    ru: 'Пожалуйста, введите корректный адрес электронной почты'
+  },
+  'auth.emailAlreadyExists': {
+    en: 'An account with this email already exists',
+    uk: 'Акаунт з таким email вже існує',
+    ru: 'Аккаунт с таким email уже существует'
+  },
+  'auth.setNewPassword': {
+    en: 'Set New Password',
+    uk: 'Встановити Новий Пароль',
+    ru: 'Установить Новый Пароль'
+  },
+  'auth.setNewPasswordDesc': {
+    en: 'Enter your new password below.',
+    uk: 'Введіть ваш новий пароль нижче.',
+    ru: 'Введите ваш новый пароль ниже.'
+  },
+  'auth.resetTokenMissing': {
+    en: 'Reset token is missing',
+    uk: 'Токен для скидання відсутній',
+    ru: 'Токен для сброса отсутствует'
+  },
+  'auth.resetTokenExpiredDesc': {
+    en: 'This reset link is no longer valid. Please request a new password reset link.',
+    uk: 'Це посилання для скидання більше недійсне. Будь ласка, запросіть нове посилання для скидання пароля.',
+    ru: 'Эта ссылка для сброса больше недействительна. Пожалуйста, запросите новую ссылку для сброса пароля.'
+  },
   'auth.name': {
     en: 'Name (Optional)',
     uk: 'Ім\'я (Опціонально)',
@@ -1194,6 +1534,11 @@ const translations: Translations = {
     uk: 'З поверненням',
     ru: 'С возвращением'
   },
+  'dashboard.logout': {
+    en: 'Log out',
+    uk: 'Вийти',
+    ru: 'Выйти'
+  },
   'dashboard.description': {
     en: 'Your trading dashboard is ready. Access powerful tools to analyze markets and execute trades.',
     uk: 'Ваша торгова панель готова. Отримайте доступ до потужних інструментів для аналізу ринків та здійснення угод.',
@@ -1203,6 +1548,31 @@ const translations: Translations = {
     en: 'Profile Information',
     uk: 'Інформація Профілю',
     ru: 'Информация Профиля'
+  },
+  'dashboard.planUnlimited': {
+    en: 'Unlimited',
+    uk: 'Без строку',
+    ru: 'Без срока'
+  },
+  'dashboard.planLabel': {
+    en: 'Plan',
+    uk: 'План',
+    ru: 'План'
+  },
+  'dashboard.planExpiryPro': {
+    en: 'Pro expiry date:',
+    uk: 'Дата закінчення Pro:',
+    ru: 'Дата окончания Pro:'
+  },
+  'dashboard.planExpiryProPlus': {
+    en: 'Pro+ expiry date:',
+    uk: 'Дата закінчення Pro+:',
+    ru: 'Дата окончания Pro+:'
+  },
+  'dashboard.planExpiryTrial': {
+    en: 'Free Trial expiry date:',
+    uk: 'Дата закінчення 7-денного пробного періоду:',
+    ru: 'Дата окончания 7-дневного пробного периода:'
   },
   'dashboard.name': {
     en: 'Name',
@@ -1276,8 +1646,13 @@ const translations: Translations = {
   },
   'prices.free': {
     en: 'Free',
-    uk: 'Безкоштовно',
-    ru: 'Бесплатно'
+    uk: 'Free',
+    ru: 'Free'
+  },
+  'prices.trial': {
+    en: 'Free Trial',
+    uk: 'Free Trial',
+    ru: 'Free Trial'
   },
   'prices.pro': {
     en: 'Pro',
@@ -1828,6 +2203,503 @@ const translations: Translations = {
     en: 'Last updated: November 29, 2025',
     uk: 'Останнє оновлення: 29 листопада 2025',
     ru: 'Последнее обновление: 29 ноября 2025'
+  },
+  'spreadAlerts.title': {
+    en: 'Crypto Monitor',
+    uk: 'Crypto Monitor',
+    ru: 'Crypto Monitor'
+  },
+  'spreadAlerts.subtitle': {
+    en: 'Arbitrage Tool',
+    uk: 'Інструмент Арбітражу',
+    ru: 'Инструмент Арбитража'
+  },
+  'spreadAlerts.toggleTitle': {
+    en: 'Auto-signals of inter-exchange spreads',
+    uk: 'Автосигнали міжбіржових спредів',
+    ru: 'Автосигналы межбиржевых спредов'
+  },
+  'spreadAlerts.toggleHint': {
+    en: 'Enable or disable automatic signal generation.',
+    uk: 'Увімкніть або вимкніть автоматичну генерацію сигналів.',
+    ru: 'Включить или выключить автоматическую генерацию сигналов.'
+  },
+  'spreadAlerts.enabled': {
+    en: 'Enabled',
+    uk: 'Увімкнено',
+    ru: 'Включено'
+  },
+  'spreadAlerts.disabled': {
+    en: 'Disabled',
+    uk: 'Вимкнено',
+    ru: 'Выключено'
+  },
+  'spreadAlerts.upgradeToPro': {
+    en: 'Upgrade to Pro',
+    uk: 'Перейдіть на Pro версію',
+    ru: 'Перейдите на Pro версию'
+  },
+  'spreadAlerts.lastCheck': {
+    en: 'Last check',
+    uk: 'Остання перевірка',
+    ru: 'Последняя проверка'
+  },
+  'spreadAlerts.nextCheck': {
+    en: 'Next check',
+    uk: 'Наступна перевірка',
+    ru: 'Следующая проверка'
+  },
+  'spreadAlerts.nextCheckIn': {
+    en: 'Next in',
+    uk: 'Наступна через',
+    ru: 'Следующая через'
+  },
+  'spreadAlerts.nextRule': {
+    en: 'Next rule',
+    uk: 'Наступне правило',
+    ru: 'Следующее правило'
+  },
+  'spreadAlerts.nextRuleCheckAt': {
+    en: 'Due at',
+    uk: 'Перевірка о',
+    ru: 'Проверка в'
+  },
+  'spreadAlerts.nextRuleLastCheck': {
+    en: 'Last check',
+    uk: 'Остання перевірка',
+    ru: 'Последняя проверка'
+  },
+  'spreadAlerts.statusIntervalHelp': {
+    en: 'Rule interval: how often this rule is checked. For example, 30m means once every 30 minutes.',
+    uk: 'Інтервал правила: як часто перевіряється це правило. Наприклад, 30хв означає раз на 30 хвилин.',
+    ru: 'Интервал правила: как часто проверяется это правило. Например, 30м означает раз в 30 минут.'
+  },
+  'spreadAlerts.rules': {
+    en: 'Rules',
+    uk: 'Правила',
+    ru: 'Правила'
+  },
+  'spreadAlerts.rulesHint': {
+    en: 'Select rule to edit. Create up to {maxRules}.',
+    uk: 'Виберіть правило для редагування. Створіть до {maxRules}.',
+    ru: 'Выберите правило для редактирования. Создайте до {maxRules}.'
+  },
+  'spreadAlerts.newRule': {
+    en: 'New rule',
+    uk: 'Нове правило',
+    ru: 'Новое правило'
+  },
+  'spreadAlerts.ruleSettings': {
+    en: 'Rule settings',
+    uk: 'Налаштування правила',
+    ru: 'Настройки правила'
+  },
+  'spreadAlerts.symbol': {
+    en: 'Currency pair',
+    uk: 'Валютна пара',
+    ru: 'Валютная пара'
+  },
+  'spreadAlerts.errors.minExchanges': {
+    en: 'Select at least 2 exchanges',
+    uk: 'Виберіть мінімум 2 біржі',
+    ru: 'Выберите минимум 2 биржи'
+  },
+  'spreadAlerts.threshold': {
+    en: 'Threshold (%)',
+    uk: 'Поріг (%)',
+    ru: 'Порог (%)'
+  },
+  'spreadAlerts.thresholdHelp': {
+    en: 'Alert triggers when spread between selected exchanges is greater than or equal to this percent.',
+    uk: 'Сповіщення спрацює, коли спред між вибраними біржами буде більший або дорівнюватиме цьому відсотку.',
+    ru: 'Уведомление сработает, когда спред между выбранными биржами будет больше или равен этому проценту.'
+  },
+  'spreadAlerts.checkInterval': {
+    en: 'Check interval (minutes)',
+    uk: 'Інтервал перевірки (хвилини)',
+    ru: 'Интервал проверки (минуты)'
+  },
+  'spreadAlerts.cooldown': {
+    en: 'Cooldown (seconds)',
+    uk: 'Пауза (секунди)',
+    ru: 'Пауза (секунды)'
+  },
+  'spreadAlerts.exchanges': {
+    en: 'Exchanges',
+    uk: 'Біржі',
+    ru: 'Биржи'
+  },
+  'spreadAlerts.selectExchanges': {
+    en: 'Select exchanges',
+    uk: 'Виберіть біржі',
+    ru: 'Выберите биржи'
+  },
+  'spreadAlerts.selectExchangesHint': {
+    en: 'Select at least 2 exchanges.',
+    uk: 'Виберіть щонайменше 2 біржі.',
+    ru: 'Выберите минимум 2 биржи.'
+  },
+  'spreadAlerts.selectAll': {
+    en: 'All',
+    uk: 'Усі',
+    ru: 'Все'
+  },
+  'spreadAlerts.save': {
+    en: 'Save',
+    uk: 'Зберегти',
+    ru: 'Сохранить'
+  },
+
+  'cryptoMonitor.appSettings.title': {
+    en: 'App settings',
+    uk: 'Налаштування застосунку',
+    ru: 'Настройки приложения'
+  },
+  'cryptoMonitor.appSettings.interval': {
+    en: 'Check interval (sec)',
+    uk: 'Інтервал перевірки (сек)',
+    ru: 'Интервал проверки (сек)'
+  },
+  'cryptoMonitor.appSettings.quote': {
+    en: 'Quote',
+    uk: 'Котировка',
+    ru: 'Котировка'
+  },
+  'cryptoMonitor.appSettings.tokens': {
+    en: 'Tokens to scan',
+    uk: 'Токенів для аналізу',
+    ru: 'Токенов для анализа'
+  },
+  'cryptoMonitor.appSettings.results': {
+    en: 'Results (Top N)',
+    uk: 'Результат (Top N)',
+    ru: 'Результат (Top N)'
+  },
+  'cryptoMonitor.appSettings.minThreshold': {
+    en: 'Min threshold (%)',
+    uk: 'Мінімальний поріг (%)',
+    ru: 'Минимальный порог (%)'
+  },
+  'cryptoMonitor.appSettings.maxThreshold': {
+    en: 'Max threshold (%)',
+    uk: 'Максимальний поріг (%)',
+    ru: 'Максимальный порог (%)'
+  },
+  'cryptoMonitor.appSettings.exchanges': {
+    en: 'Selected exchanges',
+    uk: 'Вибрані біржі',
+    ru: 'Выбранные биржи'
+  },
+  'cryptoMonitor.appSettings.save': {
+    en: 'Save',
+    uk: 'Зберегти',
+    ru: 'Сохранить'
+  },
+
+  'cryptoMonitor.appSettings.freeLimitsText': {
+    en: 'Free plan limits: tokens ≤ 50, Top N ≤ 5, interval ≥ 5 minutes.',
+    uk: 'Ліміти Free: токенів ≤ 50, Top N ≤ 5, інтервал ≥ 5 хвилин.',
+    ru: 'Лимиты Free: токенов ≤ 50, Top N ≤ 5, интервал ≥ 5 минут.'
+  },
+  'cryptoMonitor.appSettings.faqLink': {
+    en: 'FAQ',
+    uk: 'FAQ',
+    ru: 'FAQ'
+  },
+  'spreadAlerts.saving': {
+    en: 'Saving...',
+    uk: 'Збереження...',
+    ru: 'Сохранение...'
+  },
+  'spreadAlerts.delete': {
+    en: 'Delete',
+    uk: 'Видалити',
+    ru: 'Удалить'
+  },
+  'spreadAlerts.test': {
+    en: 'Test',
+    uk: 'Тест',
+    ru: 'Тест'
+  },
+  'spreadAlerts.testing': {
+    en: 'Testing...',
+    uk: 'Тестування...',
+    ru: 'Тестирование...'
+  },
+  'spreadAlerts.cooldownHelp': {
+    en: 'Minimum time between alert notifications for this rule. Helps avoid spam during volatile markets.',
+    uk: 'Мінімальний час між сповіщеннями для цього правила. Допомагає уникнути спаму під час високої волатильності.',
+    ru: 'Минимальное время между уведомлениями для этого правила. Помогает избежать спама при высокой волатильности.'
+  },
+  'spreadAlerts.testOutputTitle': {
+    en: 'Test output',
+    uk: 'Вивід тесту',
+    ru: 'Вывод теста'
+  },
+  'spreadAlerts.testOutput': {
+    en: 'Test output',
+    uk: 'Результат тесту',
+    ru: 'Результат теста'
+  },
+  'spreadAlerts.logs': {
+    en: 'Logs',
+    uk: 'Логи',
+    ru: 'Логи'
+  },
+  'spreadAlerts.recentLogsTitle': {
+    en: 'Recent logs',
+    uk: 'Останні логи',
+    ru: 'Последние логи'
+  },
+  'spreadAlerts.showMore': {
+    en: 'Show more',
+    uk: 'Показати ще',
+    ru: 'Показать еще'
+  },
+  'spreadAlerts.logStatus.skipped': {
+    en: 'Skipped',
+    uk: 'Пропущено',
+    ru: 'Пропущено'
+  },
+  'spreadAlerts.logStatus.fired': {
+    en: 'Fired',
+    uk: 'Спрацювало',
+    ru: 'Сработало'
+  },
+  'spreadAlerts.logStatus.threshold': {
+    en: 'Threshold',
+    uk: 'Поріг',
+    ru: 'Порог'
+  },
+  'spreadAlerts.logStatus.error': {
+    en: 'Error',
+    uk: 'Помилка',
+    ru: 'Ошибка'
+  },
+  'spreadAlerts.logError.threshold': {
+    en: 'Below threshold',
+    uk: 'Нижче порогу',
+    ru: 'Ниже порога'
+  },
+  'spreadAlerts.logError.interval': {
+    en: 'Interval not reached',
+    uk: 'Інтервал ще не минув',
+    ru: 'Интервал ещё не прошёл'
+  },
+  'spreadAlerts.logError.cooldown': {
+    en: 'Cooldown active',
+    uk: 'Пауза (cooldown) активна',
+    ru: 'Пауза (cooldown) активна'
+  },
+  'spreadAlerts.logError.insufficient_prices': {
+    en: 'Insufficient prices',
+    uk: 'Недостатньо цін',
+    ru: 'Недостаточно цен'
+  },
+  'spreadAlerts.logError.trial_expired': {
+    en: 'Trial expired',
+    uk: 'Пробний період завершено',
+    ru: 'Пробный период завершён'
+  },
+  'spreadAlerts.logError.dedupe': {
+    en: 'Duplicate',
+    uk: 'Дублікат',
+    ru: 'Дубликат'
+  },
+  'spreadAlerts.limit': {
+    en: 'Limit',
+    uk: 'Ліміт',
+    ru: 'Лимит'
+  },
+  'spreadAlerts.noRules': {
+    en: 'No rules yet',
+    uk: 'Поки немає правил',
+    ru: 'Пока нет правил'
+  },
+  'spreadAlerts.noLogs': {
+    en: 'No logs yet',
+    uk: 'Поки немає логів',
+    ru: 'Пока нет логов'
+  },
+  'spreadAlerts.editingRule': {
+    en: 'Editing rule #{id}',
+    uk: 'Редагування правила #{id}',
+    ru: 'Редактирование правила #{id}'
+  },
+  'spreadAlerts.minInterval': {
+    en: 'Minimum: {min} min',
+    uk: 'Мінімум: {min} хв',
+    ru: 'Минимум: {min} мин'
+  },
+  'spreadAlerts.toast.saved': {
+    en: 'Saved',
+    uk: 'Збережено',
+    ru: 'Сохранено'
+  },
+  'spreadAlerts.toast.saveError': {
+    en: 'Save failed',
+    uk: 'Не вдалося зберегти',
+    ru: 'Не удалось сохранить'
+  },
+  'spreadAlerts.toast.deleted': {
+    en: 'Deleted',
+    uk: 'Видалено',
+    ru: 'Удалено'
+  },
+  'spreadAlerts.toast.deleteError': {
+    en: 'Delete failed',
+    uk: 'Не вдалося видалити',
+    ru: 'Не удалось удалить'
+  },
+  'spreadAlerts.toast.testDone': {
+    en: 'Test finished',
+    uk: 'Тест завершено',
+    ru: 'Тест завершен'
+  },
+  'spreadAlerts.toast.testError': {
+    en: 'Test failed',
+    uk: 'Тест не вдався',
+    ru: 'Тест не удался'
+  },
+  'spreadAlerts.status.unavailable': {
+    en: 'Status unavailable',
+    uk: 'Статус недоступний',
+    ru: 'Статус недоступен'
+  },
+  'spreadAlerts.rulesCount': {
+    en: '{count}/{max} rules · min {min}m',
+    uk: '{count}/{max} правил · мін {min}хв',
+    ru: '{count}/{max} правил · мин {min}мин'
+  },
+  'spreadAlerts.table.id': {
+    en: 'ID',
+    uk: 'ID',
+    ru: 'ID'
+  },
+  'spreadAlerts.table.enabled': {
+    en: 'Enabled',
+    uk: 'Увімкнено',
+    ru: 'Включено'
+  },
+  'spreadAlerts.table.symbol': {
+    en: 'Symbol',
+    uk: 'Символ',
+    ru: 'Символ'
+  },
+  'spreadAlerts.table.exchanges': {
+    en: 'Exchanges',
+    uk: 'Біржі',
+    ru: 'Биржи'
+  },
+  'spreadAlerts.table.threshold': {
+    en: 'Threshold %',
+    uk: 'Поріг %',
+    ru: 'Порог %'
+  },
+  'spreadAlerts.table.interval': {
+    en: 'Every',
+    uk: 'Кожні',
+    ru: 'Каждые'
+  },
+  'spreadAlerts.table.actions': {
+    en: 'Actions',
+    uk: 'Дії',
+    ru: 'Действия'
+  },
+  'spreadAlerts.table.rule': {
+    en: 'Rule',
+    uk: 'Правило',
+    ru: 'Правило'
+  },
+  'spreadAlerts.table.status': {
+    en: 'Status',
+    uk: 'Статус',
+    ru: 'Статус'
+  },
+  'spreadAlerts.table.spread': {
+    en: 'Spread %',
+    uk: 'Спред %',
+    ru: 'Спред %'
+  },
+  'spreadAlerts.table.time': {
+    en: 'Time',
+    uk: 'Час',
+    ru: 'Время'
+  },
+  'spreadAlerts.table.error': {
+    en: 'Error',
+    uk: 'Помилка',
+    ru: 'Ошибка'
+  },
+  'spreadAlerts.notificationsTitle': {
+    en: 'Notifications',
+    uk: 'Сповіщення',
+    ru: 'Уведомления'
+  },
+  'spreadAlerts.emailTitle': {
+    en: 'Email',
+    uk: 'Email',
+    ru: 'Email'
+  },
+  'spreadAlerts.emailHint': {
+    en: 'Send an email when a signal is fired',
+    uk: 'Надсилати лист при сигналі',
+    ru: 'Отправлять письмо при сигнале'
+  },
+  'spreadAlerts.telegramTitle': {
+    en: 'Telegram',
+    uk: 'Telegram',
+    ru: 'Telegram'
+  },
+  'spreadAlerts.telegramHint': {
+    en: 'Send to Telegram when a signal is fired',
+    uk: 'Надсилати в Telegram при сигналі',
+    ru: 'Отправлять в Telegram при сигнале'
+  },
+  'spreadAlerts.telegramChatId': {
+    en: 'Telegram chat id',
+    uk: 'Telegram chat id',
+    ru: 'Telegram chat id'
+  },
+  'spreadAlerts.firedAt': {
+    en: 'Fired at',
+    uk: 'Спрацювало',
+    ru: 'Сработало'
+  },
+  'spreadAlerts.firedKey': {
+    en: 'Fired key',
+    uk: 'Ключ спрацювання',
+    ru: 'Ключ срабатывания'
+  },
+  'spreadAlerts.logTitle': {
+    en: 'Log',
+    uk: 'Лог',
+    ru: 'Лог'
+  },
+  'spreadAlerts.message': {
+    en: 'Message',
+    uk: 'Повідомлення',
+    ru: 'Сообщение'
+  },
+  'spreadAlerts.prices': {
+    en: 'Prices',
+    uk: 'Ціни',
+    ru: 'Цены'
+  },
+  'spreadAlerts.logsShowMore': {
+    en: 'Show more',
+    uk: 'Показати більше',
+    ru: 'Показать еще'
+  },
+  'spreadAlerts.logsShowLess': {
+    en: 'Show less',
+    uk: 'Показати менше',
+    ru: 'Показать меньше'
+  },
+  'spreadAlerts.loading': {
+    en: 'Loading...',
+    uk: 'Завантаження...',
+    ru: 'Загрузка...'
   }
 };
 

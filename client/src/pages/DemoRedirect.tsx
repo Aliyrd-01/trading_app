@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
+import { useLanguage } from "@/lib/i18n";
 
 export default function DemoRedirect() {
   const [loading, setLoading] = useState(true);
+  const { t } = useLanguage();
   const iframeSrc = useMemo(() => `https://cryptoanalyz.net/demo_static.html?cb=${Date.now()}`, []);
 
   return (
@@ -10,7 +12,7 @@ export default function DemoRedirect() {
         <div className="absolute inset-0 flex items-center justify-center text-white">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-            <p>Загрузка демо...</p>
+            <p>{t("demo.loading")}</p>
           </div>
         </div>
       )}

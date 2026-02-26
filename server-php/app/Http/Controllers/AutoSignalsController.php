@@ -228,7 +228,7 @@ class AutoSignalsController extends BaseController
         $data = $request->validate([
             'enabled' => 'required|boolean',
             'symbol' => 'nullable|string|max:50',
-            'capital' => 'nullable|numeric|min:0',
+            'capital' => 'nullable|numeric|min:0|max:999999999999',
             'trading_type' => 'nullable|string|max:50',
             'strategy' => 'nullable|string|max:50',
             'risk' => 'nullable|numeric|min:0|max:100',

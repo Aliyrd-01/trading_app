@@ -16,6 +16,16 @@ class Kernel extends ConsoleKernel
             ->everyMinute()
             ->withoutOverlapping()
             ->runInBackground();
+
+        $schedule->command('spread:check')
+            ->everyMinute()
+            ->withoutOverlapping()
+            ->runInBackground();
+
+        $schedule->command('crypto_monitor:check')
+            ->everyMinute()
+            ->withoutOverlapping()
+            ->runInBackground();
     }
 
     /**
@@ -23,6 +33,7 @@ class Kernel extends ConsoleKernel
      */
     protected function commands(): void
     {
+        $this->load(app_path('Console/Commands'));
         $this->load(__DIR__.'/Commands');
 
         require base_path('routes/console.php');

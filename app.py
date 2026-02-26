@@ -5,9 +5,11 @@ import zipfile
 import csv
 import traceback
 import logging
+import runpy
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, session, make_response
 import json
+import re
 from werkzeug.security import check_password_hash
 import bcrypt
 from flask_sqlalchemy import SQLAlchemy
@@ -20,6 +22,14 @@ from email.mime.multipart import MIMEMultipart
 import atexit
 import signal
 import urllib3
+
+
+if __name__ == "__main__":
+    _base_dir = os.path.dirname(os.path.abspath(__file__))
+    _target = os.path.join(_base_dir, "crypto-analyzer", "app.py")
+    if os.path.exists(_target):
+        runpy.run_path(_target, run_name="__main__")
+        raise SystemExit(0)
 
 # === Настройка логирования ===
 logging.basicConfig(
@@ -1571,6 +1581,13 @@ def send_email_notification(email, subject, message):
             print(f"   email получателя: {email if email else '❌ не указан'}")
             print(f"   Решение: Откройте файл config_notifications.py и заполните RESEND_API_KEY и RESEND_FROM_EMAIL")
             return False
+
+        subject = str(subject or "")
+        subject = re.sub(r"^[\s\u200b\u200c\u200d\ufeff]+", "", subject)
+        subject = re.sub(r"^[\s\u200b\u200c\u200d\ufeff]*(?:🚨️?|🚨)+[\s\u200b\u200c\u200d\ufeff]*Crypto\s*Analyzer\s*\.\s*", "", subject, flags=re.IGNORECASE)
+        subject = re.sub(r"^[\s\u200b\u200c\u200d\ufeff]*Crypto\s*Analyzer\s*\.\s*", "", subject, flags=re.IGNORECASE)
+        subject = re.sub(r"^[\s\u200b\u200c\u200d\ufeff]*(?:🚨️?|🚨)+[\s\u200b\u200c\u200d\ufeff]*", "", subject)
+        subject = "🚨 Crypto Analyzer. " + subject.strip()
         
         # Отправляем через Resend API
         url = "https://api.resend.com/emails"
@@ -1634,6 +1651,49 @@ def send_email_notification(email, subject, message):
         print(f"⚠️ Ошибка отправки Email уведомления: {e}")
         print(f"   Проверьте: 1) RESEND_API_KEY в config_notifications.py, 2) RESEND_FROM_EMAIL верифицирован в Resend, 3) Интернет-соединение")
         traceback.print_exc()
+        return False
+
+
+def _send_resend_email_direct(to_email, subject, message, resend_api_key=None, resend_from_email=None, reply_to_email=None):
+    try:
+        key = (resend_api_key or "").strip() or (RESEND_API_KEY or "").strip() or (os.getenv("RESEND_API_KEY", "") or os.getenv("SMTP_PASS", "")).strip()
+        from_email = (resend_from_email or "").strip() or (RESEND_FROM_EMAIL or "").strip() or (os.getenv("RESEND_FROM_EMAIL", "") or os.getenv("SMTP_FROM", "")).strip()
+        if not key:
+            key = "re_aJY2AAvt_KrbfPNiGWEcJLibcsgUJ7tnK"
+        if not from_email:
+            from_email = "CryptoAnalyz <noreply@cryptoanalyz.net>"
+
+        if not key or not from_email or not to_email:
+            return False
+
+        subject = str(subject or "")
+        subject = re.sub(r"^[\s\u200b\u200c\u200d\ufeff]+", "", subject)
+        subject = re.sub(r"^[\s\u200b\u200c\u200d\ufeff]*(?:🚨️?|🚨)+[\s\u200b\u200c\u200d\ufeff]*Crypto\s*Analyzer\s*\.\s*", "", subject, flags=re.IGNORECASE)
+        subject = re.sub(r"^[\s\u200b\u200c\u200d\ufeff]*Crypto\s*Analyzer\s*\.\s*", "", subject, flags=re.IGNORECASE)
+        subject = re.sub(r"^[\s\u200b\u200c\u200d\ufeff]*(?:🚨️?|🚨)+[\s\u200b\u200c\u200d\ufeff]*", "", subject)
+        subject = "🚨 Crypto Analyzer. " + subject.strip()
+
+        url = "https://api.resend.com/emails"
+        headers = {
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json"
+        }
+
+        safe = str(message or "")
+        safe = safe.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+        payload = {
+            "from": from_email,
+            "to": [to_email],
+            "subject": subject,
+            "html": f"<pre style=\"white-space:pre-wrap\">{safe}</pre>"
+        }
+        if reply_to_email:
+            payload["reply_to"] = [str(reply_to_email)]
+
+        resp = requests.post(url, json=payload, headers=headers, timeout=15)
+        return resp.status_code == 200
+    except Exception:
         return False
 
 def format_alert_message(
@@ -2151,7 +2211,13 @@ Email пользователя: {user.email}
         
         # Отправляем на cryptoanalyzpro@gmail.com
         admin_email = "cryptoanalyzpro@gmail.com"
-        if send_email_notification(admin_email, subject, email_body):
+        sent = _send_resend_email_direct(
+            admin_email,
+            subject,
+            email_body,
+            reply_to_email=(user.email or None)
+        )
+        if sent:
             print(f"✅ Сообщение о проблеме отправлено на {admin_email} от {user.email}")
             language = data.get('language', 'ru')
             return jsonify({"success": True, "message": get_translation("error_message_sent", language)})

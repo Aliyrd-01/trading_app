@@ -9,6 +9,8 @@ param(
 
   [string]$OutDir = "release_artifacts",
 
+  [string]$LatestName = "CryptoTradingAnalyzer-Setup-latest.exe",
+
   [string]$BaseUrl = "https://cryptoanalyz.net/downloads"
 )
 
@@ -24,7 +26,7 @@ if (-not (Test-Path -LiteralPath $OutDir)) {
   New-Item -ItemType Directory -Path $OutDir | Out-Null
 }
 
-$latestName = "CryptoTradingAnalyzer-Setup-latest.exe"
+$latestName = $LatestName
 $latestPath = Join-Path $OutDir $latestName
 Copy-Item -LiteralPath $InstallerPath -Destination $latestPath -Force
 

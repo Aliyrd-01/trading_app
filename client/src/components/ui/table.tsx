@@ -8,7 +8,7 @@ const Table = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div className={cn(
     "relative w-full",
-    props["data-no-x-scroll"] != null ? "overflow-hidden" : "overflow-auto",
+    props["data-no-x-scroll"] != null ? "overflow-visible" : "overflow-auto",
   )}>
     <table
       ref={ref}

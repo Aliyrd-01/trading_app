@@ -203,11 +203,11 @@ def check_and_prompt_update(ui, timeout_sec: int = 8) -> bool:
             pass
         return False
 
-    text = f"Доступна новая версия {latest_version} (текущая {APP_VERSION}).\n\nУстановить обновление сейчас?"
+    text = f"A new version {latest_version} is available (current {APP_VERSION}).\n\nInstall the update now?"
     if release_notes:
-        text = text + f"\n\nЧто нового:\n{release_notes}"
+        text = text + f"\n\nWhat's new:\n{release_notes}"
 
-    if not ui.question("Обновление доступно", text):
+    if not ui.question("Update Available", text):
         try:
             _log_update("user declined update prompt")
         except Exception:
@@ -215,7 +215,7 @@ def check_and_prompt_update(ui, timeout_sec: int = 8) -> bool:
         return False
 
     try:
-        ui.info("Обновление", "Скачиваю установщик обновления. Пожалуйста, подождите...")
+        ui.info("Update", "Downloading the update installer. Please wait...")
         tmp_dir = tempfile.mkdtemp(prefix="cryptotradinganalyzer_update_")
         parsed = urlparse(installer_url)
         filename = os.path.basename(parsed.path) or "CryptoTradingAnalyzer-Setup.exe"
@@ -229,7 +229,7 @@ def check_and_prompt_update(ui, timeout_sec: int = 8) -> bool:
         progress = None
         if hasattr(ui, "progress"):
             try:
-                progress = ui.progress("Обновление", "Скачивание установщика...", 0)
+                progress = ui.progress("Update", "Downloading installer...", 0)
             except Exception:
                 progress = None
 
@@ -254,7 +254,7 @@ def check_and_prompt_update(ui, timeout_sec: int = 8) -> bool:
         state["in_progress_until"] = int(time.time()) + 30 * 60
         _save_state(state)
 
-        ui.info("Обновление", "Установщик запущен. Сейчас приложение закроется.\n\nПосле завершения установки запусти приложение снова.")
+        ui.info("Update", "Installer started. The app will now close.\n\nAfter installation, please start the app again.")
 
         # Inno Setup: https://jrsoftware.org/ishelp/topic_setupcmdline.htm
         # /SILENT показывает прогресс, в отличие от /VERYSILENT.
@@ -269,5 +269,5 @@ def check_and_prompt_update(ui, timeout_sec: int = 8) -> bool:
             pass
         state["error_until"] = int(time.time()) + 5 * 60
         _save_state(state)
-        ui.error("Ошибка обновления", f"Не удалось скачать или запустить обновление.\n\nДетали: {e}")
+        ui.error("Update Error", f"Failed to download or launch the update.\n\nDetails: {e}")
         return False

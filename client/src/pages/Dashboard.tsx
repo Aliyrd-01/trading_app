@@ -3,10 +3,12 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { LogOut, Repeat, User, Mail } from "lucide-react";
+import { LogOut, User, Mail } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLanguage } from '@/lib/i18n';
 import AutoSignalsPanel from "@/components/AutoSignalsPanel";
+import SpreadAlertsPanel from "@/components/SpreadAlertsPanel";
+import CryptoMonitorAppSettingsPanel from "@/components/CryptoMonitorAppSettingsPanel";
 import Header from "@/components/Header";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -17,8 +19,48 @@ import { useToast } from "@/hooks/use-toast";
 export default function Dashboard() {
   const { user, loading, logout } = useAuth();
   const [, setLocation] = useLocation();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { toast } = useToast();
+
+  const planRaw = (user?.effective_plan ?? user?.plan ?? "").toString();
+  const planNorm = (planRaw || "").trim().toLowerCase();
+  const showPlanExpiry = Boolean(
+    planNorm && (planNorm.includes('trial') || planNorm.includes('pro') || planNorm.includes('pro_plus') || planNorm.includes('pro+'))
+  );
+  const expiresAtRaw = (showPlanExpiry
+    ? (user?.effective_expires_at ??
+        (planNorm.includes('trial') ? user?.trial_expires_at : user?.plan_expires_at) ??
+        null)
+    : null) as string | null;
+
+  const planTitle = (() => {
+    if (!planNorm) return '';
+    if (planNorm.includes('pro+') || planNorm.includes('pro_plus')) return 'PRO+';
+    if (planNorm.includes('pro')) return 'PRO';
+    if (planNorm.includes('trial')) return 'TRIAL';
+    if (planNorm.includes('free')) return 'FREE';
+    return planRaw.toUpperCase();
+  })();
+
+  const planExpiryLabel = (() => {
+    if (planNorm.includes('pro+') || planNorm.includes('pro_plus')) return t('dashboard.planExpiryProPlus');
+    if (planNorm.includes('pro')) return t('dashboard.planExpiryPro');
+    return t('dashboard.planExpiryTrial');
+  })();
+
+  const planExpiryText = (() => {
+    if (!expiresAtRaw) return t('dashboard.planUnlimited');
+    const dt = new Date(expiresAtRaw);
+    if (Number.isNaN(dt.getTime())) return String(expiresAtRaw);
+    const locale = language === 'ru' ? 'ru-RU' : language === 'uk' ? 'uk-UA' : 'en-GB';
+    return dt.toLocaleString(locale, {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  })();
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
@@ -35,14 +77,21 @@ export default function Dashboard() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background via-background to-card">
         <div className="text-center space-y-4">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-muted-foreground">Loading...</p>
+          <p className="text-muted-foreground">{t("common.loading")}</p>
         </div>
       </div>
     );
   }
 
   if (!user) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background via-background to-card">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-muted-foreground">{t("common.loading")}</p>
+        </div>
+      </div>
+    );
   }
 
   const handleLogout = async () => {
@@ -104,12 +153,12 @@ export default function Dashboard() {
                 className="shrink-0"
               >
                 <LogOut className="mr-2 h-4 w-4" />
-                Logout
+                {t('dashboard.logout')}
               </Button>
             </div>
           </div>
 
-          <Card className="p-4 sm:p-6 lg:p-8 border-primary/20 backdrop-blur-sm" data-testid="card-user-profile">
+          <Card className="p-4 sm:p-6 lg:p-8 border-card-border backdrop-blur-sm" data-testid="card-user-profile">
             <div className="space-y-6">
               <h2 className="text-xl sm:text-2xl font-bold">{t('dashboard.profile')}</h2>
               <div className="grid md:grid-cols-2 gap-4 sm:gap-6">
@@ -123,15 +172,30 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-lg bg-secondary/10 flex items-center justify-center">
-                    <Mail className="w-6 h-6 text-secondary" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">{t('auth.email')}</p>
-                    <p className="font-medium">{user.email}</p>
-                  </div>
+                <div className="w-12 h-12 rounded-lg bg-secondary/10 flex items-center justify-center">
+                  <Mail className="w-6 h-6 text-secondary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">{t('auth.email')}</p>
+                  <p className="font-medium">{user.email}</p>
                 </div>
               </div>
+            </div>
+
+              {planTitle ? (
+                <div className="rounded-lg border border-card-border bg-background/60 px-3 py-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    {showPlanExpiry ? (
+                      <p className="text-[11px] text-muted-foreground whitespace-nowrap">
+                        {planExpiryLabel} {planExpiryText}
+                      </p>
+                    ) : null}
+                    <Badge variant="outline" className="w-fit text-[11px] px-2 py-0.5 whitespace-nowrap">
+                      {planTitle}
+                    </Badge>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="pt-2">
                 <Dialog open={deleteOpen} onOpenChange={(v) => {
@@ -170,7 +234,7 @@ export default function Dashboard() {
                       <Button
                         variant="destructive"
                         onClick={handleDeleteAccount}
-                        disabled={deleteBusy || !deletePassword.trim()}
+                        disabled={deleteBusy || !(deletePassword ?? "").trim()}
                       >
                         {t('dashboard.deleteAccountConfirm')}
                       </Button>
@@ -181,35 +245,15 @@ export default function Dashboard() {
             </div>
           </Card>
 
-          <div className="grid md:grid-cols-2 gap-4 sm:gap-6">
-            <Card className="p-4 sm:p-6 lg:p-8 hover-elevate transition-all duration-300 border-primary/20" data-testid="card-trading-analyzer">
+          <div className="grid lg:grid-cols-2 gap-4 sm:gap-6 min-w-0">
+            <Card className="p-4 sm:p-6 lg:p-8 hover-elevate transition-all duration-300 border-card-border min-w-0" data-testid="card-trading-analyzer">
               <AutoSignalsPanel />
             </Card>
 
-            <Card className="p-4 sm:p-6 lg:p-8 hover-elevate transition-all duration-300 border-secondary/20" data-testid="card-arbitrage-tool">
-              <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-secondary/20 to-accent/20 flex items-center justify-center">
-                    <Repeat className="w-7 h-7 text-secondary" />
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className="text-secondary border-secondary/50 text-[11px] sm:text-xs self-start sm:self-auto"
-                  >
-                    {t('dashboard.comingSoon')}
-                  </Badge>
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-lg sm:text-2xl font-bold leading-tight break-words">
-                    {t('header.arbitrageTool')}
-                  </h3>
-                  <p className="text-sm sm:text-base text-muted-foreground break-words">
-                    {t('dashboard.arbitrageDescription')}
-                  </p>
-                </div>
-                <Button className="w-full" disabled data-testid="button-launch-arbitrage">
-                  {t('dashboard.launchTool')}
-                </Button>
+            <Card className="p-4 sm:p-6 lg:p-8 hover-elevate transition-all duration-300 border-card-border min-w-0" data-testid="card-arbitrage-tool">
+              <div className="space-y-6">
+                <SpreadAlertsPanel />
+                <CryptoMonitorAppSettingsPanel />
               </div>
             </Card>
           </div>

@@ -73,7 +73,7 @@ type AutoSignalsLogItem = {
   direction: string | null;
   reliability: number | null;
   price: string | null;
-  status: string;
+  status: any;
   fired_at: string | null;
   message: string | null;
   error: string | null;
@@ -84,6 +84,10 @@ type AutoSignalsLogItem = {
 type AutoSignalsLogsResponse = {
   items: AutoSignalsLogItem[];
 };
+
+function toTrimmedLower(v: any): string {
+  return String(v ?? "").trim().toLowerCase();
+}
 
 type AutoSignalsStatusResponse = {
   enabled: boolean;
@@ -101,7 +105,9 @@ function formatIsoLocal(iso: string | null | undefined, language: string): strin
   if (!raw) return "-";
 
   const locale = language === "ru" ? "ru-RU" : language === "uk" ? "uk-UA" : "en-GB";
-  const dt = new Date(raw);
+  const hasTz = /([zZ]|[+-]\d{2}:?\d{2})$/.test(raw);
+  const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
+  const dt = new Date(normalized);
   if (Number.isNaN(dt.getTime())) {
     return raw.replace("T", " ").replace("Z", "");
   }
@@ -127,15 +133,30 @@ function normalizeTradingType(v: string | null | undefined): string | null {
   return raw;
 }
 
-function toNumberOrNull(v: string): number | null {
-  const s = v.trim();
+function normalizeSymbolWithSlashSafe(symbol: any): string {
+  const s = (symbol ?? "").toString();
+  return normalizeSymbolWithSlash(s);
+}
+
+function toNumberOrNull(v: string | null | undefined): number | null {
+  const s = (v ?? "").trim();
   if (s === "") return null;
   const n = Number(s);
   return Number.isFinite(n) ? n : null;
 }
 
-function normalizeSymbolWithSlash(symbol: string): string {
-  const raw = symbol.trim().toUpperCase();
+function toClampedNumberOrNull(v: string, min: number, max: number): number | null {
+  const n = toNumberOrNull(v);
+  if (n === null) return null;
+  if (n < min) return min;
+  if (n > max) return max;
+  return n;
+}
+
+const MAX_CAPITAL = 999999999999;
+
+function normalizeSymbolWithSlash(symbol: string | null | undefined): string {
+  const raw = (symbol ?? "").trim().toUpperCase();
   if (!raw) return "";
 
   if (raw.includes("/")) {
@@ -360,6 +381,9 @@ export default function AutoSignalsPanel() {
     queryKey: [logsUrl],
   });
 
+  const logsCount = logs?.items?.length ?? 0;
+  const canShowMoreLogs = logsLimit < 100 && logsCount >= logsLimit;
+
   const [form, setForm] = useState<AutoSignalsSettings>({
     enabled: true,
     symbol: "ETH/USDT",
@@ -399,6 +423,21 @@ export default function AutoSignalsPanel() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      if (form.risk != null && form.risk > 100) {
+        throw new Error(t("autoSignals.validation.riskMax"));
+      }
+      if (form.min_reliability != null && form.min_reliability > 100) {
+        throw new Error(t("autoSignals.validation.minReliabilityMax"));
+      }
+      if (form.capital != null && form.capital > MAX_CAPITAL) {
+        throw new Error(t("autoSignals.validation.capitalMax"));
+      }
+      if (form.check_interval != null && form.check_interval < 1) {
+        throw new Error(t("autoSignals.validation.checkIntervalMin"));
+      }
+      if (form.check_interval != null && form.check_interval > 10080) {
+        throw new Error(t("autoSignals.validation.checkIntervalMax"));
+      }
       const payload: AutoSignalsSettings = {
         ...form,
         symbol: form.symbol ? normalizeSymbolWithSlash(form.symbol) : null,
@@ -417,7 +456,33 @@ export default function AutoSignalsPanel() {
     onError: (e: any) => {
       toast({
         title: t("autoSignals.toast.saveError"),
-        description: e instanceof Error ? e.message : "",
+        description: (() => {
+          const anyErr = e as any;
+          const payload = anyErr?.payload;
+          const errors = payload && typeof payload === "object" ? (payload as any).errors : null;
+          if (errors && typeof errors === "object") {
+            const key = Object.keys(errors)[0] || "";
+            if (key === "risk") return t("autoSignals.validation.riskMax");
+            if (key === "min_reliability") return t("autoSignals.validation.minReliabilityMax");
+            if (key === "check_interval") {
+              const msgs = (errors as any)[key];
+              const msg = Array.isArray(msgs) ? String(msgs[0] || "") : "";
+              if (msg.includes("at least")) return t("autoSignals.validation.checkIntervalMin");
+              if (msg.includes("greater than") || msg.includes("not be greater")) return t("autoSignals.validation.checkIntervalMax");
+              return t("autoSignals.validation.invalid");
+            }
+            if (key === "capital") {
+              const msgs = (errors as any)[key];
+              const msg = Array.isArray(msgs) ? String(msgs[0] || "") : "";
+              if (msg.includes("greater than") || msg.includes("not be greater")) {
+                return t("autoSignals.validation.capitalMax");
+              }
+              return t("autoSignals.validation.capitalInvalid");
+            }
+            return t("autoSignals.validation.invalid");
+          }
+          return e instanceof Error ? e.message : "";
+        })(),
         variant: "destructive",
       });
     },
@@ -429,15 +494,15 @@ export default function AutoSignalsPanel() {
       return (await resp.json()) as AutoSignalsTestResponse;
     },
     onSuccess: (data) => {
-      setTestOutput(data.output ?? "");
+      setTestOutput(data.output || "");
       queryClient.invalidateQueries({ queryKey: [logsUrl] });
       queryClient.invalidateQueries({ queryKey: ["/api/auto_signals/status"] });
       toast({
         title: t("autoSignals.toast.testDone"),
-        description: data.message || undefined,
       });
     },
     onError: (e: any) => {
+      setTestOutput("");
       toast({
         title: t("autoSignals.toast.testError"),
         description: e instanceof Error ? e.message : "",
@@ -455,7 +520,7 @@ export default function AutoSignalsPanel() {
   const suggestedPairs = useMemo(() => {
     const out: string[] = [];
     const add = (p: string) => {
-      const v = normalizeSymbolWithSlash(p);
+      const v = normalizeSymbolWithSlashSafe(p);
       if (!v) return;
       if (!out.includes(v)) out.push(v);
     };
@@ -463,11 +528,11 @@ export default function AutoSignalsPanel() {
     // Keep the desktop order; do not move selected symbol to the front.
     for (const p of defaultPairs) add(p);
 
-    const current = form.symbol ? normalizeSymbolWithSlash(form.symbol) : "";
+    const current = form.symbol ? normalizeSymbolWithSlashSafe(form.symbol) : "";
     if (current) add(current);
 
     for (const it of logs?.items ?? []) {
-      const s = (it.symbol ?? "").trim();
+      const s = ((it.symbol ?? "").toString()).trim();
       if (s) add(s);
       if (out.length >= 12) break;
     }
@@ -475,7 +540,14 @@ export default function AutoSignalsPanel() {
     return out;
   }, [logs?.items, form.symbol]);
 
-  const selectedSymbol = normalizeSymbolWithSlash(form.symbol ?? "");
+  const logsItemsSafe = useMemo(() => {
+    return (logs?.items ?? []).map((it) => ({
+      ...it,
+      status: String((it as any)?.status ?? ""),
+    }));
+  }, [logs?.items]);
+
+  const selectedSymbol = normalizeSymbolWithSlashSafe(form.symbol ?? "");
 
   const confirmationSavedAs = useMemo(() => {
     if (confirmationUi.mode === "ALL") return t("autoSignals.confirmation.all");
@@ -485,7 +557,7 @@ export default function AutoSignalsPanel() {
   }, [confirmationUi.mode, confirmationUi.selected, t]);
 
   return (
-    <div className="space-y-6 sm:space-y-8">
+    <div className="space-y-6 sm:space-y-8 min-w-0">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center shrink-0">
@@ -650,7 +722,10 @@ export default function AutoSignalsPanel() {
                 type="number"
                 inputMode="decimal"
                 value={form.capital ?? ""}
-                onChange={(e) => setForm((p) => ({ ...p, capital: toNumberOrNull(e.target.value) }))}
+                max={MAX_CAPITAL}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, capital: toClampedNumberOrNull(e.target.value, 0, MAX_CAPITAL) }))
+                }
                 placeholder="2500"
                 disabled={locked}
               />
@@ -661,7 +736,9 @@ export default function AutoSignalsPanel() {
                 type="number"
                 inputMode="decimal"
                 value={form.risk ?? ""}
-                onChange={(e) => setForm((p) => ({ ...p, risk: toNumberOrNull(e.target.value) }))}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, risk: toClampedNumberOrNull(e.target.value, 0, 100) }))
+                }
                 placeholder="1"
                 disabled={locked}
               />
@@ -676,7 +753,7 @@ export default function AutoSignalsPanel() {
                 inputMode="numeric"
                 value={form.min_reliability ?? ""}
                 onChange={(e) =>
-                  setForm((p) => ({ ...p, min_reliability: toNumberOrNull(e.target.value) }))
+                  setForm((p) => ({ ...p, min_reliability: toClampedNumberOrNull(e.target.value, 0, 100) }))
                 }
                 placeholder="60"
                 disabled={locked}
@@ -701,8 +778,8 @@ export default function AutoSignalsPanel() {
 
       <Card className="p-4 sm:p-6 border-card-border">
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="font-semibold">{t("autoSignals.confirmationTitle")}</div>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="font-semibold whitespace-nowrap">{t("autoSignals.confirmationTitle")}</div>
             <div className="flex flex-wrap items-center justify-end gap-2">
               <Badge
                 variant={confirmationUi.mode === "ALL" ? "default" : "outline"}
@@ -795,7 +872,18 @@ export default function AutoSignalsPanel() {
 
               {form.enable_telegram_notifications ? (
                 <div className="space-y-2">
-                  <Label>{t("autoSignals.telegramChatId")}</Label>
+                  <div className="flex items-center gap-2">
+                    <Label>{t("autoSignals.telegramChatId")}</Label>
+                    <a
+                      href="https://cryptoanalyz.net/faq"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center text-muted-foreground hover:text-foreground"
+                      aria-label="FAQ"
+                    >
+                      <Info className="h-4 w-4" />
+                    </a>
+                  </div>
                   <Input
                     value={form.telegram_chat_id ?? ""}
                     onChange={(e) => setForm((p) => ({ ...p, telegram_chat_id: e.target.value }))}
@@ -818,25 +906,31 @@ export default function AutoSignalsPanel() {
         >
           {saving ? t("autoSignals.saving") : t("autoSignals.save")}
         </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => {
-            testMutation.mutate();
-          }}
-          disabled={locked || testing || settingsLoading || saving}
-          className="w-full sm:w-auto"
-        >
-          {testing ? t("autoSignals.testing") : t("autoSignals.test")}
-        </Button>
       </div>
 
       <Card className="p-4 sm:p-6 border-card-border">
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div className="font-semibold">{t("autoSignals.testOutput")}</div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                testMutation.mutate();
+              }}
+              disabled={locked || testing || settingsLoading || saving}
+              className="w-full sm:w-auto"
+            >
+              {testing ? t("autoSignals.testing") : t("autoSignals.test")}
+            </Button>
           </div>
-          <Textarea value={testOutput} readOnly className="font-mono text-xs min-h-[120px]" />
+          <Textarea
+            value={testOutput}
+            readOnly
+            placeholder={t("autoSignals.testOutputPlaceholder")}
+            className="font-mono text-xs min-h-[120px]"
+          />
         </div>
       </Card>
 
@@ -846,58 +940,59 @@ export default function AutoSignalsPanel() {
             <div className="font-semibold">{t("autoSignals.logsTitle")}</div>
           </div>
 
-          <div className="rounded-xl border border-card-border overflow-x-auto autosignals-logs-scrollbar">
-            <Table className="text-xs w-full table-auto">
+          <div className="rounded-xl border border-card-border overflow-x-auto autosignals-logs-scrollbar w-full max-w-full min-w-0">
+            <Table
+              className="text-xs w-max min-w-full table-auto [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap"
+              data-no-x-scroll
+            >
               <TableHeader>
                 <TableRow>
-                  <TableHead className="h-9 px-2 text-[11px] whitespace-nowrap">{t("autoSignals.table.id")}</TableHead>
-                  <TableHead className="h-9 px-2 text-[11px] whitespace-normal sm:whitespace-nowrap">{t("autoSignals.table.symbol")}</TableHead>
-                  <TableHead className="h-9 px-2 text-[11px] whitespace-nowrap hidden sm:table-cell">{t("autoSignals.table.tf")}</TableHead>
-                  <TableHead className="h-9 px-2 text-[11px] whitespace-normal sm:whitespace-nowrap">{t("autoSignals.table.status")}</TableHead>
-                  <TableHead className="h-9 px-2 text-[11px] whitespace-nowrap hidden md:table-cell">{t("autoSignals.table.rel")}</TableHead>
-                  <TableHead className="h-9 px-2 text-[11px] whitespace-normal sm:whitespace-nowrap">{t("autoSignals.table.created")}</TableHead>
+                  <TableHead className="h-9 px-2 text-[11px]">{t("autoSignals.table.id")}</TableHead>
+                  <TableHead className="h-9 px-2 text-[11px]">{t("autoSignals.table.symbol")}</TableHead>
+                  <TableHead className="h-9 px-2 text-[11px] hidden sm:table-cell">{t("autoSignals.table.tf")}</TableHead>
+                  <TableHead className="h-9 px-2 text-[11px]">{t("autoSignals.table.status")}</TableHead>
+                  <TableHead className="h-9 px-2 text-[11px] hidden md:table-cell">{t("autoSignals.table.rel")}</TableHead>
+                  <TableHead className="h-9 px-2 text-[11px]">{t("autoSignals.table.created")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {(logs?.items ?? []).map((item) => (
                   <Dialog key={item.id}>
                     <DialogTrigger asChild>
-                      <TableRow
-                        className="cursor-pointer"
-                      >
-                        <TableCell className="px-2 py-2 font-mono text-[11px] whitespace-nowrap">{item.id}</TableCell>
-                        <TableCell className="px-2 py-2 font-mono text-[11px] break-words">{item.symbol ?? ""}</TableCell>
-                        <TableCell className="px-2 py-2 font-mono text-[11px] whitespace-nowrap hidden sm:table-cell">{item.timeframe ?? ""}</TableCell>
-                        <TableCell className="px-2 py-2">
+                      <TableRow className="cursor-pointer">
+                        <TableCell className="px-2 py-2 font-mono text-[11px]">{item.id}</TableCell>
+                        <TableCell className="px-2 py-2 font-mono text-[11px]">{item.symbol ?? ""}</TableCell>
+                        <TableCell className="px-2 py-2 font-mono text-[11px] hidden sm:table-cell">{item.timeframe ?? ""}</TableCell>
+                        <TableCell>
                           <Badge
                             variant={
-                              item.status === "fired"
-                                ? "default"
-                                : item.status === "skipped"
-                                  ? "secondary"
-                                  : item.status === "error"
-                                    ? "destructive"
-                                    : "outline"
+                              (() => {
+                                const st = toTrimmedLower(String((item as any)?.status));
+                                if (st === "ok" || st === "success" || st === "fired") return "default";
+                                if (st === "error") return "destructive";
+                                return "secondary";
+                              })()
                             }
                           >
                             {(() => {
-                              const key = `autoSignals.status.${item.status}`;
-                              const label = t(key);
-                              return label === key ? item.status : label;
+                              const rawStatus = String((item as any)?.status ?? "");
+                              const key = `autoSignals.status.${rawStatus.toLowerCase()}`;
+                              const translated = t(key);
+                              return translated === key ? rawStatus : translated;
                             })()}
                           </Badge>
-
-                          {item.status === "skipped" && item.error ? (
+                          {item.error ? (
                             <div className="text-[10px] text-muted-foreground mt-0.5 truncate">
                               {(() => {
-                                const key = `autoSignals.skip.${item.error}`;
+                                const err = String((item as any)?.error ?? "");
+                                const key = `autoSignals.skip.${err}`;
                                 const label = t(key);
-                                return label === key ? item.error : label;
+                                return label === key ? err : label;
                               })()}
                             </div>
                           ) : null}
                         </TableCell>
-                        <TableCell className="px-2 py-2 font-mono text-[10px] whitespace-nowrap tabular-nums hidden md:table-cell">{item.reliability ?? ""}</TableCell>
+                        <TableCell className="px-2 py-2 font-mono text-[10px] tabular-nums hidden md:table-cell">{item.reliability ?? ""}</TableCell>
                         <TableCell className="px-2 py-2 text-[11px] text-muted-foreground">
                           {(() => {
                             const raw = formatIsoLocal(item.created_at ?? "", language);
@@ -939,7 +1034,7 @@ export default function AutoSignalsPanel() {
                           <Textarea
                             value={item.message ?? ""}
                             readOnly
-                            className="min-h-[140px] font-mono text-xs"
+                            className="min-h-[100px] sm:min-h-[140px] max-h-[40vh] font-mono text-xs autosignals-logs-scrollbar"
                           />
                         </div>
 
@@ -948,7 +1043,7 @@ export default function AutoSignalsPanel() {
                           <Textarea
                             value={item.meta ?? ""}
                             readOnly
-                            className="min-h-[140px] font-mono text-xs"
+                            className="min-h-[100px] sm:min-h-[140px] max-h-[40vh] font-mono text-xs autosignals-logs-scrollbar"
                           />
                         </div>
                       </div>
@@ -982,6 +1077,7 @@ export default function AutoSignalsPanel() {
               size="sm"
               className="w-full"
               onClick={() => setLogsLimit((p) => (p >= 100 ? 10 : 100))}
+              disabled={!canShowMoreLogs && logsLimit < 100}
             >
               {logsLimit >= 100 ? t("autoSignals.logsShowLess") : t("autoSignals.logsShowMore")}
             </Button>

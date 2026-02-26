@@ -22,8 +22,14 @@ function Write-UInt32LE([System.IO.BinaryWriter]$bw, [uint32]$value) {
 }
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$inPath = Join-Path $ScriptDir $InputPng
-$outPath = Join-Path $ScriptDir $OutputIco
+$inPath = $InputPng
+$outPath = $OutputIco
+if (-not [System.IO.Path]::IsPathRooted($inPath)) {
+  $inPath = Join-Path $ScriptDir $inPath
+}
+if (-not [System.IO.Path]::IsPathRooted($outPath)) {
+  $outPath = Join-Path $ScriptDir $outPath
+}
 
 if (-not (Test-Path -LiteralPath $inPath)) {
   throw "Input PNG not found: $inPath"

@@ -155,6 +155,10 @@ class CheckSignalsCommand extends Command
 
     public function processUserForJob(User $user, Client $client, Carbon $now, bool $force, bool $explicitRun): void
     {
+        if (!$force && !($user->auto_signals_enabled ?? false)) {
+            return;
+        }
+
         $checkIntervalMinutes = $this->resolveCheckIntervalMinutes($user);
 
         $lastCheck = $user->auto_signal_last_check ? Carbon::parse($user->auto_signal_last_check) : null;
@@ -529,6 +533,11 @@ class CheckSignalsCommand extends Command
         $adx = TechnicalIndicators::adx($highs, $lows, $closes, 14);
         $vwma20 = TechnicalIndicators::vwma($closes, $volumes, 20);
 
+        $vwap = TechnicalIndicators::vwap($highs, $lows, $closes, $volumes);
+        $avwap = TechnicalIndicators::avwap($highs, $lows, $closes, $volumes);
+        $supertrend = TechnicalIndicators::supertrend($highs, $lows, $closes, 10, 3.0);
+        $obv = TechnicalIndicators::obv($closes, $volumes, 20);
+
         $bb = TechnicalIndicators::bollinger($closes, 20, 2.0);
 
         $prevClose = (float) $closes[max(0, count($closes) - 2)];
@@ -545,7 +554,11 @@ class CheckSignalsCommand extends Command
             'MACD' => $macd['macd'] > $macd['signal'],
             'ADX' => $adx > 25,
             'VWMA' => end($closes) > $vwma20,
+            'VWAP' => end($closes) > $vwap,
+            'AVWAP' => end($closes) > $avwap,
+            'SUPERTREND' => end($closes) > (float) ($supertrend['value'] ?? 0.0),
             'STOCHRSI' => $this->stochRsi($closes, 14) > 50,
+            'OBV' => (float) ($obv['value'] ?? 0.0) > (float) ($obv['ema20'] ?? 0.0),
             'MSTRUCT' => $this->marketStructure($highs, $lows, $trend),
             'BB' => (
                 ($prevBb['lower'] !== null && $bb['lower'] !== null && $prevClose < $prevBb['lower'] && end($closes) >= $bb['lower'])
@@ -600,6 +613,12 @@ class CheckSignalsCommand extends Command
                 'macd_signal' => $macd['signal'],
                 'adx' => $adx,
                 'vwma20' => $vwma20,
+                'vwap' => $vwap,
+                'avwap' => $avwap,
+                'supertrend' => (float) ($supertrend['value'] ?? 0.0),
+                'supertrend_dir' => (float) ($supertrend['dir'] ?? 0.0),
+                'obv' => (float) ($obv['value'] ?? 0.0),
+                'obv_ema20' => (float) ($obv['ema20'] ?? 0.0),
                 'bb_upper' => $bb['upper'],
                 'bb_lower' => $bb['lower'],
                 'confirm_selected' => $selected,
@@ -984,7 +1003,7 @@ class CheckSignalsCommand extends Command
 
         $texts = [
             'ru' => [
-                'subject' => '🚨 Новый торговый сигнал: {symbol} {dirUpper}',
+                'subject' => 'Новый торговый сигнал: {symbol} {dirUpper}',
                 'title' => '🚨 Новый торговый сигнал!',
                 'instrument' => '📊 Инструмент: {symbol}',
                 'direction' => '🟢 Направление: {dirLocal} {dirIcon}',
@@ -1005,7 +1024,7 @@ class CheckSignalsCommand extends Command
                 'trend_down' => 'Медвежий рынок',
             ],
             'en' => [
-                'subject' => '🚨 New trading signal: {symbol} {dirUpper}',
+                'subject' => 'New trading signal: {symbol} {dirUpper}',
                 'title' => '🚨 New trading signal!',
                 'instrument' => '📊 Instrument: {symbol}',
                 'direction' => '🟢 Direction: {dirLocal} {dirIcon}',
@@ -1026,7 +1045,7 @@ class CheckSignalsCommand extends Command
                 'trend_down' => 'Bear market',
             ],
             'uk' => [
-                'subject' => '🚨 Новий торговий сигнал: {symbol} {dirUpper}',
+                'subject' => 'Новий торговий сигнал: {symbol} {dirUpper}',
                 'title' => '🚨 Новий торговий сигнал!',
                 'instrument' => '📊 Інструмент: {symbol}',
                 'direction' => '🟢 Напрям: {dirLocal} {dirIcon}',
@@ -1190,13 +1209,18 @@ class CheckSignalsCommand extends Command
                 if (!in_array($lang, ['ru', 'en', 'uk'], true)) {
                     $lang = 'ru';
                 }
+
+                $subjectPrefix = '🚨 Crypto Analyzer. ';
                 $fallbackSubjectMap = [
-                    'ru' => '🚨 Новый торговый сигнал',
-                    'en' => '🚨 New trading signal',
-                    'uk' => '🚨 Новий торговий сигнал',
+                    'ru' => 'Новый торговый сигнал!',
+                    'en' => 'New trading signal!',
+                    'uk' => 'Новий торговий сигнал!',
                 ];
                 $fallbackSubject = (string) ($fallbackSubjectMap[$lang] ?? $fallbackSubjectMap['ru']);
-                $finalSubject = $subject !== '' ? $subject : $fallbackSubject;
+                $finalSubjectRaw = $subject !== '' ? $subject : $fallbackSubject;
+                $finalSubjectRaw = preg_replace('/^[\s\p{Cf}\p{Mn}\x{FE0F}]*(?:🚨\x{FE0F}?)?[\s\p{Cf}\p{Mn}\x{FE0F}]*Crypto\s*Analyzer\s*\.\s*/iu', '', $finalSubjectRaw) ?? $finalSubjectRaw;
+                $finalSubjectRaw = preg_replace('/^[\s\p{Cf}\p{Mn}\x{FE0F}]*(?:🚨\x{FE0F}?)+[\s\p{Cf}\p{Mn}\x{FE0F}]*/u', '', $finalSubjectRaw) ?? $finalSubjectRaw;
+                $finalSubject = $subjectPrefix . $finalSubjectRaw;
                 Mail::raw($message, function ($m) use ($user, $finalSubject) {
                     $m->to($user->email)->subject($finalSubject);
                 });
@@ -1206,24 +1230,165 @@ class CheckSignalsCommand extends Command
         }
 
         if ($telegramEnabled) {
-            $token = (string) env('TELEGRAM_BOT_TOKEN', '');
-            $chatId = (string) ($user->telegram_chat_id ?? '');
+            $token = trim((string) env('TELEGRAM_BOT_TOKEN', ''));
+            $chatId = trim((string) ($user->telegram_chat_id ?? ''));
+
+            $resolvedChatId = $this->resolveTelegramChatId($token, $chatId);
+            if ($resolvedChatId !== '' && $resolvedChatId !== $chatId) {
+                try {
+                    $user->telegram_chat_id = $resolvedChatId;
+                    $user->save();
+                    $chatId = $resolvedChatId;
+                } catch (\Throwable $e) {
+                    Log::warning('signals:check telegram chat_id save failed', [
+                        'user_id' => $user->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
 
             if ($token !== '' && $chatId !== '') {
                 try {
-                    $http = new Client(['timeout' => 15]);
-                    $http->post("https://api.telegram.org/bot{$token}/sendMessage", [
+                    $http = new Client(['timeout' => 15, 'http_errors' => false]);
+                    $resp = $http->post("https://api.telegram.org/bot{$token}/sendMessage", [
                         'form_params' => [
                             'chat_id' => $chatId,
                             'text' => $message,
                             'disable_web_page_preview' => true,
                         ],
                     ]);
+
+                    $status = (int) $resp->getStatusCode();
+                    if ($status < 200 || $status >= 300) {
+                        $body = (string) $resp->getBody();
+                        if (is_string($body) && strlen($body) > 1000) {
+                            $body = substr($body, 0, 1000);
+                        }
+                        Log::error('signals:check telegram bad response', [
+                            'user_id' => $user->id,
+                            'status' => $status,
+                            'body' => $body,
+                        ]);
+                    }
                 } catch (\Throwable $e) {
-                    Log::error('signals:check telegram failed', ['user_id' => $user->id, 'error' => $e->getMessage()]);
+                    $msg = (string) $e->getMessage();
+                    $msg = preg_replace('/bot\d+:[^\s\/]+/i', 'bot***', $msg) ?? $msg;
+                    Log::error('signals:check telegram failed', [
+                        'user_id' => $user->id,
+                        'error' => $msg,
+                        'exception' => get_class($e),
+                    ]);
                 }
             }
         }
+    }
+
+    private function resolveTelegramChatId(string $token, string $chatIdOrUsername): string
+    {
+        $token = trim($token);
+        $value = trim($chatIdOrUsername);
+
+        if ($token === '' || $value === '') {
+            return '';
+        }
+
+        if (preg_match('/^\d{5,}$/', $value)) {
+            return $value;
+        }
+
+        $username = ltrim($value, '@');
+        $username = strtolower(trim($username));
+        if ($username === '') {
+            return '';
+        }
+
+        try {
+            $http = new Client(['timeout' => 15, 'http_errors' => false]);
+            $offset = 0;
+            $all = [];
+
+            for ($i = 0; $i < 5; $i++) {
+                $resp = $http->get("https://api.telegram.org/bot{$token}/getUpdates", [
+                    'query' => [
+                        'offset' => $offset,
+                        'limit' => 100,
+                        'timeout' => 10,
+                    ],
+                ]);
+
+                $status = (int) $resp->getStatusCode();
+                if ($status < 200 || $status >= 300) {
+                    break;
+                }
+
+                $data = json_decode((string) $resp->getBody(), true);
+                if (!is_array($data) || empty($data['ok'])) {
+                    break;
+                }
+
+                $updates = $data['result'] ?? [];
+                if (!is_array($updates) || count($updates) === 0) {
+                    break;
+                }
+
+                foreach ($updates as $u) {
+                    if (is_array($u)) {
+                        $all[] = $u;
+                    }
+                }
+
+                $maxId = 0;
+                foreach ($updates as $u) {
+                    if (is_array($u) && isset($u['update_id']) && is_numeric($u['update_id'])) {
+                        $uid = (int) $u['update_id'];
+                        if ($uid > $maxId) {
+                            $maxId = $uid;
+                        }
+                    }
+                }
+                if ($maxId <= 0) {
+                    break;
+                }
+                $offset = $maxId + 1;
+            }
+
+            foreach ($all as $update) {
+                if (!is_array($update)) {
+                    continue;
+                }
+
+                $msg = null;
+                if (isset($update['message']) && is_array($update['message'])) {
+                    $msg = $update['message'];
+                } elseif (isset($update['edited_message']) && is_array($update['edited_message'])) {
+                    $msg = $update['edited_message'];
+                } elseif (isset($update['callback_query']['message']) && is_array($update['callback_query']['message'])) {
+                    $msg = $update['callback_query']['message'];
+                }
+
+                if (!is_array($msg)) {
+                    continue;
+                }
+
+                $from = $msg['from'] ?? null;
+                $chat = $msg['chat'] ?? null;
+                if (!is_array($from) || !is_array($chat)) {
+                    continue;
+                }
+
+                $uname = strtolower(trim((string) ($from['username'] ?? '')));
+                if ($uname !== '' && $uname === $username) {
+                    $cid = $chat['id'] ?? null;
+                    if (is_numeric($cid)) {
+                        return (string) $cid;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            return '';
+        }
+
+        return '';
     }
 
     private function logAutoSignal(User $user, array $data): void

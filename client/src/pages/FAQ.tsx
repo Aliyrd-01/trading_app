@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { HelpCircle, LineChart, Repeat, Wallet } from "lucide-react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -9,9 +9,52 @@ import { useLanguage } from "@/lib/i18n";
 
 export default function FAQ() {
   const { t } = useLanguage();
+  const [arbOpen, setArbOpen] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    window.scrollTo(0, 0);
+    try {
+      const hasHash = !!(window.location.hash || "").trim();
+      if (!hasHash) {
+        window.scrollTo(0, 0);
+      }
+    } catch {
+      window.scrollTo(0, 0);
+    }
+  }, []);
+
+  useEffect(() => {
+    const applyHash = () => {
+      const raw = (window.location.hash || "").trim();
+      const id = raw.startsWith("#") ? raw.slice(1) : raw;
+      if (!id) return;
+
+      if (id === "arb-free-limits") {
+        setArbOpen("arb-free-limits");
+      }
+
+      const doScroll = () => {
+        const el = document.getElementById(id);
+        if (el) {
+          try {
+            const rect = el.getBoundingClientRect();
+            const y = rect.top + (window.pageYOffset || 0);
+            const headerEl = document.querySelector("header") as HTMLElement | null;
+            const headerH = headerEl ? headerEl.getBoundingClientRect().height : 0;
+            const offset = Math.max(340, Math.round(headerH + 160));
+            window.scrollTo({ top: Math.max(0, y - offset), behavior: "smooth" });
+          } catch {
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        }
+      };
+
+      setTimeout(doScroll, 120);
+      setTimeout(doScroll, 420);
+    };
+
+    applyHash();
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
   }, []);
 
   return (
@@ -142,6 +185,13 @@ export default function FAQ() {
                       {t("faq.desktopApp.a.demo")}
                     </AccordionContent>
                   </AccordionItem>
+
+                  <AccordionItem value="desktop-free-limits">
+                    <AccordionTrigger>{t("faq.desktopApp.q.freeLimits")}</AccordionTrigger>
+                    <AccordionContent className="text-muted-foreground whitespace-pre-wrap">
+                      {t("faq.desktopApp.a.freeLimits")}
+                    </AccordionContent>
+                  </AccordionItem>
                 </Accordion>
               </div>
             </Card>
@@ -158,7 +208,64 @@ export default function FAQ() {
                 </div>
               </div>
 
-              <div className="mt-6 flex-1" />
+              <div className="mt-6 flex-1">
+                <p className="text-muted-foreground">
+                  {t("faq.arbitrage.subtitle")}
+                </p>
+
+                <div className="mt-6">
+                  <Accordion type="single" collapsible className="w-full" value={arbOpen} onValueChange={setArbOpen}>
+                    <AccordionItem value="arb-what-is-cryptomonitor">
+                      <AccordionTrigger>{t("faq.arbitrage.q.whatIsCryptoMonitor")}</AccordionTrigger>
+                      <AccordionContent className="text-muted-foreground">
+                        {t("faq.arbitrage.a.whatIsCryptoMonitor")}
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="arb-alerts">
+                      <AccordionTrigger>{t("faq.arbitrage.q.signals")}</AccordionTrigger>
+                      <AccordionContent className="text-muted-foreground">
+                        {t("faq.arbitrage.a.signals")}
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="arb-smtp-setup">
+                      <AccordionTrigger>{t("faq.arbitrage.q.smtpSetup")}</AccordionTrigger>
+                      <AccordionContent className="text-muted-foreground whitespace-pre-wrap">
+                        {t("faq.arbitrage.a.smtpSetup")}
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="arb-api-keys">
+                      <AccordionTrigger>{t("faq.arbitrage.q.apiKeys")}</AccordionTrigger>
+                      <AccordionContent className="text-muted-foreground">
+                        {t("faq.arbitrage.a.apiKeys")}
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="arb-download">
+                      <AccordionTrigger>{t("faq.arbitrage.q.download")}</AccordionTrigger>
+                      <AccordionContent className="text-muted-foreground">
+                        {t("faq.arbitrage.a.download")}
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="arb-how-to-start">
+                      <AccordionTrigger>{t("faq.arbitrage.q.howToStart")}</AccordionTrigger>
+                      <AccordionContent className="text-muted-foreground">
+                        {t("faq.arbitrage.a.howToStart")}
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="arb-free-limits" id="arb-free-limits">
+                      <AccordionTrigger>{t("faq.arbitrage.q.freeLimits")}</AccordionTrigger>
+                      <AccordionContent className="text-muted-foreground whitespace-pre-wrap">
+                        {t("faq.arbitrage.a.freeLimits")}
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+                </div>
+              </div>
             </Card>
           </div>
 
@@ -191,6 +298,13 @@ export default function FAQ() {
                     <AccordionTrigger>{t("faq.general.q.deleteAccount")}</AccordionTrigger>
                     <AccordionContent className="text-muted-foreground">
                       {t("faq.general.a.deleteAccount")}
+                    </AccordionContent>
+                  </AccordionItem>
+
+                  <AccordionItem value="general-telegram-notifications">
+                    <AccordionTrigger>{t("faq.general.q.telegramNotifications")}</AccordionTrigger>
+                    <AccordionContent className="text-muted-foreground whitespace-pre-wrap">
+                      {t("faq.general.a.telegramNotifications")}
                     </AccordionContent>
                   </AccordionItem>
                 </Accordion>

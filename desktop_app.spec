@@ -1,5 +1,16 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import os
+import sys
+
+# Delegate to crypto-analyzer/desktop_app.spec to avoid building from root
+_base_dir = os.path.dirname(os.path.abspath(__file__))
+_target_spec = os.path.join(_base_dir, "crypto-analyzer", "desktop_app.spec")
+if os.path.exists(_target_spec):
+    sys.argv = ["pyinstaller"] + [arg for arg in sys.argv if arg not in ("desktop_app.spec", _target_spec)] + [_target_spec]
+    exec(open(_target_spec, "r", encoding="utf-8").read())
+    raise SystemExit(0)
+
 
 a = Analysis(
     ['desktop_app.py'],

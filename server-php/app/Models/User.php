@@ -24,8 +24,11 @@ class User extends Authenticatable
         'enable_email_notifications',
         'enable_telegram_notifications',
         'telegram_chat_id',
+        'spread_enable_telegram_notifications',
+        'spread_telegram_chat_id',
         'language',
         'auto_signals_enabled',
+        'spread_alerts_enabled',
         'auto_signal_symbol',
         'auto_signal_capital',
         'auto_signal_trading_type',
@@ -38,6 +41,14 @@ class User extends Authenticatable
         'auto_signal_last_signal_price',
         'auto_signal_last_signal_direction',
         'auto_signal_last_fired_at',
+
+        'crypto_monitor_interval_sec',
+        'crypto_monitor_quote',
+        'crypto_monitor_tokens_to_scan',
+        'crypto_monitor_top_n',
+        'crypto_monitor_alert_percent_min',
+        'crypto_monitor_alert_percent_max',
+        'crypto_monitor_selected_exchanges',
     ];
 
     protected $hidden = [
@@ -50,8 +61,12 @@ class User extends Authenticatable
         'plan_expires_at' => 'datetime',
         'trial_expires_at' => 'datetime',
         'reset_token_expires' => 'datetime',
+        'auto_signals_enabled' => 'boolean',
+        'spread_alerts_enabled' => 'boolean',
+        'spread_enable_telegram_notifications' => 'boolean',
         'auto_signal_last_check' => 'datetime',
         'auto_signal_last_fired_at' => 'datetime',
+        'crypto_monitor_selected_exchanges' => 'array',
     ];
 }
 

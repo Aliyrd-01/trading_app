@@ -96,7 +96,14 @@ function ScrollToTopOnRouteChange() {
 
   useEffect(() => {
     // Прокручиваем страницу в самый верх при изменении маршрута
-    window.scrollTo(0, 0);
+    try {
+      const hasHash = !!(window.location.hash || "").trim();
+      if (!hasHash) {
+        window.scrollTo(0, 0);
+      }
+    } catch {
+      window.scrollTo(0, 0);
+    }
   }, [location]);
 
   return null;

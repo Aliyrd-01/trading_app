@@ -2,10 +2,24 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { useLocation } from 'wouter';
 import { queryClient } from './queryClient';
 
+function getPreferredLanguage(): string {
+  try {
+    const saved = localStorage.getItem('language');
+    return (saved && typeof saved === 'string' ? saved : 'en') || 'en';
+  } catch {
+    return 'en';
+  }
+}
+
 type User = {
   id: string;
   email: string;
   name: string | null;
+  plan?: string;
+  plan_expires_at?: string | null;
+  trial_expires_at?: string | null;
+  effective_plan?: string | null;
+  effective_expires_at?: string | null;
   createdAt: string;
 };
 
@@ -32,9 +46,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = async () => {
     try {
+      const lang = getPreferredLanguage();
       const response = await fetch(`${API_BASE_URL}/auth/me`, {
         headers: {
           Accept: 'application/json',
+          'Accept-Language': lang,
         },
         credentials: 'include',
       });
@@ -51,9 +67,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const login = async (email: string, password: string) => {
+    const lang = getPreferredLanguage();
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'Accept-Language': lang },
       credentials: 'include',
       body: JSON.stringify({ email, password }),
     });
@@ -94,9 +111,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (email: string, password: string, name?: string) => {
+    const lang = getPreferredLanguage();
     const response = await fetch(`${API_BASE_URL}/auth/register`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'Accept-Language': lang },
       credentials: 'include',
       body: JSON.stringify({ email, password, name: (name ?? '').trim() }),
     });
@@ -104,23 +122,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!response.ok) {
       const text = await response.text();
       let msg = '';
+      let code = '';
       try {
         const payload: any = text ? JSON.parse(text) : null;
         const emailErr = Array.isArray(payload?.errors?.email) ? payload.errors.email[0] : null;
-        msg = (emailErr || payload?.error || payload?.message || '').toString();
+        code = (payload?.code || '').toString();
+        msg = (payload?.error || emailErr || payload?.message || '').toString();
       } catch {
         const m = (text || '').match(/"error"\s*:\s*"([^"]+)"/);
         msg = m?.[1] || '';
       }
 
-      throw new Error(msg || 'Registration failed');
+      const msgNorm = (msg || '').toLowerCase();
+      if (!code && (msgNorm.includes('already been taken') || msgNorm.includes('already exists') || msgNorm.includes('unique'))) {
+        code = 'EMAIL_ALREADY_EXISTS';
+      }
+      if (!code && msgNorm.includes('invalid') && msgNorm.includes('email')) {
+        code = 'INVALID_EMAIL';
+      }
+
+      const err = new Error(msg || 'Registration failed') as Error & { code?: string };
+      if (code) {
+        err.code = code;
+      }
+      throw err;
     }
 
     const userData: any = await response.json();
     queryClient.clear();
-    if (userData && typeof userData === 'object' && userData.verification_required) {
+    const needsVerification =
+      !!(userData && typeof userData === 'object' && (userData.verification_required || userData.email_verified === false));
+    if (needsVerification) {
       setUser(null);
-      setLocation('/auth?verify=1');
+      setLocation(`/auth?verify=1&email=${encodeURIComponent((email || '').trim())}`);
       return;
     }
     setUser(userData);
@@ -128,10 +162,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    const lang = getPreferredLanguage();
     await fetch(`${API_BASE_URL}/auth/logout`, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
+        'Accept-Language': lang,
       },
       credentials: 'include',
     });

@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Carbon;
@@ -15,6 +16,62 @@ use Illuminate\Support\Facades\DB;
 
 class AuthController extends Controller
 {
+
+    private function normalizePlanString($plan): string
+    {
+        try {
+            $s = strtolower(trim((string) ($plan ?? '')));
+            if ($s === '' || $s === 'free' || $s === 'basic' || $s === 'trial') {
+                return 'free';
+            }
+            if ($s === 'pro+' || $s === 'proplus' || $s === 'pro_plus') {
+                return 'pro_plus';
+            }
+            if (Str::startsWith($s, 'pro')) {
+                return 'pro';
+            }
+            if ($s === 'premium' || $s === 'paid') {
+                return 'pro';
+            }
+            return 'free';
+        } catch (\Throwable $e) {
+            return 'free';
+        }
+    }
+
+    private function computeEffectiveSubscription(string $planNorm, $planExpiresAtDt, $trialExpiresAtDt): array
+    {
+        $effectivePlan = 'free';
+        $effectiveExpiresAt = null;
+
+        try {
+            if ($planNorm !== 'free') {
+                if ($planExpiresAtDt instanceof Carbon) {
+                    if ($planExpiresAtDt->isFuture()) {
+                        $effectivePlan = $planNorm;
+                        $effectiveExpiresAt = $planExpiresAtDt->copy()->utc()->toISOString();
+                    }
+                } else {
+                    $effectivePlan = $planNorm;
+                    $effectiveExpiresAt = null;
+                }
+            } else {
+                if ($trialExpiresAtDt instanceof Carbon && $trialExpiresAtDt->isFuture()) {
+                    $effectivePlan = 'trial';
+                    $effectiveExpiresAt = $trialExpiresAtDt->copy()->utc()->toISOString();
+                }
+            }
+        } catch (\Throwable $e) {
+            $effectivePlan = 'free';
+            $effectiveExpiresAt = null;
+        }
+
+        return [
+            'effective_plan' => $effectivePlan,
+            'effective_expires_at' => $effectiveExpiresAt,
+        ];
+    }
+
     public function register(Request $request)
     {
         try {
@@ -40,12 +97,6 @@ class AuthController extends Controller
                 'verification_token' => $verificationToken,
             ]);
 
-            if (!$user->email_verified_at) {
-                $user->email_verified_at = now();
-                $user->verification_token = null;
-                $user->save();
-            }
-
             // Отправляем email верификации
             try {
                 $this->sendVerificationEmail($user, $verificationToken);
@@ -54,23 +105,68 @@ class AuthController extends Controller
                 // Продолжаем выполнение - пользователь создан
             }
 
-            Auth::login($user);
+            $trialExpiresAtDt = null;
+            try {
+                if ($trialExpiresAt) {
+                    $trialExpiresAtDt = $trialExpiresAt instanceof \DateTimeInterface
+                        ? Carbon::instance($trialExpiresAt)
+                        : Carbon::parse($trialExpiresAt);
+                }
+            } catch (\Throwable $e) {
+                $trialExpiresAtDt = null;
+            }
+            $sub = $this->computeEffectiveSubscription('free', null, $trialExpiresAtDt);
 
             return response()->json([
+                'verification_required' => true,
                 'id' => (string) $user->id,
                 'email' => $user->email,
                 'name' => ($user->name ?? '') !== '' ? $user->name : null,
                 'plan' => $user->plan,
+                'plan_raw' => $user->plan,
+                'plan_expires_at' => null,
+                'trial_expires_at' => $trialExpiresAtDt ? $trialExpiresAtDt->copy()->utc()->toISOString() : null,
+                'effective_plan' => $sub['effective_plan'],
+                'effective_expires_at' => $sub['effective_expires_at'],
+                'server_time' => Carbon::now('UTC')->toISOString(),
+                'schema_version' => 1,
                 'createdAt' => $user->created_at->toIso8601String(),
             ]);
         } catch (ValidationException $e) {
+            $errors = $e->errors();
+            $code = 'VALIDATION_ERROR';
+            $emailErrors = isset($errors['email']) && is_array($errors['email']) ? $errors['email'] : [];
+            $emailMsg = implode(' ', array_map('strval', $emailErrors));
+            if ($emailMsg !== '' && (Str::contains($emailMsg, 'taken') || Str::contains($emailMsg, 'unique'))) {
+                $code = 'EMAIL_ALREADY_EXISTS';
+            } elseif ($emailMsg !== '' && Str::contains($emailMsg, 'email')) {
+                $code = 'INVALID_EMAIL';
+            }
+
+            $lang = $this->getLanguageFromRequest();
+            $errorText = $e->getMessage();
+            if ($code === 'EMAIL_ALREADY_EXISTS') {
+                $errorText = $lang === 'ru'
+                    ? 'Аккаунт с таким email уже существует'
+                    : ($lang === 'uk'
+                        ? 'Акаунт з таким email вже існує'
+                        : 'An account with this email already exists');
+            } elseif ($code === 'INVALID_EMAIL') {
+                $errorText = $lang === 'ru'
+                    ? 'Пожалуйста, введите корректный адрес электронной почты'
+                    : ($lang === 'uk'
+                        ? 'Будь ласка, введіть коректну email адресу'
+                        : 'Please enter a valid email address');
+            }
             return response()->json([
-                'error' => $e->getMessage(),
-                'errors' => $e->errors()
+                'code' => $code,
+                'error' => $errorText,
+                'errors' => $errors
             ], 422);
         } catch (\Exception $e) {
             \Log::error('Ошибка в AuthController@register: ' . $e->getMessage());
             return response()->json([
+                'code' => 'REGISTER_FAILED',
                 'error' => 'Registration failed. Please try again later.'
             ], 500);
         }
@@ -107,12 +203,12 @@ class AuthController extends Controller
             ], 422);
         }
 
-        // Если пользователь существует, но email не верифицирован - автоматически верифицируем
-        // (для старых пользователей, которые были созданы до внедрения верификации)
-        if (!$user->email_verified_at) {
-            $user->email_verified_at = now();
-            $user->verification_token = null;
-            $user->save();
+        if (!$user->email_verified_at && !empty($user->verification_token)) {
+            return response()->json([
+                'code' => 'EMAIL_NOT_VERIFIED',
+                'email' => $user->email,
+                'error' => 'Email not verified',
+            ], 403);
         }
 
         if (
@@ -125,7 +221,73 @@ class AuthController extends Controller
             $user->save();
         }
 
+        if (
+            Schema::hasColumn('users', 'plan_expires_at') &&
+            (($user->plan ?? 'free') !== 'free') &&
+            !$user->plan_expires_at
+        ) {
+            $user->plan_expires_at = Carbon::now()->addMonth();
+            $user->save();
+        }
+
         Auth::login($user);
+
+        $planExpiresAt = null;
+        $planExpiresAtDt = null;
+        if (Schema::hasColumn('users', 'plan_expires_at') && $user->plan_expires_at) {
+            try {
+                $dt = $user->plan_expires_at instanceof \DateTimeInterface
+                    ? Carbon::instance($user->plan_expires_at)
+                    : Carbon::parse($user->plan_expires_at);
+                $planExpiresAtDt = $dt;
+                $planExpiresAt = $dt->copy()->utc()->toISOString();
+            } catch (\Throwable $e) {
+                $planExpiresAt = (string) $user->plan_expires_at;
+            }
+        }
+
+        $trialExpiresAt = null;
+        $trialExpiresAtDt = null;
+        if (Schema::hasColumn('users', 'trial_expires_at') && $user->trial_expires_at) {
+            try {
+                $dt = $user->trial_expires_at instanceof \DateTimeInterface
+                    ? Carbon::instance($user->trial_expires_at)
+                    : Carbon::parse($user->trial_expires_at);
+                $trialExpiresAtDt = $dt;
+                $trialExpiresAt = $dt->copy()->utc()->toISOString();
+            } catch (\Throwable $e) {
+                $trialExpiresAt = (string) $user->trial_expires_at;
+            }
+        }
+
+        $planNorm = $this->normalizePlanString($user->plan);
+        $sub = $this->computeEffectiveSubscription($planNorm, $planExpiresAtDt, $trialExpiresAtDt);
+
+        $effectivePlan = (string) ($sub['effective_plan'] ?? 'free');
+        $effectiveExpiresAt = $sub['effective_expires_at'] ?? null;
+
+        $access = [
+            'allowed' => true,
+            'reason' => null,
+            'trial_expires_at' => $trialExpiresAt,
+        ];
+        try {
+            if (
+                Schema::hasColumn('users', 'trial_expires_at') &&
+                $planNorm === 'free' &&
+                ($trialExpiresAtDt instanceof Carbon) &&
+                $trialExpiresAtDt->isPast()
+            ) {
+                $access['allowed'] = false;
+                $access['reason'] = 'trial_expired';
+            }
+        } catch (\Throwable $e) {
+            $access = [
+                'allowed' => true,
+                'reason' => null,
+                'trial_expires_at' => $trialExpiresAt,
+            ];
+        }
 
         return response()->json([
             'id' => (string) $user->id,
@@ -133,11 +295,154 @@ class AuthController extends Controller
             'name' => $user->name,
             'plan' => $user->plan,
             'createdAt' => $user->created_at->toIso8601String(),
+            'plan_expires_at' => $planExpiresAt,
+            'trial_expires_at' => $trialExpiresAt,
+            'effective_plan' => $effectivePlan,
+            'effective_expires_at' => $effectiveExpiresAt,
+            'access' => $access,
         ]);
+    }
+
+    public function desktopFeedback(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['error' => 'Unauthenticated'], 401);
+        }
+
+        $data = $request->validate([
+            'message' => 'required|string|min:1|max:10000',
+            'email' => 'nullable|string|max:191',
+            'client' => 'nullable|string|max:100',
+            'version' => 'nullable|string|max:50',
+        ]);
+
+        $msg = (string) ($data['message'] ?? '');
+        $reportedEmail = (string) ($data['email'] ?? $user->email);
+        $client = (string) ($data['client'] ?? 'desktop');
+        $version = (string) ($data['version'] ?? '');
+
+        $subject = 'Desktop feedback: ' . $reportedEmail;
+        $body = "User: {$user->email}\nReported email: {$reportedEmail}\nClient: {$client}\nVersion: {$version}\n\nMessage:\n{$msg}\n";
+
+        $resendKey = (string) env('RESEND_API_KEY', '');
+        $resendFrom = (string) env('RESEND_FROM_EMAIL', '');
+
+        if ($resendKey !== '' && $resendFrom !== '') {
+            try {
+                $resp = Http::withHeaders([
+                    'Authorization' => 'Bearer ' . $resendKey,
+                    'Content-Type' => 'application/json',
+                ])->post('https://api.resend.com/emails', [
+                    'from' => $resendFrom,
+                    'to' => ['cryptoanalyzpro@gmail.com'],
+                    'subject' => $subject,
+                    'text' => $body,
+                ]);
+
+                if (!$resp->successful()) {
+                    return response()->json(['error' => 'Failed to send'], 500);
+                }
+            } catch (\Throwable $e) {
+                return response()->json(['error' => 'Failed to send'], 500);
+            }
+        } else {
+            try {
+                Mail::raw($body, function ($m) use ($subject) {
+                    $m->to('cryptoanalyzpro@gmail.com')->subject($subject);
+                });
+            } catch (\Throwable $e) {
+                return response()->json(['error' => 'Failed to send'], 500);
+            }
+        }
+
+        return response()->json(['ok' => true]);
     }
 
     public function token(Request $request)
     {
+        try {
+            $expected = (string) env('INTERNAL_API_KEY', '');
+            $provided = (string) $request->header('X-API-KEY', '');
+            if ($expected !== '' && $provided !== '' && hash_equals($expected, $provided)) {
+                $emailHeader = strtolower(trim((string) $request->header('X-User-Email', '')));
+                if ($emailHeader !== '') {
+                    $userFromKey = User::where('email', $emailHeader)->first();
+                    if ($userFromKey) {
+                        if (!$userFromKey->email_verified_at) {
+                            $userFromKey->email_verified_at = now();
+                            $userFromKey->verification_token = null;
+                            $userFromKey->save();
+                        }
+
+                        if (
+                            Schema::hasColumn('users', 'plan_expires_at') &&
+                            (($userFromKey->plan ?? 'free') !== 'free') &&
+                            !$userFromKey->plan_expires_at
+                        ) {
+                            $userFromKey->plan_expires_at = Carbon::now()->addMonth();
+                            $userFromKey->save();
+                        }
+
+                        $userFromKey->tokens()->where('name', 'desktop')->delete();
+                        $token = $userFromKey->createToken('desktop')->plainTextToken;
+
+                        $planExpiresAt = null;
+                        $planExpiresAtDt = null;
+                        if (Schema::hasColumn('users', 'plan_expires_at') && $userFromKey->plan_expires_at) {
+                            try {
+                                $dt = $userFromKey->plan_expires_at instanceof \DateTimeInterface
+                                    ? Carbon::instance($userFromKey->plan_expires_at)
+                                    : Carbon::parse($userFromKey->plan_expires_at);
+                                $planExpiresAtDt = $dt;
+                                $planExpiresAt = $dt->copy()->utc()->toISOString();
+                            } catch (\Throwable $e) {
+                                $planExpiresAt = (string) $userFromKey->plan_expires_at;
+                            }
+                        }
+
+                        $trialExpiresAt = null;
+                        $trialExpiresAtDt = null;
+                        if (Schema::hasColumn('users', 'trial_expires_at') && $userFromKey->trial_expires_at) {
+                            try {
+                                $dt = $userFromKey->trial_expires_at instanceof \DateTimeInterface
+                                    ? Carbon::instance($userFromKey->trial_expires_at)
+                                    : Carbon::parse($userFromKey->trial_expires_at);
+                                $trialExpiresAtDt = $dt;
+                                $trialExpiresAt = $dt->copy()->utc()->toISOString();
+                            } catch (\Throwable $e) {
+                                $trialExpiresAt = (string) $userFromKey->trial_expires_at;
+                            }
+                        }
+
+                        $planNorm = $this->normalizePlanString($userFromKey->plan);
+                        $sub = $this->computeEffectiveSubscription($planNorm, $planExpiresAtDt, $trialExpiresAtDt);
+
+                        return response()->json([
+                            'token' => $token,
+                            'id' => (string) $userFromKey->id,
+                            'email' => $userFromKey->email,
+                            'plan' => $userFromKey->plan,
+                            'plan_raw' => $userFromKey->plan,
+                            'plan_expires_at' => $planExpiresAt,
+                            'trial_expires_at' => $trialExpiresAt,
+                            'effective_plan' => $sub['effective_plan'],
+                            'effective_expires_at' => $sub['effective_expires_at'],
+                            'server_time' => Carbon::now('UTC')->toISOString(),
+                            'schema_version' => 1,
+                        ]);
+                    }
+
+                    return response()->json([
+                        'code' => 'UNAUTHORIZED',
+                        'error' => 'Unauthenticated',
+                    ], 401);
+                }
+            }
+        } catch (\Throwable $e) {
+            // silent fallback
+        }
+
         try {
             $request->validate([
                 'email' => 'required|email',
@@ -183,13 +488,61 @@ class AuthController extends Controller
             $user->save();
         }
 
+        if (
+            Schema::hasColumn('users', 'plan_expires_at') &&
+            (($user->plan ?? 'free') !== 'free') &&
+            !$user->plan_expires_at
+        ) {
+            $user->plan_expires_at = Carbon::now()->addMonth();
+            $user->save();
+        }
+
         $user->tokens()->where('name', 'desktop')->delete();
         $token = $user->createToken('desktop')->plainTextToken;
+
+        $planExpiresAt = null;
+        $planExpiresAtDt = null;
+        if (Schema::hasColumn('users', 'plan_expires_at') && $user->plan_expires_at) {
+            try {
+                $dt = $user->plan_expires_at instanceof \DateTimeInterface
+                    ? Carbon::instance($user->plan_expires_at)
+                    : Carbon::parse($user->plan_expires_at);
+                $planExpiresAtDt = $dt;
+                $planExpiresAt = $dt->copy()->utc()->toISOString();
+            } catch (\Throwable $e) {
+                $planExpiresAt = (string) $user->plan_expires_at;
+            }
+        }
+
+        $trialExpiresAt = null;
+        $trialExpiresAtDt = null;
+        if (Schema::hasColumn('users', 'trial_expires_at') && $user->trial_expires_at) {
+            try {
+                $dt = $user->trial_expires_at instanceof \DateTimeInterface
+                    ? Carbon::instance($user->trial_expires_at)
+                    : Carbon::parse($user->trial_expires_at);
+                $trialExpiresAtDt = $dt;
+                $trialExpiresAt = $dt->copy()->utc()->toISOString();
+            } catch (\Throwable $e) {
+                $trialExpiresAt = (string) $user->trial_expires_at;
+            }
+        }
+
+        $planNorm = $this->normalizePlanString($user->plan);
+        $sub = $this->computeEffectiveSubscription($planNorm, $planExpiresAtDt, $trialExpiresAtDt);
 
         return response()->json([
             'token' => $token,
             'id' => (string) $user->id,
             'email' => $user->email,
+            'plan' => $user->plan,
+            'plan_raw' => $user->plan,
+            'plan_expires_at' => $planExpiresAt,
+            'trial_expires_at' => $trialExpiresAt,
+            'effective_plan' => $sub['effective_plan'],
+            'effective_expires_at' => $sub['effective_expires_at'],
+            'server_time' => Carbon::now('UTC')->toISOString(),
+            'schema_version' => 1,
         ]);
     }
 
@@ -307,13 +660,24 @@ class AuthController extends Controller
             $user->save();
         }
 
+        if (
+            Schema::hasColumn('users', 'plan_expires_at') &&
+            (($user->plan ?? 'free') !== 'free') &&
+            !$user->plan_expires_at
+        ) {
+            $user->plan_expires_at = Carbon::now()->addMonth();
+            $user->save();
+        }
+
         $planExpiresAt = null;
+        $planExpiresAtDt = null;
         if (Schema::hasColumn('users', 'plan_expires_at') && $user->plan_expires_at) {
             try {
                 $dt = $user->plan_expires_at instanceof \DateTimeInterface
                     ? Carbon::instance($user->plan_expires_at)
                     : Carbon::parse($user->plan_expires_at);
-                $planExpiresAt = $dt->toIso8601String();
+                $planExpiresAtDt = $dt;
+                $planExpiresAt = $dt->copy()->utc()->toISOString();
             } catch (\Throwable $e) {
                 $planExpiresAt = (string) $user->plan_expires_at;
             }
@@ -337,12 +701,15 @@ class AuthController extends Controller
                 $trialExpiresAtDt = $user->trial_expires_at instanceof \DateTimeInterface
                     ? Carbon::instance($user->trial_expires_at)
                     : Carbon::parse($user->trial_expires_at);
-                $trialExpiresAt = $trialExpiresAtDt->toIso8601String();
+                $trialExpiresAt = $trialExpiresAtDt->copy()->utc()->toISOString();
             } catch (\Throwable $e) {
                 $trialExpiresAtDt = null;
                 $trialExpiresAt = (string) $user->trial_expires_at;
             }
         }
+
+        $planNorm = $this->normalizePlanString($user->plan);
+        $sub = $this->computeEffectiveSubscription($planNorm, $planExpiresAtDt, $trialExpiresAtDt);
 
         $autoSignalsAllowed = true;
         $autoSignalsReason = null;
@@ -379,8 +746,13 @@ class AuthController extends Controller
             'email' => $user->email,
             'name' => $user->name,
             'plan' => $user->plan,
+            'plan_raw' => $user->plan,
             'plan_expires_at' => $planExpiresAt,
             'trial_expires_at' => $trialExpiresAt,
+            'effective_plan' => $sub['effective_plan'],
+            'effective_expires_at' => $sub['effective_expires_at'],
+            'server_time' => Carbon::now('UTC')->toISOString(),
+            'schema_version' => 1,
             'auto_signals_allowed' => $autoSignalsAllowed,
             'auto_signals_reason' => $autoSignalsReason,
             'createdAt' => $user->created_at->toIso8601String(),
@@ -500,12 +872,14 @@ class AuthController extends Controller
             ]);
         } catch (ValidationException $e) {
             return response()->json([
+                'code' => 'INVALID_EMAIL',
                 'error' => 'Invalid email address'
             ], 422);
         } catch (\Exception $e) {
             \Log::error('Ошибка в AuthController@resetPasswordRequest: ' . $e->getMessage());
             \Log::error('Stack trace: ' . $e->getTraceAsString());
             return response()->json([
+                'code' => 'RESET_REQUEST_FAILED',
                 'error' => 'Failed to process request. Please try again later.'
             ], 500);
         }
@@ -523,8 +897,15 @@ class AuthController extends Controller
             ->first();
 
         if (!$user) {
+            $lang = $this->getLanguageFromRequest();
+            $errorText = $lang === 'ru'
+                ? 'Ссылка для сброса пароля недействительна или устарела'
+                : ($lang === 'uk'
+                    ? 'Посилання для скидання пароля недійсне або застаріло'
+                    : 'The reset link is invalid or has expired');
             return response()->json([
-                'error' => 'Invalid or expired reset token'
+                'code' => 'RESET_TOKEN_EXPIRED',
+                'error' => $errorText
             ], 400);
         }
 
@@ -579,13 +960,7 @@ class AuthController extends Controller
         }
         $user->save();
 
-        return response()->json([
-            'id' => (string) $user->id,
-            'email' => $user->email,
-            'name' => $user->name,
-            'plan' => $user->plan,
-            'createdAt' => $user->created_at->toIso8601String(),
-        ]);
+        return $this->me($request);
     }
 
     private function sendVerificationEmail($user, $token)

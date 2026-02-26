@@ -41,7 +41,7 @@ export default function TradingAnalyzerSection() {
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           <div className="relative order-2 lg:order-1">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-secondary/20 rounded-3xl blur-3xl" />
-            <Card className="relative p-8 backdrop-blur-sm border-primary/20">
+            <Card className="relative p-8 backdrop-blur-sm border-card-border">
               <img 
                 src={analyzerImage} 
                 alt="Trading analyzer tool" 

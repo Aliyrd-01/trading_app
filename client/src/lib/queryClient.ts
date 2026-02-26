@@ -3,7 +3,34 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    let payload: any = null;
+    try {
+      payload = text ? JSON.parse(text) : null;
+    } catch {
+      payload = null;
+    }
+
+    const message =
+      (payload && typeof payload === 'object' && (payload.error || payload.message))
+        ? String(payload.error || payload.message)
+        : String(text || res.statusText || `HTTP ${res.status}`);
+
+    const err = new Error(message) as Error & { status?: number; payload?: any; code?: string };
+    err.status = res.status;
+    err.payload = payload;
+    if (payload && typeof payload === 'object' && payload.code) {
+      err.code = String(payload.code);
+    }
+    throw err;
+  }
+}
+
+function getPreferredLanguage(): string {
+  try {
+    const saved = localStorage.getItem('language');
+    return (saved && typeof saved === 'string' ? saved : 'en') || 'en';
+  } catch {
+    return 'en';
   }
 }
 
@@ -12,10 +39,12 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  const lang = getPreferredLanguage();
   const res = await fetch(url, {
     method,
     headers: {
       Accept: "application/json",
+      'Accept-Language': lang,
       ...(data ? { "Content-Type": "application/json" } : {}),
     },
     body: data ? JSON.stringify(data) : undefined,
@@ -32,9 +61,11 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
+    const lang = getPreferredLanguage();
     const res = await fetch(queryKey.join("/") as string, {
       headers: {
         Accept: "application/json",
+        'Accept-Language': lang,
       },
       credentials: "include",
     });

@@ -32,7 +32,7 @@ export default function ResetPassword() {
       setToken(tokenParam);
     } else {
       setStatus("error");
-      setErrorMessage("Reset token is missing");
+      setErrorMessage(t('auth.resetTokenMissing') || "Reset token is missing");
     }
   }, [searchParams]);
 
@@ -40,7 +40,7 @@ export default function ResetPassword() {
     e.preventDefault();
 
     if (!token) {
-      setErrorMessage("Reset token is missing");
+      setErrorMessage(t('auth.resetTokenMissing') || "Reset token is missing");
       setStatus("error");
       return;
     }
@@ -73,9 +73,15 @@ export default function ResetPassword() {
         description: t("auth.passwordResetDesc") || "Your password has been successfully reset.",
       });
     } catch (error) {
-      const errorMsg = error instanceof Error
-        ? error.message
-        : "Failed to reset password. The link may be invalid or expired.";
+      const err = error as Error & { code?: string; status?: number };
+      const msgNorm = ((err?.message || '') as string).toLowerCase();
+      const isExpiredFallback = msgNorm.includes('invalid or expired reset token') || msgNorm.includes('expired reset token');
+      const errorMsg =
+        err?.code === 'RESET_TOKEN_EXPIRED' || isExpiredFallback
+          ? (t('auth.resetTokenExpiredDesc') || "The reset link is invalid or has expired.")
+          : (error instanceof Error
+              ? error.message
+              : "Failed to reset password. The link may be invalid or expired.");
       setStatus("error");
       setErrorMessage(errorMsg);
       toast({
@@ -97,10 +103,10 @@ export default function ResetPassword() {
             {status === "form" && (
               <>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                  {t("auth.resetPassword") || "Reset Password"}
+                  {t("auth.setNewPassword") || "Set New Password"}
                 </h1>
                 <p className="text-muted-foreground">
-                  {t("auth.resetPasswordDesc") || "Enter your new password below."}
+                  {t("auth.setNewPasswordDesc") || "Enter your new password below."}
                 </p>
 
                 <form onSubmit={handleSubmit} className="space-y-4 text-left">
@@ -170,7 +176,7 @@ export default function ResetPassword() {
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {isLoading
                       ? t("auth.resetting") || "Resetting..."
-                      : t("auth.resetPassword") || "Reset Password"}
+                      : t("auth.setNewPassword") || "Set New Password"}
                   </Button>
                 </form>
               </>

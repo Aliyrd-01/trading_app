@@ -19,6 +19,8 @@ export default function Auth() {
   const { t } = useLanguage();
   const defaultTab = searchParams.includes("mode=signup") ? "signup" : "signin";
 
+  const [tab, setTab] = useState(defaultTab);
+
   const [signInData, setSignInData] = useState({ email: "", password: "" });
   const [signUpData, setSignUpData] = useState({ email: "", password: "", confirmPassword: "", name: "" });
   const [isLoading, setIsLoading] = useState(false);
@@ -29,6 +31,27 @@ export default function Auth() {
   const [unverifiedEmail, setUnverifiedEmail] = useState("");
   const [isResendingVerification, setIsResendingVerification] = useState(false);
 
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(searchParams);
+      const verify = params.get('verify');
+      const email = params.get('email');
+      if (verify === '1') {
+        setUnverifiedEmail(email || '');
+        setShowEmailNotVerified(true);
+        setTab('signin');
+      } else {
+        setTab(defaultTab);
+      }
+    } catch {
+    }
+  }, [searchParams, defaultTab]);
+
+  const isValidEmail = (value: string) => {
+    const v = (value || '').trim();
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+  };
+
   // Если пользователь уже аутентифицирован или стал аутентифицирован — увести на дашборд
   useEffect(() => {
     if (!loading && user) {
@@ -38,6 +61,14 @@ export default function Auth() {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isValidEmail(signInData.email)) {
+      toast({
+        title: t('auth.error'),
+        description: t('auth.invalidEmail'),
+        variant: 'destructive',
+      });
+      return;
+    }
     setIsLoading(true);
     setShowEmailNotVerified(false);
 
@@ -77,6 +108,15 @@ export default function Auth() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!isValidEmail(signUpData.email)) {
+      toast({
+        title: t('auth.error'),
+        description: t('auth.invalidEmail'),
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (signUpData.password !== signUpData.confirmPassword) {
       toast({
         title: t("auth.error"),
@@ -106,9 +146,17 @@ export default function Auth() {
         description: t("auth.registerSuccessDesc") || undefined,
       });
     } catch (error) {
+      const err = error as Error & { code?: string };
+      const code = (err?.code || '').toString();
+      const msg = (err?.message || '').trim();
+      const msgNorm = msg.toLowerCase();
+      const isEmailTakenFallback = !code && (msgNorm.includes('already been taken') || msgNorm.includes('already exists') || msgNorm.includes('unique'));
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create account",
+        title: t('auth.error'),
+        description:
+          code === 'EMAIL_ALREADY_EXISTS' || isEmailTakenFallback
+            ? t('auth.emailAlreadyExists')
+            : (msg || t('auth.registerFailed')),
         variant: "destructive",
       });
     } finally {
@@ -118,6 +166,16 @@ export default function Auth() {
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!isValidEmail(forgotPasswordEmail)) {
+      toast({
+        title: t('auth.error'),
+        description: t('auth.invalidEmail'),
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsResettingPassword(true);
 
     try {
@@ -129,9 +187,13 @@ export default function Auth() {
       setShowForgotPassword(false);
       setForgotPasswordEmail("");
     } catch (error) {
+      const err = error as Error & { code?: string };
       toast({
         title: t("auth.error") || "Error",
-        description: error instanceof Error ? error.message : "Failed to send reset email",
+        description:
+          err?.code === 'INVALID_EMAIL'
+            ? t('auth.invalidEmail')
+            : (error instanceof Error ? error.message : "Failed to send reset email"),
         variant: "destructive",
       });
     } finally {
@@ -188,14 +250,63 @@ export default function Auth() {
             <p className="text-sm sm:text-base text-muted-foreground break-words">{t('auth.title')}</p>
           </div>
 
-          <Tabs defaultValue={defaultTab} className="w-full">
+          {showEmailNotVerified && (
+            <Card className="p-4 mb-4 backdrop-blur-sm border-yellow-500/50 bg-yellow-500/10">
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-sm mb-1">
+                      {t("auth.emailNotVerified") || "Email Not Verified"}
+                    </h4>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      {(() => {
+                        const base = (t("auth.emailNotVerifiedMessage") || `Please check your email and click the verification link. If you didn't receive the email, you can resend it.`).trim();
+                        return unverifiedEmail ? `${base} (${unverifiedEmail})` : base;
+                      })()}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={handleResendVerification}
+                        disabled={isResendingVerification}
+                        className="text-xs"
+                        data-testid="button-resend-verification"
+                      >
+                        {isResendingVerification && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+                        {isResendingVerification
+                          ? t("auth.sending") || "Sending..."
+                          : t("auth.resendVerification") || "Resend Verification Email"}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setShowEmailNotVerified(false);
+                          setUnverifiedEmail("");
+                        }}
+                        className="text-xs"
+                        data-testid="button-dismiss-verification"
+                      >
+                        {t("auth.dismiss") || "Dismiss"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          <Tabs value={tab} onValueChange={setTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-6">
               <TabsTrigger value="signin" data-testid="tab-signin" className="text-xs sm:text-sm break-words">{t('header.signIn')}</TabsTrigger>
               <TabsTrigger value="signup" data-testid="tab-signup" className="text-xs sm:text-sm break-words">{t('header.signUp')}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="signin">
-              <form onSubmit={handleSignIn} className="space-y-4">
+              <form onSubmit={handleSignIn} className="space-y-4" noValidate>
                 <div className="space-y-2">
                   <Label htmlFor="signin-email">{t('auth.email')}</Label>
                   <Input
@@ -204,7 +315,6 @@ export default function Auth() {
                     placeholder="your@email.com"
                     value={signInData.email}
                     onChange={(e) => setSignInData({ ...signInData, email: e.target.value })}
-                    required
                     disabled={isLoading}
                     data-testid="input-signin-email"
                   />
@@ -224,7 +334,7 @@ export default function Auth() {
                 </div>
                 <Button 
                   type="button"
-                  variant="link"
+                  variant="ghost"
                   className="px-0 text-sm"
                   onClick={() => setShowForgotPassword(true)}
                   data-testid="button-forgot-password"
@@ -237,55 +347,10 @@ export default function Auth() {
                 </Button>
               </form>
 
-              {showEmailNotVerified && (
-                <Card className="p-4 mt-4 backdrop-blur-sm border-yellow-500/50 bg-yellow-500/10">
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-sm mb-1">
-                          {t("auth.emailNotVerified") || "Email Not Verified"}
-                        </h4>
-                        <p className="text-xs text-muted-foreground mb-3">
-                          {t("auth.emailNotVerifiedMessage") || `Please check your email (${unverifiedEmail}) and click the verification link. If you didn't receive the email, you can resend it.`}
-                        </p>
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={handleResendVerification}
-                            disabled={isResendingVerification}
-                            className="text-xs"
-                            data-testid="button-resend-verification"
-                          >
-                            {isResendingVerification && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
-                            {isResendingVerification
-                              ? t("auth.sending") || "Sending..."
-                              : t("auth.resendVerification") || "Resend Verification Email"}
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              setShowEmailNotVerified(false);
-                              setUnverifiedEmail("");
-                            }}
-                            className="text-xs"
-                            data-testid="button-dismiss-verification"
-                          >
-                            {t("auth.dismiss") || "Dismiss"}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              )}
             </TabsContent>
 
             <TabsContent value="signup">
-              <form onSubmit={handleSignUp} className="space-y-4">
+              <form onSubmit={handleSignUp} className="space-y-4" noValidate>
                 <div className="space-y-2">
                   <Label htmlFor="signup-name">{t('auth.name')}</Label>
                   <Input
@@ -306,7 +371,6 @@ export default function Auth() {
                     placeholder="your@email.com"
                     value={signUpData.email}
                     onChange={(e) => setSignUpData({ ...signUpData, email: e.target.value })}
-                    required
                     disabled={isLoading}
                     data-testid="input-signup-email"
                   />
@@ -367,7 +431,7 @@ export default function Auth() {
                 <p className="text-sm text-muted-foreground">
                   {t('auth.resetPasswordDesc') || 'Enter your email address and we will send you a link to reset your password.'}
                 </p>
-                <form onSubmit={handleForgotPassword} className="space-y-4">
+                <form onSubmit={handleForgotPassword} className="space-y-4" noValidate>
                   <div className="space-y-2">
                     <Label htmlFor="forgot-password-email">{t('auth.email')}</Label>
                     <Input
@@ -376,7 +440,6 @@ export default function Auth() {
                       placeholder="your@email.com"
                       value={forgotPasswordEmail}
                       onChange={(e) => setForgotPasswordEmail(e.target.value)}
-                      required
                       disabled={isResettingPassword}
                       data-testid="input-forgot-password-email"
                     />

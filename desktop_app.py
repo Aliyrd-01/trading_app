@@ -5,6 +5,16 @@ import base64
 import requests
 import os
 
+import runpy
+
+
+if __name__ == "__main__":
+    _base_dir = os.path.dirname(os.path.abspath(__file__))
+    _target = os.path.join(_base_dir, "crypto-analyzer", "desktop_app.py")
+    if os.path.exists(_target):
+        runpy.run_path(_target, run_name="__main__")
+        raise SystemExit(0)
+
 os.environ.setdefault("QT_OPENGL", "angle")
 os.environ.setdefault(
     "QTWEBENGINE_CHROMIUM_FLAGS",
@@ -13,7 +23,7 @@ os.environ.setdefault(
 os.environ.setdefault("QTWEBENGINE_DISABLE_SANDBOX", "1")
 
 from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QFileDialog, QLabel, QPushButton
-from PyQt5.QtCore import QObject, pyqtSlot, QUrl, Qt, QCoreApplication, QLibraryInfo
+from PyQt5.QtCore import QObject, pyqtSlot, QUrl, Qt, QCoreApplication, QLibraryInfo, QTimer
 from PyQt5.QtGui import QIcon
 
 # импорт твоего backend Flask
@@ -101,8 +111,10 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Crypto Trading Analyzer")
-        self.resize(1200, 800)
-        self.setMinimumSize(1200, 800)
+        self.resize(1500, 900)
+        self.setMinimumSize(1500, 900)
+
+        self._initial_size_applied = False
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -163,6 +175,23 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self._init_error_view(layout, e=e)
 
+    def _apply_initial_size(self):
+        try:
+            self.resize(1500, 900)
+            self.setMinimumSize(1500, 900)
+        except Exception:
+            pass
+
+    def showEvent(self, event):
+        try:
+            if not self._initial_size_applied:
+                self._initial_size_applied = True
+                self._apply_initial_size()
+                QTimer.singleShot(0, self._apply_initial_size)
+        except Exception:
+            pass
+        return super().showEvent(event)
+
     def _init_error_view(self, layout, e=None):
         import webbrowser
 
@@ -200,7 +229,7 @@ if __name__ == "__main__":
         try:
             base_path = sys._MEIPASS  # type: ignore[attr-defined]
         except Exception:
-            base_path = os.path.abspath(".")
+            base_path = os.path.dirname(os.path.abspath(__file__))
         return os.path.join(base_path, relative_path)
 
     # Запуск Flask в отдельном потоке
@@ -224,7 +253,8 @@ if __name__ == "__main__":
     try:
         icon_path = _resource_path(os.path.join("assets", "favicon.ico"))
         if not os.path.exists(icon_path):
-            icon_path = os.path.join(os.path.abspath("."), "server-php", "public", "favicon.ico")
+            _here = os.path.dirname(os.path.abspath(__file__))
+            icon_path = os.path.join(_here, "server-php", "public", "favicon.ico")
         APP_ICON = QIcon(icon_path)
         app_qt.setWindowIcon(APP_ICON)
     except Exception as e:
