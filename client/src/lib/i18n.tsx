@@ -198,9 +198,71 @@ const translations: Translations = {
     ru: 'Какие ограничения Free-версии для CryptoMonitor?'
   },
   'faq.arbitrage.a.freeLimits': {
-    en: 'After the trial ends, Free accounts have reduced limits:\n\n- Tokens to scan: up to 50\n- Results (Top N): up to 5\n- Continuous scan interval: at least 5 minutes\n- Notifications (Email/Telegram): up to 1 send per day\n\nTo remove limits, upgrade to Pro.',
-    uk: 'Після завершення Trial, для Free акаунтів діють обмеження:\n\n- Токенів для аналізу: до 50\n- Результат (Top N): до 5\n- Інтервал безперервного сканування: не менше 5 хвилин\n- Сповіщення (Email/Telegram): до 1 відправки на добу\n\nЩоб зняти обмеження, перейдіть на Pro.',
-    ru: 'После окончания Trial, для Free аккаунтов действуют ограничения:\n\n- Токенов для анализа: до 50\n- Результат (Top N): до 5\n- Интервал непрерывного сканирования: не меньше 5 минут\n- Уведомления (Email/Telegram): до 1 отправки в сутки\n\nЧтобы снять ограничения, перейдите на Pro.'
+    en: 'After the trial ends, Free accounts have reduced limits:\n\n- Tokens to scan: up to 50\n- Results (Top N): up to 5\n- Continuous scan interval: at least 15 minutes\n- Notifications (Email/Telegram): up to 1 send per day\n\nTo remove limits, upgrade to Pro.',
+    uk: 'Після завершення Trial, для Free акаунтів діють обмеження:\n\n- Токенів для аналізу: до 50\n- Результат (Top N): до 5\n- Інтервал безперервного сканування: не менше 15 хвилин\n- Сповіщення (Email/Telegram): до 1 відправки на добу\n\nЩоб зняти обмеження, перейдіть на Pro.',
+    ru: 'После окончания Trial, для Free аккаунтов действуют ограничения:\n\n- Токенов для анализа: до 50\n- Результат (Top N): до 5\n- Интервал непрерывного сканирования: не меньше 15 минут\n- Уведомления (Email/Telegram): до 1 отправки в сутки\n\nЧтобы снять ограничения, перейдите на Pro.'
+  },
+
+  'prices.cryptoMonitor.free.feature1': {
+    en: '7-day trial period',
+    uk: '7-денний пробний період',
+    ru: '7-дневный пробный период'
+  },
+  'prices.cryptoMonitor.free.feature2': {
+    en: 'Tokens to scan: up to 50',
+    uk: 'Токенів для аналізу: до 50',
+    ru: 'Токенов для анализа: до 50'
+  },
+  'prices.cryptoMonitor.free.feature3': {
+    en: 'Results (Top N): up to 5',
+    uk: 'Результат (Top N): до 5',
+    ru: 'Результат (Top N): до 5'
+  },
+  'prices.cryptoMonitor.free.feature4': {
+    en: 'Continuous scan interval: at least 15 minutes',
+    uk: 'Інтервал безперервного сканування: не менше 15 хвилин',
+    ru: 'Интервал непрерывного сканирования: не меньше 15 минут'
+  },
+  'prices.cryptoMonitor.free.feature5': {
+    en: 'Notifications (Email/Telegram): up to 1 send per day',
+    uk: 'Сповіщення (Email/Telegram): до 1 відправки на добу',
+    ru: 'Уведомления (Email/Telegram): до 1 отправки в сутки'
+  },
+
+  'prices.cryptoMonitor.pro.feature1': {
+    en: 'Unlimited analyses per month',
+    uk: 'Необмежена кількість аналізів на місяць',
+    ru: 'Неограниченное количество анализов в месяц'
+  },
+  'prices.cryptoMonitor.pro.feature2': {
+    en: 'All Free plan features',
+    uk: 'Усі функції Free плану',
+    ru: 'Все функции Free плана'
+  },
+  'prices.cryptoMonitor.pro.feature3': {
+    en: 'Analysis across 15 exchanges',
+    uk: 'Аналіз по 15 біржам',
+    ru: 'Анализ по 15 биржам'
+  },
+  'prices.cryptoMonitor.pro.feature4': {
+    en: 'Tokens to scan: up to 10,000',
+    uk: 'Токенів для аналізу: до 10 000',
+    ru: 'Токенов для анализа: до 10 000'
+  },
+  'prices.cryptoMonitor.pro.feature5': {
+    en: 'Results (Top N): up to 100',
+    uk: 'Результат (Top N): до 100',
+    ru: 'Результат (Top N): до 100'
+  },
+  'prices.cryptoMonitor.pro.feature6': {
+    en: 'Auto-notifications via Email and Telegram',
+    uk: 'Автосповіщення через Email та Telegram',
+    ru: 'Автоуведомления на Email и Telegram'
+  },
+  'prices.cryptoMonitor.pro.feature7': {
+    en: 'Continuous scan interval: from 1 second',
+    uk: 'Інтервал безперервного сканування: від 1 секунди',
+    ru: 'Интервал непрерывного сканирования: от 1 секунды'
   },
   'faq.webApp.title': {
     en: 'Web App',
@@ -394,9 +456,9 @@ const translations: Translations = {
     ru: 'Какие ограничения Free-версии для CryptoAnalyzer?'
   },
   'faq.desktopApp.a.freeLimits': {
-    en: 'After the trial ends, Free accounts have reduced access:\n\n- Run limit: 1 analysis run per day\n- Advanced settings: unavailable\n- Investor report download: unavailable\n- TradingView export: unavailable\n- Download statistics: unavailable\n- Strategy analysis: unavailable\n\nTo unlock these features, upgrade to Pro.',
-    uk: 'Після завершення Trial, для Free акаунтів діє урізаний доступ:\n\n- Ліміт запусків: 1 запуск аналізу на добу\n- Розширені налаштування: недоступні\n- Завантаження Investor report: недоступно\n- Експорт у TradingView: недоступно\n- Завантаження статистики: недоступно\n- Аналіз стратегій: недоступно\n\nЩоб відкрити ці функції, перейдіть на Pro.',
-    ru: 'После окончания Trial, для Free аккаунтов доступ урезан:\n\n- Лимит запусков: 1 запуск анализа в сутки\n- Расширенные настройки: недоступны\n- Скачать Investor report: недоступно\n- Экспорт в TradingView: недоступно\n- Скачать статистику: недоступно\n- Анализ стратегий: недоступно\n\nЧтобы открыть эти функции, перейдите на Pro.'
+    en: 'After the trial ends, Free accounts have reduced access:\n\n- Run limit: 3 analysis runs per day\n- Advanced settings: unavailable\n- Investor report download: unavailable\n- TradingView export: unavailable\n- Download statistics: unavailable\n- Strategy analysis: unavailable\n\nTo unlock these features, upgrade to Pro.',
+    uk: 'Після завершення Trial, для Free акаунтів діє урізаний доступ:\n\n- Ліміт запусків: 3 запуски аналізу на добу\n- Розширені налаштування: недоступні\n- Завантаження Investor report: недоступно\n- Експорт у TradingView: недоступно\n- Завантаження статистики: недоступно\n- Аналіз стратегій: недоступно\n\nЩоб відкрити ці функції, перейдіть на Pro.',
+    ru: 'После окончания Trial, для Free аккаунтов доступ урезан:\n\n- Лимит запусков: 3 запуска анализа в сутки\n- Расширенные настройки: недоступны\n- Скачать Investor report: недоступно\n- Экспорт в TradingView: недоступно\n- Скачать статистику: недоступно\n- Анализ стратегий: недоступно\n\nЧтобы открыть эти функции, перейдите на Pro.'
   },
   'faq.general.title': {
     en: 'General',
@@ -1644,6 +1706,21 @@ const translations: Translations = {
     uk: 'Оберіть ідеальний план для ваших торгових потреб',
     ru: 'Выберите идеальный план для ваших торговых нужд'
   },
+  'prices.bundleNote': {
+    en: 'One subscription includes access to both CryptoAnalyzer and CryptoMonitor.',
+    uk: 'Одна підписка включає доступ до CryptoAnalyzer та CryptoMonitor.',
+    ru: 'Одна подписка включает доступ к CryptoAnalyzer и CryptoMonitor.'
+  },
+  'prices.product.cryptoAnalyzer': {
+    en: 'CryptoAnalyzer',
+    uk: 'CryptoAnalyzer',
+    ru: 'CryptoAnalyzer'
+  },
+  'prices.product.cryptoMonitor': {
+    en: 'CryptoMonitor',
+    uk: 'CryptoMonitor',
+    ru: 'CryptoMonitor'
+  },
   'prices.free': {
     en: 'Free',
     uk: 'Free',
@@ -1811,7 +1888,7 @@ const translations: Translations = {
   },
   'prices.free.feature6': {
     en: 'Download ZIP report',
-    uk: 'Скачивання ZIP звіту',
+    uk: 'Скачування ZIP звіту',
     ru: 'Скачивание ZIP отчета'
   },
   'prices.pro.feature1': {
@@ -1868,6 +1945,11 @@ const translations: Translations = {
     en: '15+ technical indicators',
     uk: '15+ технічних індикаторів',
     ru: '15+ технических индикаторов'
+  },
+  'prices.pro.feature12': {
+    en: 'Investor report download',
+    uk: 'Завантаження Investor report',
+    ru: 'Скачивание Investor report'
   },
   'prices.proPlus.feature1': {
     en: 'All Pro plan features',
@@ -2397,9 +2479,9 @@ const translations: Translations = {
   },
 
   'cryptoMonitor.appSettings.freeLimitsText': {
-    en: 'Free plan limits: tokens ≤ 50, Top N ≤ 5, interval ≥ 5 minutes.',
-    uk: 'Ліміти Free: токенів ≤ 50, Top N ≤ 5, інтервал ≥ 5 хвилин.',
-    ru: 'Лимиты Free: токенов ≤ 50, Top N ≤ 5, интервал ≥ 5 минут.'
+    en: 'Free plan limits: tokens ≤ 50, Top N ≤ 5, interval ≥ 15 minutes.',
+    uk: 'Ліміти Free: токенів ≤ 50, Top N ≤ 5, інтервал ≥ 15 хвилин.',
+    ru: 'Лимиты Free: токенов ≤ 50, Top N ≤ 5, интервал ≥ 15 минут.'
   },
   'cryptoMonitor.appSettings.faqLink': {
     en: 'FAQ',

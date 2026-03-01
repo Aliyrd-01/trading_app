@@ -1208,7 +1208,10 @@ export default function SpreadAlertsPanel() {
       </Card>
 
       <Dialog open={!!selectedLog} onOpenChange={(o) => (!o ? setSelectedLog(null) : null)}>
-        <DialogContent className="max-w-2xl" onOpenAutoFocus={(e) => e.preventDefault()}>
+        <DialogContent
+          className="max-w-2xl max-h-[85vh] overflow-y-auto"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle className="font-mono">{t("spreadAlerts.logTitle")} #{selectedLog?.id ?? ""}</DialogTitle>
             <DialogDescription>{t("spreadAlerts.recentLogsTitle")}</DialogDescription>

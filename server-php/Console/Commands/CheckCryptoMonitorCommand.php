@@ -371,7 +371,7 @@ class CheckCryptoMonitorCommandLegacy extends Command
         if (!is_numeric($tokens) || (int) $tokens <= 0) {
             $tokens = 1000;
         }
-        $tokens = min(100000, (int) $tokens);
+        $tokens = min(10000, (int) $tokens);
 
         $topN = $user->crypto_monitor_top_n;
         if (!is_numeric($topN) || (int) $topN <= 0) {

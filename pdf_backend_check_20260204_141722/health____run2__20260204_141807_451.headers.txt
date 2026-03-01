@@ -1,0 +1,11 @@
+HTTP/1.1 405 Method Not Allowed
+Date: Wed, 04 Feb 2026 12:18:06 GMT
+Content-Length: 0
+Connection: keep-alive
+x-request-id: cc90f7ff8bb52da72a95a7f6d267fb13
+allow: GET,HEAD
+strict-transport-security: max-age=31536000; includeSubDomains
+cf-cache-status: DYNAMIC
+Server: cloudflare
+CF-RAY: 9c8a1bd9285d1ae9-WAW
+

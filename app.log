@@ -3178,3 +3178,77 @@ WHERE report_v2.user_id = %(user_id_1)s ORDER BY report_v2.timestamp DESC]
 2025-12-13 08:22:41,073 - werkzeug - INFO - 172.31.99.34 - - [13/Dec/2025 08:22:41] "[36mGET /static/style.css HTTP/1.1[0m" 304 -
 2025-12-13 08:22:41,543 - werkzeug - INFO - 172.31.99.34 - - [13/Dec/2025 08:22:41] "[36mGET /static/translations.js HTTP/1.1[0m" 304 -
 2025-12-13 08:22:42,346 - werkzeug - INFO - 172.31.99.34 - - [13/Dec/2025 08:22:42] "GET /session_check HTTP/1.1" 200 -
+2026-01-14 18:02:44,117 - app - INFO - ✅ DB target: mysql+pymysql://u543957720_crypto:***@auth-db936.hstgr.io:3306/u543957720_cryptoprice?charset=utf8mb4
+2026-01-14 18:02:46,549 - app - INFO - ✅ База данных инициализирована
+2026-01-14 18:02:47,404 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5050
+2026-01-14 18:02:47,405 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2026-01-14 18:02:47,913 - werkzeug - INFO - 127.0.0.1 - - [14/Jan/2026 18:02:47] "[32mGET / HTTP/1.1[0m" 302 -
+2026-01-14 18:02:47,954 - werkzeug - INFO - 127.0.0.1 - - [14/Jan/2026 18:02:47] "GET /login HTTP/1.1" 200 -
+2026-01-14 18:02:49,923 - werkzeug - INFO - 127.0.0.1 - - [14/Jan/2026 18:02:49] "GET /login HTTP/1.1" 200 -
+2026-01-14 18:02:50,015 - werkzeug - INFO - 127.0.0.1 - - [14/Jan/2026 18:02:50] "GET /static/style.css HTTP/1.1" 200 -
+2026-01-14 18:02:50,016 - werkzeug - INFO - 127.0.0.1 - - [14/Jan/2026 18:02:50] "GET /static/translations.js HTTP/1.1" 200 -
+2026-01-14 18:02:50,119 - werkzeug - INFO - 127.0.0.1 - - [14/Jan/2026 18:02:50] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-01-14 18:02:51,186 - werkzeug - INFO - 127.0.0.1 - - [14/Jan/2026 18:02:51] "POST /api/login HTTP/1.1" 200 -
+2026-01-14 18:02:51,206 - werkzeug - INFO - 127.0.0.1 - - [14/Jan/2026 18:02:51] "GET / HTTP/1.1" 200 -
+2026-01-14 18:02:51,227 - werkzeug - INFO - 127.0.0.1 - - [14/Jan/2026 18:02:51] "GET /static/style.css?v=dev HTTP/1.1" 200 -
+2026-01-14 18:02:51,228 - werkzeug - INFO - 127.0.0.1 - - [14/Jan/2026 18:02:51] "GET /static/script.js?v=dev HTTP/1.1" 200 -
+2026-01-14 18:02:51,230 - werkzeug - INFO - 127.0.0.1 - - [14/Jan/2026 18:02:51] "[36mGET /static/translations.js HTTP/1.1[0m" 304 -
+2026-01-14 18:02:51,371 - werkzeug - INFO - 127.0.0.1 - - [14/Jan/2026 18:02:51] "GET /session_check HTTP/1.1" 200 -
+2026-01-14 18:02:51,559 - werkzeug - INFO - 127.0.0.1 - - [14/Jan/2026 18:02:51] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-01-14 18:02:52,269 - werkzeug - INFO - 127.0.0.1 - - [14/Jan/2026 18:02:52] "GET /api/user_info HTTP/1.1" 200 -
+2026-01-14 18:02:58,415 - werkzeug - INFO - 127.0.0.1 - - [14/Jan/2026 18:02:58] "GET /api/klines?symbol=BTC/USDT&interval=1h&limit=500 HTTP/1.1" 200 -
+2026-01-14 18:02:58,821 - werkzeug - INFO - 127.0.0.1 - - [14/Jan/2026 18:02:58] "GET /api/klines?symbol=BTC/USDT&interval=1h&limit=500 HTTP/1.1" 200 -
+2026-01-14 18:03:04,558 - werkzeug - INFO - 127.0.0.1 - - [14/Jan/2026 18:03:04] "GET /api/klines?symbol=BTC/USDT&interval=1h&limit=500 HTTP/1.1" 200 -
+2026-01-14 18:03:30,601 - werkzeug - INFO - 127.0.0.1 - - [14/Jan/2026 18:03:30] "GET /api/klines?symbol=ETH/USDT&interval=1h&limit=500 HTTP/1.1" 200 -
+2026-01-14 18:03:38,557 - werkzeug - INFO - 127.0.0.1 - - [14/Jan/2026 18:03:38] "GET /api/klines?symbol=ETH/USDT&interval=1m&limit=200 HTTP/1.1" 200 -
+2026-01-15 11:03:31,259 - app - INFO - ✅ DB target: mysql+pymysql://u543957720_crypto:***@auth-db936.hstgr.io:3306/u543957720_cryptoprice?charset=utf8mb4
+2026-01-15 11:03:34,035 - app - INFO - ✅ База данных инициализирована
+2026-01-15 11:03:34,970 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5050
+2026-01-15 11:03:34,974 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2026-01-15 11:04:11,290 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:04:11] "POST /api/login HTTP/1.1" 200 -
+2026-01-15 11:04:11,412 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:04:11] "GET /?v=1768467851346 HTTP/1.1" 200 -
+2026-01-15 11:04:11,648 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:04:11] "[36mGET /static/style.css?v=dev HTTP/1.1[0m" 304 -
+2026-01-15 11:04:11,717 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:04:11] "[36mGET /static/script.js?v=dev HTTP/1.1[0m" 304 -
+2026-01-15 11:04:11,728 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:04:11] "[36mGET /static/translations.js HTTP/1.1[0m" 304 -
+2026-01-15 11:04:12,358 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:04:12] "GET /session_check HTTP/1.1" 200 -
+2026-01-15 11:04:12,944 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:04:12] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-01-15 11:04:13,560 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:04:13] "GET /api/user_info HTTP/1.1" 200 -
+2026-01-15 11:04:22,655 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:04:22] "GET /api/klines?symbol=BTC/USDT&interval=1h&limit=500 HTTP/1.1" 200 -
+2026-01-15 11:04:23,355 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:04:23] "GET /api/klines?symbol=BTC/USDT&interval=1h&limit=500 HTTP/1.1" 200 -
+2026-01-15 11:04:29,433 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:04:29] "GET /api/klines?symbol=BTC/USDT&interval=1h&limit=500 HTTP/1.1" 200 -
+2026-01-15 11:39:52,913 - app - INFO - ✅ DB target: mysql+pymysql://u543957720_crypto:***@auth-db936.hstgr.io:3306/u543957720_cryptoprice?charset=utf8mb4
+2026-01-15 11:39:55,453 - app - INFO - ✅ База данных инициализирована
+2026-01-15 11:39:56,238 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5050
+2026-01-15 11:39:56,238 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2026-01-15 11:39:56,735 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:39:56] "[32mGET / HTTP/1.1[0m" 302 -
+2026-01-15 11:39:56,765 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:39:56] "GET /login HTTP/1.1" 200 -
+2026-01-15 11:40:02,045 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:40:02] "GET /login HTTP/1.1" 200 -
+2026-01-15 11:40:02,317 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:40:02] "[36mGET /static/style.css HTTP/1.1[0m" 304 -
+2026-01-15 11:40:02,318 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:40:02] "[36mGET /static/translations.js HTTP/1.1[0m" 304 -
+2026-01-15 11:40:02,621 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:40:02] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-01-15 11:40:03,870 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:40:03] "POST /api/login HTTP/1.1" 200 -
+2026-01-15 11:40:03,947 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:40:03] "GET / HTTP/1.1" 200 -
+2026-01-15 11:40:04,010 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:40:04] "[36mGET /static/style.css?v=dev HTTP/1.1[0m" 304 -
+2026-01-15 11:40:04,016 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:40:04] "[36mGET /static/translations.js HTTP/1.1[0m" 304 -
+2026-01-15 11:40:04,042 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:40:04] "[36mGET /static/script.js?v=dev HTTP/1.1[0m" 304 -
+2026-01-15 11:40:04,884 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:40:04] "GET /session_check HTTP/1.1" 200 -
+2026-01-15 11:40:05,350 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:40:05] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-01-15 11:40:05,750 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:40:05] "GET /api/user_info HTTP/1.1" 200 -
+2026-01-15 11:40:16,213 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:40:16] "GET /api/klines?symbol=BTC/USDT&interval=1h&limit=500 HTTP/1.1" 200 -
+2026-01-15 11:40:16,675 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:40:16] "GET /api/klines?symbol=BTC/USDT&interval=1h&limit=500 HTTP/1.1" 200 -
+2026-01-15 11:40:22,429 - werkzeug - INFO - 127.0.0.1 - - [15/Jan/2026 11:40:22] "GET /api/klines?symbol=BTC/USDT&interval=1h&limit=500 HTTP/1.1" 200 -
+2026-01-20 19:27:18,831 - app - INFO - ✅ DB configured
+2026-01-20 19:27:21,042 - app - INFO - ✅ База данных инициализирована
+2026-01-20 19:27:21,617 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5050
+2026-01-20 19:27:21,617 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2026-01-20 19:27:22,116 - werkzeug - INFO - 127.0.0.1 - - [20/Jan/2026 19:27:22] "[32mGET / HTTP/1.1[0m" 302 -
+2026-01-20 19:27:22,141 - werkzeug - INFO - 127.0.0.1 - - [20/Jan/2026 19:27:22] "GET /login HTTP/1.1" 200 -
+2026-01-20 19:27:24,358 - werkzeug - INFO - 127.0.0.1 - - [20/Jan/2026 19:27:24] "GET /login HTTP/1.1" 200 -
+2026-01-20 19:27:24,581 - werkzeug - INFO - 127.0.0.1 - - [20/Jan/2026 19:27:24] "GET /static/translations.js HTTP/1.1" 200 -
+2026-01-20 19:27:24,581 - werkzeug - INFO - 127.0.0.1 - - [20/Jan/2026 19:27:24] "GET /static/style.css HTTP/1.1" 200 -
+2026-01-20 19:27:24,757 - werkzeug - INFO - 127.0.0.1 - - [20/Jan/2026 19:27:24] "GET /session_check HTTP/1.1" 200 -
+2026-01-20 19:27:24,798 - werkzeug - INFO - 127.0.0.1 - - [20/Jan/2026 19:27:24] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -

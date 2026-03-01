@@ -20,8 +20,66 @@ class CheckCryptoMonitorCommand extends Command
     private float $maxRuntime = 50;
     private int $cacheTtl = 180;
     private int $notifyCooldownSec = 600;
+    private int $notifySignalCooldownSec = 1800;
+    private int $notifyMessageDedupSec = 1800;
     private int $maxOnDemandPerExchange = 2000;
     private int $onDemandPriceTtlSec = 90;
+    private int $pairListTtlSec = 21600;
+    private int $coingeckoTtlSec = 3600;
+
+    private function makeSignalKey(array $row): string
+    {
+        $sym = strtoupper(trim((string) ($row['symbol'] ?? '')));
+        $minEx = $this->canonicalizeExchange((string) ($row['min_ex'] ?? ''));
+        $maxEx = $this->canonicalizeExchange((string) ($row['max_ex'] ?? ''));
+        if ($sym === '' || $minEx === '' || $maxEx === '') {
+            return '';
+        }
+        return $sym . '|' . $minEx . '|' . $maxEx;
+    }
+
+    private function buildMessageDedupHash(array $rows, float $threshold, float $thresholdMax, string $quote): string
+    {
+        $parts = [];
+        foreach ($rows as $r) {
+            if (!is_array($r)) {
+                continue;
+            }
+            $k = $this->makeSignalKey($r);
+            if ($k === '') {
+                continue;
+            }
+            $sp = is_numeric($r['spread_pct'] ?? null) ? (float) $r['spread_pct'] : 0.0;
+            $parts[] = $k . '|' . number_format($sp, 2, '.', '');
+        }
+        $base = strtoupper(trim($quote)) . '|' . number_format($threshold, 2, '.', '') . '|' . number_format($thresholdMax, 2, '.', '') . '|' . implode(';', $parts);
+        return md5($base);
+    }
+
+    private function filterRowsBySignalCooldown(User $user, array $rows, bool $force): array
+    {
+        if ($force) {
+            return $rows;
+        }
+        $out = [];
+        $nowTs = time();
+        foreach ($rows as $r) {
+            if (!is_array($r)) {
+                continue;
+            }
+            $sig = $this->makeSignalKey($r);
+            if ($sig === '') {
+                continue;
+            }
+            $cacheKey = 'cm_notify_last_ts_sig_' . (string) $user->id . '_' . md5($sig);
+            $lastTs = (int) (Cache::get($cacheKey) ?: 0);
+            if ($lastTs > 0 && ($nowTs - $lastTs) < $this->notifySignalCooldownSec) {
+                continue;
+            }
+            $out[] = $r;
+        }
+        return $out;
+    }
 
     private function isBulkSupportedExchange(string $exchange): bool
     {
@@ -50,6 +108,26 @@ class CheckCryptoMonitorCommand extends Command
                 return ['bid' => (float) $res['bid'], 'ask' => (float) $res['ask']];
             });
             return is_array($ba) ? $ba : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function getLastPriceCached(ExchangeTickerService $ticker, string $exchange, string $pair): ?float
+    {
+        $ex = $this->canonicalizeExchange($exchange);
+        $pairKey = strtoupper(trim($pair));
+        if ($ex === '' || $pairKey === '') {
+            return null;
+        }
+
+        $cacheKey = 'cm_lp_' . md5($ex . '|' . $pairKey);
+        try {
+            $p = Cache::remember($cacheKey, $this->onDemandPriceTtlSec, function () use ($ticker, $ex, $pairKey) {
+                $res = $ticker->getLastPrice($ex, $pairKey);
+                return is_numeric($res) ? (float) $res : null;
+            });
+            return is_numeric($p) ? (float) $p : null;
         } catch (\Throwable $e) {
             return null;
         }
@@ -226,8 +304,13 @@ class CheckCryptoMonitorCommand extends Command
                         $sym = $t['symbol'] ?? '';
                         $bid = $t['bidPrice'] ?? null;
                         $ask = $t['askPrice'] ?? null;
+                        $last = $t['lastPrice'] ?? $t['last_price'] ?? null;
                         if ($sym && is_numeric($bid) && is_numeric($ask)) {
-                            $result['Binance'][$sym] = ['bid' => (float) $bid, 'ask' => (float) $ask];
+                            $row = ['bid' => (float) $bid, 'ask' => (float) $ask];
+                            if (is_numeric($last)) {
+                                $row['last'] = (float) $last;
+                            }
+                            $result['Binance'][$sym] = $row;
                         }
                     }
                 }
@@ -245,8 +328,13 @@ class CheckCryptoMonitorCommand extends Command
                     $inst = $t['instId'] ?? '';
                     $bid = $t['bidPx'] ?? null;
                     $ask = $t['askPx'] ?? null;
+                    $last = $t['last'] ?? null;
                     if ($inst && is_numeric($bid) && is_numeric($ask)) {
-                        $result['OKX'][$inst] = ['bid' => (float) $bid, 'ask' => (float) $ask];
+                        $row = ['bid' => (float) $bid, 'ask' => (float) $ask];
+                        if (is_numeric($last)) {
+                            $row['last'] = (float) $last;
+                        }
+                        $result['OKX'][$inst] = $row;
                     }
                 }
             }
@@ -263,8 +351,13 @@ class CheckCryptoMonitorCommand extends Command
                     $sym = $t['symbol'] ?? '';
                     $bid = $t['bid1Price'] ?? null;
                     $ask = $t['ask1Price'] ?? null;
+                    $last = $t['lastPrice'] ?? null;
                     if ($sym && is_numeric($bid) && is_numeric($ask)) {
-                        $result['Bybit'][$sym] = ['bid' => (float) $bid, 'ask' => (float) $ask];
+                        $row = ['bid' => (float) $bid, 'ask' => (float) $ask];
+                        if (is_numeric($last)) {
+                            $row['last'] = (float) $last;
+                        }
+                        $result['Bybit'][$sym] = $row;
                     }
                 }
             }
@@ -281,8 +374,13 @@ class CheckCryptoMonitorCommand extends Command
                     $sym = $t['symbol'] ?? '';
                     $bid = $t['buy'] ?? $t['bestBid'] ?? null;
                     $ask = $t['sell'] ?? $t['bestAsk'] ?? null;
+                    $last = $t['last'] ?? null;
                     if ($sym && is_numeric($bid) && is_numeric($ask)) {
-                        $result['KuCoin'][$sym] = ['bid' => (float) $bid, 'ask' => (float) $ask];
+                        $row = ['bid' => (float) $bid, 'ask' => (float) $ask];
+                        if (is_numeric($last)) {
+                            $row['last'] = (float) $last;
+                        }
+                        $result['KuCoin'][$sym] = $row;
                     }
                 }
             }
@@ -298,8 +396,13 @@ class CheckCryptoMonitorCommand extends Command
                     $pair = $t['currency_pair'] ?? '';
                     $bid = $t['highest_bid'] ?? null;
                     $ask = $t['lowest_ask'] ?? null;
+                    $last = $t['last'] ?? null;
                     if ($pair && is_numeric($bid) && is_numeric($ask)) {
-                        $result['Gate'][$pair] = ['bid' => (float) $bid, 'ask' => (float) $ask];
+                        $row = ['bid' => (float) $bid, 'ask' => (float) $ask];
+                        if (is_numeric($last)) {
+                            $row['last'] = (float) $last;
+                        }
+                        $result['Gate'][$pair] = $row;
                     }
                 }
             }
@@ -318,8 +421,13 @@ class CheckCryptoMonitorCommand extends Command
                         }
                         $bid = $row['buy_price'] ?? null;
                         $ask = $row['sell_price'] ?? null;
+                        $last = $row['last_trade'] ?? null;
                         if (is_string($pair) && $pair !== '' && is_numeric($bid) && is_numeric($ask)) {
-                            $result['Exmo'][$pair] = ['bid' => (float) $bid, 'ask' => (float) $ask];
+                            $out = ['bid' => (float) $bid, 'ask' => (float) $ask];
+                            if (is_numeric($last)) {
+                                $out['last'] = (float) $last;
+                            }
+                            $result['Exmo'][$pair] = $out;
                         }
                     }
                 }
@@ -339,8 +447,13 @@ class CheckCryptoMonitorCommand extends Command
                         }
                         $bid = $row['bid'] ?? null;
                         $ask = $row['ask'] ?? null;
+                        $last = $row['last'] ?? null;
                         if (is_string($pair) && $pair !== '' && is_numeric($bid) && is_numeric($ask)) {
-                            $result['HitBTC'][$pair] = ['bid' => (float) $bid, 'ask' => (float) $ask];
+                            $out = ['bid' => (float) $bid, 'ask' => (float) $ask];
+                            if (is_numeric($last)) {
+                                $out['last'] = (float) $last;
+                            }
+                            $result['HitBTC'][$pair] = $out;
                         }
                     }
                 }
@@ -350,6 +463,447 @@ class CheckCryptoMonitorCommand extends Command
         }
 
         return $result;
+    }
+
+    private function getTopCoinSymbolsCached(int $limit): array
+    {
+        $limit = max(1, min(5000, $limit));
+        $cacheKey = 'cm_cg_top_symbols_' . (string) $limit;
+        try {
+            $out = Cache::remember($cacheKey, $this->coingeckoTtlSec, function () use ($limit) {
+                $http = new \GuzzleHttp\Client(['timeout' => 12, 'connect_timeout' => 5, 'http_errors' => false]);
+                $symbols = [];
+                $page = 1;
+                $perPage = 250;
+                while (count($symbols) < $limit) {
+                    $resp = $http->get('https://api.coingecko.com/api/v3/coins/markets', [
+                        'query' => [
+                            'vs_currency' => 'usd',
+                            'order' => 'market_cap_desc',
+                            'per_page' => $perPage,
+                            'page' => $page,
+                            'sparkline' => 'false',
+                        ],
+                    ]);
+                    if ($resp->getStatusCode() !== 200) {
+                        break;
+                    }
+                    $data = json_decode((string) $resp->getBody(), true);
+                    if (!is_array($data) || empty($data)) {
+                        break;
+                    }
+                    foreach ($data as $row) {
+                        $sym = is_array($row) ? ($row['symbol'] ?? '') : '';
+                        if (is_string($sym) && trim($sym) !== '') {
+                            $symbols[] = strtoupper(trim($sym));
+                            if (count($symbols) >= $limit) {
+                                break;
+                            }
+                        }
+                    }
+                    if (count($data) < $perPage) {
+                        break;
+                    }
+                    $page++;
+                    if ($page > 20) {
+                        break;
+                    }
+                }
+                return $symbols;
+            });
+            return is_array($out) ? $out : [];
+        } catch (\Throwable $e) {
+            $this->logError('coingecko failed', ['e' => $e->getMessage()]);
+            return [];
+        }
+    }
+
+    private function getExchangeBasesForQuoteCached(string $exchange, string $quote): array
+    {
+        $exchange = $this->canonicalizeExchange($exchange);
+        $quote = strtoupper(trim($quote));
+        if ($exchange === '' || $quote === '') {
+            return [];
+        }
+
+        $cacheKey = 'cm_pairs_bases_' . md5($exchange . '|' . $quote);
+        try {
+            $bases = Cache::remember($cacheKey, $this->pairListTtlSec, function () use ($exchange, $quote) {
+                $http = new \GuzzleHttp\Client(['timeout' => 12, 'connect_timeout' => 5, 'http_errors' => false]);
+                $out = [];
+
+                if ($exchange === 'Binance') {
+                    $resp = $http->get('https://api.binance.com/api/v3/exchangeInfo');
+                    if ($resp->getStatusCode() === 200) {
+                        $data = json_decode((string) $resp->getBody(), true);
+                        $symbols = $data['symbols'] ?? [];
+                        foreach ($symbols as $s) {
+                            if (!is_array($s)) {
+                                continue;
+                            }
+                            if (($s['status'] ?? '') !== 'TRADING') {
+                                continue;
+                            }
+                            $q = strtoupper((string) ($s['quoteAsset'] ?? ''));
+                            $b = strtoupper((string) ($s['baseAsset'] ?? ''));
+                            if ($q === $quote && $b !== '') {
+                                $out[$b] = true;
+                            }
+                        }
+                    }
+                    return array_keys($out);
+                }
+
+                if ($exchange === 'OKX') {
+                    $resp = $http->get('https://www.okx.com/api/v5/public/instruments', ['query' => ['instType' => 'SPOT']]);
+                    if ($resp->getStatusCode() === 200) {
+                        $data = json_decode((string) $resp->getBody(), true);
+                        $list = $data['data'] ?? [];
+                        foreach ($list as $row) {
+                            if (!is_array($row)) {
+                                continue;
+                            }
+                            $inst = strtoupper((string) ($row['instId'] ?? ''));
+                            if ($inst === '' || !str_contains($inst, '-')) {
+                                continue;
+                            }
+                            $parts = explode('-', $inst);
+                            if (count($parts) === 2 && strtoupper($parts[1]) === $quote) {
+                                $b = strtoupper($parts[0]);
+                                if ($b !== '') {
+                                    $out[$b] = true;
+                                }
+                            }
+                        }
+                    }
+                    return array_keys($out);
+                }
+
+                if ($exchange === 'Exmo') {
+                    $resp = $http->get('https://api.exmo.com/v1.1/ticker');
+                    if ($resp->getStatusCode() === 200) {
+                        $data = json_decode((string) $resp->getBody(), true);
+                        if (is_array($data)) {
+                            foreach ($data as $pair => $_row) {
+                                if (!is_string($pair)) {
+                                    continue;
+                                }
+                                $p = strtoupper($pair);
+                                if (str_contains($p, '_') && str_ends_with($p, '_' . $quote)) {
+                                    $b = substr($p, 0, -1 * (strlen($quote) + 1));
+                                    $b = trim($b);
+                                    if ($b !== '') {
+                                        $out[$b] = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return array_keys($out);
+                }
+
+                if ($exchange === 'KuCoin') {
+                    $resp = $http->get('https://api.kucoin.com/api/v1/symbols');
+                    if ($resp->getStatusCode() === 200) {
+                        $data = json_decode((string) $resp->getBody(), true);
+                        $list = $data['data'] ?? [];
+                        foreach ($list as $row) {
+                            if (!is_array($row)) {
+                                continue;
+                            }
+                            if (($row['enableTrading'] ?? false) !== true) {
+                                continue;
+                            }
+                            $q = strtoupper((string) ($row['quoteCurrency'] ?? ''));
+                            $b = strtoupper((string) ($row['baseCurrency'] ?? ''));
+                            if ($q === $quote && $b !== '') {
+                                $out[$b] = true;
+                            }
+                        }
+                    }
+                    return array_keys($out);
+                }
+
+                if ($exchange === 'HitBTC') {
+                    $resp = $http->get('https://api.hitbtc.com/api/2/public/symbol');
+                    if ($resp->getStatusCode() === 200) {
+                        $data = json_decode((string) $resp->getBody(), true);
+                        if (is_array($data)) {
+                            foreach ($data as $row) {
+                                if (!is_array($row)) {
+                                    continue;
+                                }
+                                $q = strtoupper((string) ($row['quoteCurrency'] ?? ''));
+                                $b = strtoupper((string) ($row['baseCurrency'] ?? ''));
+                                if ($q === $quote && $b !== '') {
+                                    $out[$b] = true;
+                                }
+                            }
+                        }
+                    }
+                    return array_keys($out);
+                }
+
+                if ($exchange === 'BitMEX') {
+                    $resp = $http->get('https://www.bitmex.com/api/v1/instrument/active');
+                    if ($resp->getStatusCode() === 200) {
+                        $data = json_decode((string) $resp->getBody(), true);
+                        if (is_array($data)) {
+                            foreach ($data as $row) {
+                                if (!is_array($row)) {
+                                    continue;
+                                }
+                                $sym = strtoupper((string) ($row['symbol'] ?? ''));
+                                if ($sym === '' || !str_ends_with($sym, $quote)) {
+                                    continue;
+                                }
+                                $b = substr($sym, 0, -1 * strlen($quote));
+                                $b = trim($b);
+                                if ($b !== '') {
+                                    if ($b === 'XBT') {
+                                        $b = 'BTC';
+                                    }
+                                    $out[$b] = true;
+                                }
+                            }
+                        }
+                    }
+                    return array_keys($out);
+                }
+
+                if ($exchange === 'CEX.IO') {
+                    $resp = $http->get('https://cex.io/api/currency_limits');
+                    if ($resp->getStatusCode() === 200) {
+                        $data = json_decode((string) $resp->getBody(), true);
+                        $pairs = $data['data']['pairs'] ?? [];
+                        foreach ($pairs as $row) {
+                            if (!is_array($row)) {
+                                continue;
+                            }
+                            $q = strtoupper((string) ($row['symbol2'] ?? ''));
+                            $b = strtoupper((string) ($row['symbol1'] ?? ''));
+                            if ($q === $quote && $b !== '') {
+                                $out[$b] = true;
+                            }
+                        }
+                    }
+                    return array_keys($out);
+                }
+
+                if ($exchange === 'Bitfinex') {
+                    $resp = $http->get('https://api.bitfinex.com/v1/symbols');
+                    if ($resp->getStatusCode() === 200) {
+                        $data = json_decode((string) $resp->getBody(), true);
+                        if (is_array($data)) {
+                            foreach ($data as $sym) {
+                                if (!is_string($sym)) {
+                                    continue;
+                                }
+                                $p = strtoupper(trim($sym));
+                                if ($p !== '' && str_ends_with($p, $quote)) {
+                                    $b = substr($p, 0, -1 * strlen($quote));
+                                    $b = trim($b);
+                                    if ($b !== '') {
+                                        $out[$b] = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return array_keys($out);
+                }
+
+                if ($exchange === 'Huobi') {
+                    $resp = $http->get('https://api.huobi.pro/v1/common/symbols');
+                    if ($resp->getStatusCode() === 200) {
+                        $data = json_decode((string) $resp->getBody(), true);
+                        $list = $data['data'] ?? [];
+                        foreach ($list as $row) {
+                            if (!is_array($row)) {
+                                continue;
+                            }
+                            $q = strtoupper((string) ($row['quote-currency'] ?? ''));
+                            $b = strtoupper((string) ($row['base-currency'] ?? ''));
+                            if ($q === $quote && $b !== '') {
+                                $out[$b] = true;
+                            }
+                        }
+                    }
+                    return array_keys($out);
+                }
+
+                if ($exchange === 'Gate') {
+                    $resp = $http->get('https://api.gateio.ws/api/v4/spot/currency_pairs');
+                    if ($resp->getStatusCode() === 200) {
+                        $data = json_decode((string) $resp->getBody(), true);
+                        if (is_array($data)) {
+                            foreach ($data as $row) {
+                                if (!is_array($row)) {
+                                    continue;
+                                }
+                                $q = strtoupper((string) ($row['quote'] ?? ''));
+                                $b = strtoupper((string) ($row['base'] ?? ''));
+                                if ($q === $quote && $b !== '') {
+                                    $out[$b] = true;
+                                }
+                            }
+                        }
+                    }
+                    return array_keys($out);
+                }
+
+                if ($exchange === 'Bybit') {
+                    $resp = $http->get('https://api.bybit.com/v2/public/symbols');
+                    if ($resp->getStatusCode() === 200) {
+                        $data = json_decode((string) $resp->getBody(), true);
+                        $list = $data['result'] ?? [];
+                        if (is_array($list)) {
+                            foreach ($list as $row) {
+                                if (!is_array($row)) {
+                                    continue;
+                                }
+                                $q = strtoupper((string) ($row['quote_currency'] ?? ''));
+                                $b = strtoupper((string) ($row['base_currency'] ?? ''));
+                                if ($q === $quote && $b !== '') {
+                                    $out[$b] = true;
+                                }
+                            }
+                        }
+                    }
+                    return array_keys($out);
+                }
+
+                if ($exchange === 'Poloniex') {
+                    $resp = $http->get('https://poloniex.com/public', ['query' => ['command' => 'returnTicker']]);
+                    if ($resp->getStatusCode() === 200) {
+                        $data = json_decode((string) $resp->getBody(), true);
+                        if (is_array($data)) {
+                            foreach ($data as $pair => $_row) {
+                                if (!is_string($pair)) {
+                                    continue;
+                                }
+                                $p = strtoupper($pair);
+                                if (str_contains($p, '_')) {
+                                    $parts = explode('_', $p);
+                                    if (count($parts) === 2 && $parts[0] === $quote && $parts[1] !== '') {
+                                        $out[$parts[1]] = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return array_keys($out);
+                }
+
+                if ($exchange === 'Bitstamp') {
+                    $resp = $http->get('https://www.bitstamp.net/api/v2/trading-pairs-info/');
+                    if ($resp->getStatusCode() === 200) {
+                        $data = json_decode((string) $resp->getBody(), true);
+                        if (is_array($data)) {
+                            foreach ($data as $row) {
+                                if (!is_array($row)) {
+                                    continue;
+                                }
+                                $name = strtoupper((string) ($row['name'] ?? ''));
+                                if ($name !== '' && str_contains($name, '/')) {
+                                    $parts = explode('/', $name);
+                                    if (count($parts) === 2 && strtoupper($parts[1]) === $quote) {
+                                        $b = strtoupper(trim($parts[0]));
+                                        if ($b !== '') {
+                                            $out[$b] = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return array_keys($out);
+                }
+
+                if ($exchange === 'Kraken') {
+                    $resp = $http->get('https://api.kraken.com/0/public/AssetPairs');
+                    if ($resp->getStatusCode() === 200) {
+                        $data = json_decode((string) $resp->getBody(), true);
+                        $pairs = $data['result'] ?? [];
+                        if (is_array($pairs)) {
+                            foreach ($pairs as $_k => $row) {
+                                if (!is_array($row)) {
+                                    continue;
+                                }
+                                $ws = strtoupper((string) ($row['wsname'] ?? ''));
+                                if ($ws === '' || !str_contains($ws, '/')) {
+                                    continue;
+                                }
+                                $parts = explode('/', $ws);
+                                if (count($parts) === 2 && strtoupper(trim($parts[1])) === $quote) {
+                                    $b = strtoupper(trim($parts[0]));
+                                    if ($b === 'XBT') {
+                                        $b = 'BTC';
+                                    }
+                                    if ($b !== '') {
+                                        $out[$b] = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return array_keys($out);
+                }
+
+                if ($exchange === 'Coinbase') {
+                    $resp = $http->get('https://api.exchange.coinbase.com/products', ['headers' => ['Accept' => 'application/json']]);
+                    if ($resp->getStatusCode() === 200) {
+                        $data = json_decode((string) $resp->getBody(), true);
+                        if (is_array($data)) {
+                            foreach ($data as $row) {
+                                if (!is_array($row)) {
+                                    continue;
+                                }
+                                $q = strtoupper((string) ($row['quote_currency'] ?? ''));
+                                $b = strtoupper((string) ($row['base_currency'] ?? ''));
+                                if ($q === $quote && $b !== '') {
+                                    $out[$b] = true;
+                                }
+                            }
+                        }
+                    }
+                    return array_keys($out);
+                }
+
+                return [];
+            });
+            return is_array($bases) ? $bases : [];
+        } catch (\Throwable $e) {
+            $this->logError('pairs fetch failed', ['exchange' => $exchange, 'e' => $e->getMessage()]);
+            return [];
+        }
+    }
+
+    private function getBulkLastPriceFromCache(array $allTickers, string $exchange, string $base, string $quote): ?float
+    {
+        $exchange = $this->canonicalizeExchange($exchange);
+        $data = $allTickers[$exchange] ?? [];
+        if (!is_array($data) || empty($data)) {
+            return null;
+        }
+
+        $base = strtoupper($base);
+        $quote = strtoupper($quote);
+
+        $keys = [
+            $base . $quote,
+            $base . '-' . $quote,
+            $base . '_' . $quote,
+        ];
+
+        foreach ($keys as $k) {
+            $row = $data[$k] ?? null;
+            if (is_array($row) && isset($row['last']) && is_numeric($row['last'])) {
+                return (float) $row['last'];
+            }
+        }
+
+        return null;
     }
 
     private function processUser(User $user, Carbon $now, bool $force, bool $explicit, array $allTickers, ?ExchangeTickerService $ticker): void
@@ -394,6 +948,27 @@ class CheckCryptoMonitorCommand extends Command
 
         $rows = $this->computeSpreads($quote, $exchanges, $allTickers, $topN, $tokensToScan, $ticker);
 
+        if ($explicit) {
+            $dump = [];
+            $slice = array_slice($rows, 0, 10);
+            foreach ($slice as $r) {
+                $dump[] = [
+                    'symbol' => (string) ($r['symbol'] ?? ''),
+                    'spread_pct' => isset($r['spread_pct']) ? round((float) $r['spread_pct'], 4) : null,
+                    'min_ex' => (string) ($r['min_ex'] ?? ''),
+                    'max_ex' => (string) ($r['max_ex'] ?? ''),
+                ];
+            }
+            $this->logError('top10 dump', [
+                'user_id' => $user->id,
+                'quote' => $quote,
+                'exchanges' => $exchanges,
+                'tokens_to_scan' => $tokensToScan,
+                'top_n' => $topN,
+                'rows' => $dump,
+            ]);
+        }
+
         if (empty($rows)) {
             $this->touchLastCheck($user, $now);
             $this->logError('done no rows', ['user_id' => $user->id]);
@@ -430,163 +1005,122 @@ class CheckCryptoMonitorCommand extends Command
         $rows = [];
         $maxRows = min(1000, max(200, $topN * 50));
         $tokensToScan = max(1, min(5000, $tokensToScan));
+        $quoteU = strtoupper($quote);
 
-        $onDemandLimit = min($tokensToScan, $this->maxOnDemandPerExchange);
-        $onDemandCounts = [];
+        $symbols = $this->getTopCoinSymbolsCached($tokensToScan);
+        if (empty($symbols)) {
+            $this->logError('no coingecko symbols', ['quote' => $quoteU]);
+            return [];
+        }
+
+        $basesMap = [];
+        foreach ($exchanges as $ex) {
+            if ($this->isTimeout(6)) {
+                break;
+            }
+            $exC = $this->canonicalizeExchange((string) $ex);
+            $basesMap[$exC] = array_fill_keys($this->getExchangeBasesForQuoteCached($exC, $quoteU), true);
+        }
+
+        $candidateSymbols = [];
+        foreach ($symbols as $sym) {
+            $present = 0;
+            foreach ($exchanges as $ex) {
+                $exC = $this->canonicalizeExchange((string) $ex);
+                if (isset($basesMap[$exC][$sym])) {
+                    $present++;
+                }
+            }
+            if ($present >= 2) {
+                $candidateSymbols[] = $sym;
+            }
+        }
 
         $bulkExchanges = array_values(array_filter($exchanges, function ($ex) {
             return $this->isBulkSupportedExchange((string) $ex);
         }));
 
-        $baseCounts = [];
-        foreach ($bulkExchanges as $ex) {
-            $exC = $this->canonicalizeExchange((string) $ex);
-            $data = $allTickers[$exC] ?? [];
-            if (!is_array($data) || empty($data)) {
-                continue;
-            }
-
-            foreach ($data as $pair => $ba) {
-                if (!is_string($pair) || $pair === '') {
-                    continue;
-                }
-
-                $p = strtoupper($pair);
-                $base = '';
-                if (str_contains($p, '-') && str_ends_with($p, '-' . $quote)) {
-                    $base = substr($p, 0, -1 * (strlen($quote) + 1));
-                } elseif (str_contains($p, '_') && str_ends_with($p, '_' . $quote)) {
-                    $base = substr($p, 0, -1 * (strlen($quote) + 1));
-                } elseif (str_ends_with($p, $quote)) {
-                    $base = substr($p, 0, -1 * strlen($quote));
-                }
-
-                $base = trim($base);
-                if ($base === '') {
-                    continue;
-                }
-
-                if (!isset($baseCounts[$base])) {
-                    $baseCounts[$base] = 0;
-                }
-                $baseCounts[$base]++;
-            }
-        }
-
-        arsort($baseCounts);
-        $bases = [];
-        foreach ($baseCounts as $base => $cnt) {
-            if ($cnt < 2) {
-                continue;
-            }
-            $bases[] = $base;
-            if (count($bases) >= $tokensToScan) {
-                break;
-            }
-        }
-
-        if (count($bases) < $tokensToScan) {
-            $upperQuote = strtoupper($quote);
-            $seen = array_fill_keys($bases, true);
-
-            foreach ($bulkExchanges as $ex) {
-                $exC = $this->canonicalizeExchange((string) $ex);
-                $tickers = $allTickers[$exC] ?? [];
-                if (!is_array($tickers) || empty($tickers)) {
-                    continue;
-                }
-
-                foreach ($tickers as $pair => $_price) {
-                    if (!is_string($pair) || $pair === '') {
-                        continue;
-                    }
-
-                    $p = strtoupper($pair);
-                    $base = '';
-                    if (str_contains($p, '-') && str_ends_with($p, '-' . $upperQuote)) {
-                        $base = substr($p, 0, -1 * (strlen($upperQuote) + 1));
-                    } elseif (str_contains($p, '_') && str_ends_with($p, '_' . $upperQuote)) {
-                        $base = substr($p, 0, -1 * (strlen($upperQuote) + 1));
-                    } elseif (str_ends_with($p, $upperQuote)) {
-                        $base = substr($p, 0, -1 * strlen($upperQuote));
-                    }
-
-                    $base = trim($base);
-                    if ($base === '') {
-                        continue;
-                    }
-
-                    if (!isset($seen[$base])) {
-                        $bases[] = $base;
-                        $seen[$base] = true;
-                        if (count($bases) >= $tokensToScan) {
-                            break 2;
-                        }
-                    }
-                }
-            }
-        }
-
         $this->logError('candidate bases', [
-            'quote' => $quote,
-            'bases' => count($bases),
+            'quote' => $quoteU,
+            'bases' => count($candidateSymbols),
             'bulk_exchanges' => count($bulkExchanges),
         ]);
 
-        foreach ($bases as $base) {
+        $onDemandLimit = min($tokensToScan, $this->maxOnDemandPerExchange);
+        $onDemandCounts = [];
+
+        foreach ($candidateSymbols as $base) {
+            if ($this->isTimeout(3)) {
+                break;
+            }
+
             $prices = [];
             foreach ($exchanges as $ex) {
                 $exC = $this->canonicalizeExchange((string) $ex);
-                $p = $this->getPriceFromCache($allTickers, $exC, $base, $quote);
-                if (!$p && $ticker && !$this->isBulkSupportedExchange((string) $ex)) {
+                if (!isset($basesMap[$exC][$base])) {
+                    continue;
+                }
+
+                $p = $this->getBulkLastPriceFromCache($allTickers, $exC, $base, $quoteU);
+                if ($p === null && $ticker) {
                     $exKey = (string) $ex;
-                    $pairKey = strtoupper($base . '/' . $quote);
+                    $pairKey = strtoupper($base . '/' . $quoteU);
                     if (!isset($onDemandCounts[$exKey])) {
                         $onDemandCounts[$exKey] = 0;
                     }
-
                     if ($onDemandCounts[$exKey] < $onDemandLimit && !$this->isTimeout(2)) {
                         $onDemandCounts[$exKey]++;
-                        $p = $this->getBidAskCached($ticker, $exKey, $pairKey);
-                    } else {
-                        $p = null;
+                        $p = $this->getLastPriceCached($ticker, $exKey, $pairKey);
                     }
                 }
-                if ($p) {
-                    $prices[$exC !== '' ? $exC : (string) $ex] = $p;
+
+                if (is_numeric($p) && (float) $p > 0) {
+                    $prices[$exC !== '' ? $exC : (string) $ex] = (float) $p;
                 }
             }
 
-            if (count($prices) < 2) continue;
+            if (count($prices) < 2) {
+                continue;
+            }
 
-            $minAsk = null; $minAskEx = '';
-            $maxBid = null; $maxBidEx = '';
+            $items = [];
+            foreach ($prices as $exName => $val) {
+                $items[] = [$exName, $val];
+            }
 
-            foreach ($prices as $ex => $pa) {
-                $ask = $pa['ask'];
-                $bid = $pa['bid'];
-                if ($minAsk === null || $ask < $minAsk) {
-                    $minAsk = $ask;
-                    $minAskEx = $ex;
+            $min = null;
+            $max = null;
+            $minEx = '';
+            $maxEx = '';
+            foreach ($items as $it) {
+                $exName = $it[0];
+                $val = (float) $it[1];
+                if ($min === null || $val < $min) {
+                    $min = $val;
+                    $minEx = $exName;
                 }
-                if ($maxBid === null || $bid > $maxBid) {
-                    $maxBid = $bid;
-                    $maxBidEx = $ex;
+                if ($max === null || $val > $max) {
+                    $max = $val;
+                    $maxEx = $exName;
                 }
             }
 
-            if (!$minAsk || !$maxBid || $minAsk <= 0) continue;
+            if ($min === null || $max === null || $min <= 0) {
+                continue;
+            }
 
-            $spreadPct = ($maxBid - $minAsk) / $minAsk * 100;
-            if ($spreadPct <= 0) continue;
+            $spreadPct = ($max - $min) / $min * 100;
+            if ($spreadPct <= 0) {
+                continue;
+            }
 
             $rows[] = [
-                'symbol' => $base . '/' . $quote,
+                'symbol' => $base . '/' . $quoteU,
                 'spread_pct' => $spreadPct,
-                'min_ex' => $minAskEx,
-                'min_price' => $minAsk,
-                'max_ex' => $maxBidEx,
-                'max_price' => $maxBid,
+                'min_ex' => $minEx,
+                'min_price' => $min,
+                'max_ex' => $maxEx,
+                'max_price' => $max,
             ];
         }
 
@@ -643,6 +1177,8 @@ class CheckCryptoMonitorCommand extends Command
         $topN = max(1, min(100, $topN));
         $threshold = is_numeric($user->crypto_monitor_alert_percent_min) ? (float) $user->crypto_monitor_alert_percent_min : 1.0;
         $thresholdMax = is_numeric($user->crypto_monitor_alert_percent_max) ? (float) $user->crypto_monitor_alert_percent_max : 100.0;
+        $threshold = max(0.0, min(100.0, $threshold));
+        $thresholdMax = max(0.0, min(100.0, $thresholdMax));
         if ($thresholdMax <= 0) {
             $thresholdMax = 100.0;
         }
@@ -687,6 +1223,8 @@ class CheckCryptoMonitorCommand extends Command
         if (!in_array($lang, ['ru', 'en', 'uk'], true)) $lang = 'ru';
 
         $thresholdMax = is_numeric($user->crypto_monitor_alert_percent_max) ? (float) $user->crypto_monitor_alert_percent_max : 100.0;
+        $threshold = max(0.0, min(100.0, $threshold));
+        $thresholdMax = max(0.0, min(100.0, $thresholdMax));
         if ($thresholdMax <= 0) {
             $thresholdMax = 100.0;
         }
@@ -695,22 +1233,27 @@ class CheckCryptoMonitorCommand extends Command
         }
 
         $rowsBefore = is_array($rows) ? count($rows) : 0;
-        $rows = array_values(array_filter($rows, function ($r) use ($threshold, $thresholdMax) {
+        $rowsFiltered = [];
+        foreach ($rows as $r) {
             $sp = (float) ($r['spread_pct'] ?? 0);
-            return $sp >= $threshold && $sp <= $thresholdMax;
-        }));
+            if ($sp >= $threshold && $sp <= $thresholdMax) {
+                $rowsFiltered[] = $r;
+            }
+        }
+        $triggeredCount = count($rowsFiltered);
 
         try {
             $this->logError('notify filter', [
                 'user_id' => $user->id,
                 'rows_before' => $rowsBefore,
-                'rows_after' => count($rows),
+                'rows_after' => $triggeredCount,
                 'top_n' => (int) ($user->crypto_monitor_top_n ?? 0),
+                'threshold_max_effective' => $thresholdMax,
             ]);
         } catch (\Throwable $e) {
         }
 
-        if (count($rows) === 0) {
+        if (count($rowsFiltered) === 0) {
             return;
         }
 
@@ -719,8 +1262,30 @@ class CheckCryptoMonitorCommand extends Command
         $userTopN = max(1, min(100, $userTopN));
 
         $notifyN = min(10, $userTopN);
-        $rows = array_slice($rows, 0, $notifyN);
+        $rows = array_slice($rowsFiltered, 0, $notifyN);
         $total = count($rows);
+
+        $force = (bool) $this->option('force');
+
+        $rows = $this->filterRowsBySignalCooldown($user, $rows, $force);
+        $total = count($rows);
+        if ($total === 0) {
+            return;
+        }
+
+        try {
+            $hashKey = 'cm_notify_last_hash_user_' . (string) $user->id;
+            $hashTsKey = 'cm_notify_last_hash_ts_user_' . (string) $user->id;
+            $prevHash = (string) (Cache::get($hashKey) ?: '');
+            $prevTs = (int) (Cache::get($hashTsKey) ?: 0);
+            $nowTs = time();
+            $curHash = $this->buildMessageDedupHash($rows, $threshold, $thresholdMax, $quote);
+            if (!$force && $prevHash !== '' && $prevHash === $curHash && $prevTs > 0 && ($nowTs - $prevTs) < $this->notifyMessageDedupSec) {
+                $this->logError('notify dedup skip', ['user_id' => $user->id, 'delta_sec' => ($nowTs - $prevTs)]);
+                return;
+            }
+        } catch (\Throwable $e) {
+        }
 
         try {
             $this->logError('notify slice', ['user_id' => $user->id, 'top_n' => $notifyN, 'rows_sent' => $total]);
@@ -731,7 +1296,6 @@ class CheckCryptoMonitorCommand extends Command
             $cacheKey = 'cm_notify_last_ts_user_' . (string) $user->id;
             $lastTs = (int) (Cache::get($cacheKey) ?: 0);
             $nowTs = time();
-            $force = (bool) $this->option('force');
             if (!$force && $lastTs > 0 && ($nowTs - $lastTs) < $this->notifyCooldownSec) {
                 $this->logError('notify cooldown skip', ['user_id' => $user->id, 'delta_sec' => ($nowTs - $lastTs)]);
                 return;
@@ -830,6 +1394,29 @@ class CheckCryptoMonitorCommand extends Command
         try {
             $cacheKey = 'cm_notify_last_ts_user_' . (string) $user->id;
             Cache::put($cacheKey, time(), max(120, $this->notifyCooldownSec + 30));
+        } catch (\Throwable $e) {
+        }
+
+        try {
+            $nowTs = time();
+            foreach ($rows as $r) {
+                if (!is_array($r)) {
+                    continue;
+                }
+                $sig = $this->makeSignalKey($r);
+                if ($sig === '') {
+                    continue;
+                }
+                $cacheKey = 'cm_notify_last_ts_sig_' . (string) $user->id . '_' . md5($sig);
+                Cache::put($cacheKey, $nowTs, max(120, $this->notifySignalCooldownSec + 30));
+            }
+        } catch (\Throwable $e) {
+        }
+
+        try {
+            $curHash = $this->buildMessageDedupHash($rows, $threshold, $thresholdMax, $quote);
+            Cache::put('cm_notify_last_hash_user_' . (string) $user->id, $curHash, max(120, $this->notifyMessageDedupSec + 30));
+            Cache::put('cm_notify_last_hash_ts_user_' . (string) $user->id, time(), max(120, $this->notifyMessageDedupSec + 30));
         } catch (\Throwable $e) {
         }
     }

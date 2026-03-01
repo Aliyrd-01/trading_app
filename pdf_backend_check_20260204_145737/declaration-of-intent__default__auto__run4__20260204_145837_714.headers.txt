@@ -1,0 +1,11 @@
+HTTP/1.1 200 OK
+Date: Wed, 04 Feb 2026 12:58:38 GMT
+Content-Type: application/pdf
+Content-Length: 24159
+Connection: keep-alive
+x-request-id: cefa887347ce01897293690f4deb30c1
+strict-transport-security: max-age=31536000; includeSubDomains
+cf-cache-status: DYNAMIC
+Server: cloudflare
+CF-RAY: 9c8a572ddb8e5855-WAW
+

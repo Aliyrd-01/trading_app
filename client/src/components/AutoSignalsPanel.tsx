@@ -364,6 +364,9 @@ export default function AutoSignalsPanel() {
   const { toast } = useToast();
   const { t, language } = useLanguage();
 
+  const isTouch = useIsTouchDevice();
+  const [lockOpen, setLockOpen] = useState(false);
+
   const [logsLimit, setLogsLimit] = useState<number>(10);
 
   const { data: settings, isLoading: settingsLoading } = useQuery<AutoSignalsSettingsResponse>({
@@ -575,20 +578,38 @@ export default function AutoSignalsPanel() {
 
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
           {locked ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  className="inline-flex items-center justify-center rounded-md border border-border bg-background/60 px-2 py-2 text-muted-foreground hover:text-foreground"
-                  aria-label={lockedTooltip}
-                >
-                  <Lock className="h-4 w-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top" align="end">
-                {lockedTooltip}
-              </TooltipContent>
-            </Tooltip>
+            <>
+              {isTouch && lockOpen ? (
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setLockOpen(false)}
+                  aria-hidden="true"
+                />
+              ) : null}
+              <Tooltip open={isTouch ? lockOpen : undefined} onOpenChange={isTouch ? setLockOpen : undefined}>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center rounded-md border border-border bg-background/60 px-2 py-2 text-muted-foreground hover:text-foreground"
+                    aria-label={lockedTooltip}
+                    onClick={
+                      isTouch
+                        ? (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setLockOpen((v) => !v);
+                          }
+                        : undefined
+                    }
+                  >
+                    <Lock className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" align="end">
+                  {lockedTooltip}
+                </TooltipContent>
+              </Tooltip>
+            </>
           ) : null}
 
           <Badge
@@ -1009,7 +1030,7 @@ export default function AutoSignalsPanel() {
                         </TableCell>
                       </TableRow>
                     </DialogTrigger>
-                    <DialogContent className="max-w-3xl w-[calc(100%-24px)] sm:w-full">
+                    <DialogContent className="max-w-3xl w-[calc(100%-24px)] sm:w-full max-h-[85vh] overflow-y-auto">
                       <DialogHeader>
                         <DialogTitle>
                           {t("autoSignals.logTitle")} #{item.id}

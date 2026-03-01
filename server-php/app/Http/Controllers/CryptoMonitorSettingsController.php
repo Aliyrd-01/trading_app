@@ -331,17 +331,28 @@ class CryptoMonitorSettingsController extends BaseController
             return ($b['spread_pct'] <=> $a['spread_pct']);
         });
 
-        $rowsTop = array_values(array_filter($rows, function ($r) use ($threshold, $thresholdMax) {
+        $rowsFiltered = [];
+        foreach ($rows as $r) {
             $sp = (float) ($r['spread_pct'] ?? 0);
-            return $sp >= $threshold && $sp <= $thresholdMax;
-        }));
-
-        if (count($rowsTop) === 0) {
-            return response()->json(['ok' => true, 'sent' => false, 'reason' => 'threshold_not_met']);
+            if ($sp >= $threshold && $sp <= $thresholdMax) {
+                $rowsFiltered[] = $r;
+            }
         }
 
-        $notifyN = min(10, $topN);
-        $rowsTop = array_slice($rowsTop, 0, max(1, $notifyN));
+        if (count($rowsFiltered) === 0) {
+            return response()->json(['ok' => true, 'sent' => false, 'reason' => 'no_rows_in_threshold']);
+        }
+
+        // Manual run should show up to topN results (within the configured threshold range).
+        $rowsDisplay = array_slice($rowsFiltered, 0, min($topN, count($rowsFiltered)));
+        if (count($rowsDisplay) === 0) {
+            return response()->json(['ok' => true, 'sent' => false, 'reason' => 'no_rows_in_threshold']);
+        }
+
+        // Notifications must send the first 10 from the same list as manual run.
+        $notifyN = min(10, count($rowsDisplay));
+        $notifyN = max(1, $notifyN);
+        $rowsTop = array_slice($rowsDisplay, 0, $notifyN);
 
         $cacheKey = 'cm_notify_last_ts_user_' . (string) $user->id;
         $lastTs = (int) (Cache::get($cacheKey) ?: 0);
@@ -463,7 +474,16 @@ class CryptoMonitorSettingsController extends BaseController
             }
         }
 
-        return response()->json(['ok' => true, 'sent' => $sent, 'shown' => count($rowsTop)]);
+        return response()->json([
+            'ok' => true,
+            'sent' => $sent,
+            'shown' => count($rowsTop),
+            'rows_top' => $rowsTop,
+            'rows_display' => $rowsDisplay,
+            'top_n' => $topN,
+            'alert_percent_min' => $threshold,
+            'alert_percent_max' => $thresholdMax,
+        ]);
     }
 
     public function getSettings(Request $request)
@@ -489,17 +509,17 @@ class CryptoMonitorSettingsController extends BaseController
         $data = $request->validate([
             'interval_sec' => 'nullable|integer|min:1|max:86400',
             'quote' => 'nullable|string|max:10',
-            'tokens_to_scan' => 'nullable|integer|min:1|max:100000',
+            'tokens_to_scan' => 'nullable|integer|min:1|max:10000',
             'top_n' => 'nullable|integer|min:1|max:100',
             'alert_percent_min' => 'nullable|numeric|min:0|max:100',
             'alert_percent_max' => 'nullable|numeric|min:0|max:100',
-            'selected_exchanges' => 'nullable',
+            'selected_exchanges' => 'nullable|array',
         ]);
 
         if (array_key_exists('selected_exchanges', $data)) {
             $exchangesNorm = $this->normalizeExchanges($data['selected_exchanges']);
             if (count($exchangesNorm) < 2) {
-                return response()->json(['error' => 'Выберите минимум 2 биржи'], 422)
+                return response()->json(['error' => ''], 422)
                     ->header('X-CryptoMonitorSettings-Backend', 'server-php/app/Http/Controllers/CryptoMonitorSettingsController.php');
             }
             $data['selected_exchanges'] = $exchangesNorm;
@@ -545,13 +565,17 @@ class CryptoMonitorSettingsController extends BaseController
         $isFree = $this->isFreeEffectivePlan($user);
         if ($isFree) {
             if (array_key_exists('interval_sec', $data) && is_numeric($data['interval_sec'])) {
-                $data['interval_sec'] = max(300, (int) $data['interval_sec']);
+                $data['interval_sec'] = max(900, (int) $data['interval_sec']);
             }
             if (array_key_exists('tokens_to_scan', $data) && is_numeric($data['tokens_to_scan'])) {
                 $data['tokens_to_scan'] = min(50, (int) $data['tokens_to_scan']);
             }
             if (array_key_exists('top_n', $data) && is_numeric($data['top_n'])) {
                 $data['top_n'] = min(5, (int) $data['top_n']);
+            }
+        } else {
+            if (array_key_exists('tokens_to_scan', $data) && is_numeric($data['tokens_to_scan'])) {
+                $data['tokens_to_scan'] = min(10000, (int) $data['tokens_to_scan']);
             }
         }
 

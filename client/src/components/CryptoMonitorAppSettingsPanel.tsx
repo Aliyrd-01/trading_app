@@ -61,9 +61,9 @@ function normalizeNumericInput(v: string): string {
 }
 
 function normalizeFormForPlan(payload: CryptoMonitorSettingsResponse, isFree: boolean): CryptoMonitorSettingsResponse {
-  const intervalMin = isFree ? 300 : 1;
+  const intervalMin = isFree ? 900 : 1;
   const intervalMax = 86400;
-  const tokensMax = isFree ? 50 : 100000;
+  const tokensMax = isFree ? 50 : 10000;
   const topNMax = isFree ? 5 : 100;
 
   return {
@@ -174,9 +174,9 @@ export default function CryptoMonitorAppSettingsPanel() {
   const canSave = form.selected_exchanges.length >= 2;
 
   const getNormalizedForm = useMemo(() => {
-    const intervalMin = isFree ? 300 : 1;
+    const intervalMin = isFree ? 900 : 1;
     const intervalMax = 86400;
-    const tokensMax = isFree ? 50 : 100000;
+    const tokensMax = isFree ? 50 : 10000;
     const topNMax = isFree ? 5 : 100;
 
     const intervalV = toNumberOrNull(raw.interval_sec);
@@ -223,14 +223,14 @@ export default function CryptoMonitorAppSettingsPanel() {
               type="text"
               inputMode="numeric"
               value={raw.interval_sec}
-              min={isFree ? 300 : 1}
+              min={isFree ? 900 : 1}
               max={86400}
               onChange={(e) => {
                 setRaw((p) => ({ ...p, interval_sec: normalizeNumericInput(e.target.value) }));
               }}
               onBlur={() => {
                 const v = toNumberOrNull(raw.interval_sec);
-                const minV = isFree ? 300 : 1;
+                const minV = isFree ? 900 : 1;
                 const fixed = v == null ? form.interval_sec : clampInt(v, minV, 86400);
                 setForm((p) => ({ ...p, interval_sec: fixed }));
                 setRaw((p) => ({ ...p, interval_sec: String(fixed) }));
@@ -266,13 +266,13 @@ export default function CryptoMonitorAppSettingsPanel() {
               inputMode="numeric"
               value={raw.tokens_to_scan}
               min={1}
-              max={isFree ? 50 : 100000}
+              max={isFree ? 50 : 10000}
               onChange={(e) => {
                 setRaw((p) => ({ ...p, tokens_to_scan: normalizeNumericInput(e.target.value) }));
               }}
               onBlur={() => {
                 const v = toNumberOrNull(raw.tokens_to_scan);
-                const maxV = isFree ? 50 : 100000;
+                const maxV = isFree ? 50 : 10000;
                 const fixed = v == null ? form.tokens_to_scan : clampInt(v, 1, maxV);
                 setForm((p) => ({ ...p, tokens_to_scan: fixed }));
                 setRaw((p) => ({ ...p, tokens_to_scan: String(fixed) }));
